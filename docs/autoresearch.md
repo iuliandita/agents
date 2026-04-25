@@ -10,10 +10,11 @@ This repo uses a small version of the Karpathy autoimprove pattern:
 The score is intentionally mechanical today:
 
 - `python scripts/lint_prompts.py`
+- `python scripts/scan_prompt_sources.py`
 - `python -m pytest -q`
 - `python scripts/render_prompts.py --out-dir build/generated`
 
-That gives the loop a hard floor: no private path leaks, no token-looking strings, all harness fragments present, renderer behavior intact, and output generation still works.
+That gives the loop a hard floor: no private path leaks, no token-looking strings, no CRLF line endings, no injected override or exfiltration instructions, no zero-width or Unicode-tag payloads, all harness fragments present, renderer behavior intact, and output generation still works.
 
 `prompts/private.md` is intentionally ignored by git. The loop may read it during local render checks, but public improvements should go into `prompts/core.md`, `prompts/harnesses/`, docs, tests, or scripts.
 

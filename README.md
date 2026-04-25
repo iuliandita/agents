@@ -10,7 +10,7 @@ This is not a neutral baseline. It is a working config shaped by 20+ years in IT
 - Merges an optional gitignored private overlay from `prompts/private.md`.
 - Renders harness-specific global files for Claude, Codex, OpenCode, Gemini, Cursor, Windsurf, Copilot, Aider, Goose, Amp, Continue, Cline, Roo, Qwen, Warp, Kiro, Augment, and OpenHands.
 - Deploys rendered files to global paths with backups.
-- Lints public prompt sources for private paths, token-like secrets, missing harness fragments, and non-ASCII drift.
+- Lints public prompt sources, including `prompts/private.example.md`, for private paths, token-like secrets, missing harness fragments, and non-ASCII drift.
 - Provides a Karpathy-style score -> improve -> verify loop in `scripts/autoimprove-prompts`.
 
 ## Quick Start
@@ -57,9 +57,12 @@ scripts/
   render_prompts.py       # renderer and deploy logic
   sync-ai-prompts         # wrapper for render/deploy
   lint_prompts.py         # prompt-source linter
+  scan_prompt_sources.py  # prompt-injection scanner
   autoimprove-prompts     # score -> improve -> verify loop
 tests/
+  test_lint_prompts.py
   test_render_prompts.py
+  test_scan_prompt_sources.py
 ```
 
 ## Autoimprove
