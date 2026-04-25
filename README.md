@@ -98,11 +98,18 @@ Each target path can be overridden with an environment variable such as `CLAUDE_
 
 ```bash
 python scripts/lint_prompts.py
+python scripts/scan_prompt_sources.py
 python -m pytest -q
 bash -n scripts/sync-ai-prompts scripts/autoimprove-prompts
-python -m py_compile scripts/render_prompts.py scripts/lint_prompts.py
+python -m py_compile scripts/render_prompts.py scripts/lint_prompts.py scripts/scan_prompt_sources.py
 scripts/sync-ai-prompts --dry-run
 ```
+
+## GitHub Actions
+
+- `.github/workflows/ci.yml` runs the repo's prompt lint, prompt-injection scan, workflow lint, tests, shell syntax checks, Python compile checks, and dry-run render.
+- `.github/workflows/security.yml` runs CodeQL and Gitleaks.
+- `.github/workflows/promptfoo-code-scan.yml` wires in Promptfoo's LLM security scanner for prompt-sensitive PRs when `PROMPTFOO_API_KEY` is configured. The Promptfoo GitHub App is the cleaner no-key setup if you want hosted PR comments without storing a token.
 
 ## License
 
