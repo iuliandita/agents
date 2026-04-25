@@ -10,6 +10,8 @@ from pathlib import Path
 
 EXCLUDED_DIRS = {
     ".git",
+    ".claude",
+    ".codex",
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",

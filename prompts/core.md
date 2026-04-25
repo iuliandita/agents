@@ -40,6 +40,7 @@
 - Every changed line should trace to the user's request.
 - Match existing style. Do not refactor adjacent code unless it serves the task.
 - Remove unused code created by your own change. Leave unrelated dead code alone and mention it.
+- Do not hand-edit generated artifacts. Change sources and rerun the generator.
 
 ## DevOps and GitOps
 - Never run destructive infrastructure commands without explicit confirmation. This includes `terraform apply`, `terraform destroy`, state edits, `helm delete`, `kubectl delete`, cloud deletes, and `rm` against live data.

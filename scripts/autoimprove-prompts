@@ -70,6 +70,7 @@ done
 
 score() {
   python "$repo_root/scripts/lint_prompts.py"
+  python "$repo_root/scripts/scan_prompt_sources.py"
   python -m pytest -q "$repo_root/tests"
   python "$repo_root/scripts/render_prompts.py" --repo-root "$repo_root" --out-dir "$repo_root/build/generated" >/dev/null
 }
@@ -141,6 +142,7 @@ Rules:
 - Do not add AI attribution.
 - After editing, run:
   python scripts/lint_prompts.py
+  python scripts/scan_prompt_sources.py
   python -m pytest -q
   python scripts/render_prompts.py --out-dir build/generated
 

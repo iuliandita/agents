@@ -3,6 +3,7 @@ build/
 prompts/private.md
 SECURITY-AUDIT.md
 /.claude/
+/.codex
 /CLAUDE.md
 /AGENT.md
 /AGENTS.md

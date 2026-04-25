@@ -21,6 +21,8 @@ Render all supported harness files into `build/generated/`:
 scripts/sync-ai-prompts
 ```
 
+Harnesses that share an output filename, such as `AGENTS.md`, render into per-harness subdirectories so targets do not overwrite each other.
+
 Deploy to global paths:
 
 ```bash
@@ -72,7 +74,7 @@ Run it in step mode:
 scripts/autoimprove-prompts --iterations 3 --mode step
 ```
 
-It runs lint, tests, and rendering before and after each improvement attempt. If a configured harness is available, it asks that harness for one small improvement. If verification fails, the diff is left in place for review instead of being silently accepted.
+It runs lint, prompt-source scanning, tests, and rendering before and after each improvement attempt. If a configured harness is available, it asks that harness for one small improvement. If verification fails, the diff is left in place for review instead of being silently accepted.
 
 ## Private Overlay
 

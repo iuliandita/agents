@@ -31,6 +31,14 @@ scripts/sync-ai-prompts --target claude --deploy
 scripts/sync-ai-prompts --target codex,opencode --deploy
 ```
 
+## List Targets
+
+```bash
+scripts/sync-ai-prompts --list-targets
+```
+
+Use this before deploys when checking the current harness names and default global paths.
+
 ## Override Paths
 
 Use env vars when a tool's real global rules path differs from the default:
