@@ -58,6 +58,18 @@ HIDDEN_CODEPOINTS = {
     "\ufeff",
 }
 
+# Unicode Tag block (U+E0000-U+E007F) can encode invisible ASCII payloads
+# that tokenizers still see; treat the whole range as hidden.
+TAG_RANGE_START = 0xE0000
+TAG_RANGE_END = 0xE007F
+
+
+def is_hidden_codepoint(char: str) -> bool:
+    if char in HIDDEN_CODEPOINTS:
+        return True
+    return TAG_RANGE_START <= ord(char) <= TAG_RANGE_END
+
+
 NEGATING_WORDS = re.compile(
     r"\b(avoid|block|blocked|deny|do not|don't|forbid|forbidden|never|reject|refuse|warn)\b",
     re.IGNORECASE,
@@ -159,9 +171,13 @@ def iter_prompt_sources(root: Path) -> list[Path]:
 def visible_text(text: str, limit: int = 180) -> str:
     escaped = []
     for char in text.strip():
-        if char in HIDDEN_CODEPOINTS:
+        if is_hidden_codepoint(char):
             name = unicodedata.name(char, "UNKNOWN")
-            escaped.append(f"\\u{ord(char):04x}<{name}>")
+            cp = ord(char)
+            if cp <= 0xFFFF:
+                escaped.append(f"\\u{cp:04x}<{name}>")
+            else:
+                escaped.append(f"\\U{cp:08x}<{name}>")
         else:
             escaped.append(char)
     rendered = "".join(escaped)
@@ -169,7 +185,7 @@ def visible_text(text: str, limit: int = 180) -> str:
 
 
 def hidden_codepoints(line: str) -> list[str]:
-    return [char for char in line if char in HIDDEN_CODEPOINTS]
+    return [char for char in line if is_hidden_codepoint(char)]
 
 
 def scan_file(path: Path, root: Path) -> list[Finding]:
@@ -183,7 +199,7 @@ def scan_file(path: Path, root: Path) -> list[Finding]:
                     path=rel_path,
                     line_no=line_no,
                     rule="hidden-unicode",
-                    message="zero-width or bidirectional Unicode can hide prompt instructions",
+                    message="zero-width, bidirectional, or tag-block Unicode can hide prompt instructions",
                     line=visible_text(line),
                 )
             )
