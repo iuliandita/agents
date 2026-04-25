@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+iterations=3
+harness="${AGENTS_AUTOIMPROVE_HARNESS:-auto}"
+mode="${AGENTS_AUTOIMPROVE_MODE:-step}"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/autoimprove-prompts [OPTIONS]
+
+Run a Karpathy-style score -> improve -> verify -> keep/revert loop for this prompt repo.
+
+Options:
+  --iterations N        Maximum improvement attempts (default: 3)
+  --harness NAME        claude, codex, opencode, or auto (default: auto)
+  --mode MODE           step or auto (default: step)
+  --help                Show this help
+
+Environment:
+  AGENTS_AUTOIMPROVE_HARNESS  Override harness selection
+  AGENTS_AUTOIMPROVE_MODE     step or auto
+EOF
+}
+
+validate_options() {
+  case "$mode" in
+    step|auto)
+      ;;
+    *)
+      printf 'Unsupported mode: %s\n' "$mode" >&2
+      usage >&2
+      return 2
+      ;;
+  esac
+
+  if [[ ! "$iterations" =~ ^[0-9]+$ ]]; then
+    printf 'Invalid iteration count: %s\n' "$iterations" >&2
+    usage >&2
+    return 2
+  fi
+}
+
+while (($#)); do
+  case "$1" in
+    --iterations)
+      iterations="$2"
+      shift 2
+      ;;
+    --harness)
+      harness="$2"
+      shift 2
+      ;;
+    --mode)
+      mode="$2"
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'Unknown option: %s\n' "$1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+score() {
+  python "$repo_root/scripts/lint_prompts.py"
+  python -m pytest -q "$repo_root/tests"
+  python "$repo_root/scripts/render_prompts.py" --repo-root "$repo_root" --out-dir "$repo_root/build/generated" >/dev/null
+}
+
+worktree_changes() {
+  git status --porcelain --untracked-files=normal
+}
+
+change_summary() {
+  git diff --stat
+  git ls-files --others --exclude-standard
+}
+
+detect_harness() {
+  if [[ "$harness" != "auto" ]]; then
+    printf '%s\n' "$harness"
+    return
+  fi
+
+  if command -v claude >/dev/null 2>&1; then
+    printf 'claude\n'
+  elif command -v codex >/dev/null 2>&1; then
+    printf 'codex\n'
+  elif command -v opencode >/dev/null 2>&1; then
+    printf 'opencode\n'
+  else
+    printf 'none\n'
+  fi
+}
+
+run_harness() {
+  local selected="$1"
+  local prompt_file="$2"
+
+  case "$selected" in
+    claude)
+      claude -p "$(cat "$prompt_file")"
+      ;;
+    codex)
+      codex exec "$(cat "$prompt_file")"
+      ;;
+    opencode)
+      opencode run "$(cat "$prompt_file")"
+      ;;
+    none)
+      printf 'No AI harness detected. Prompt written to %s\n' "$prompt_file" >&2
+      return 1
+      ;;
+    *)
+      printf 'Unsupported harness for autoimprove: %s\n' "$selected" >&2
+      return 2
+      ;;
+  esac
+}
+
+make_prompt() {
+  local iter="$1"
+  local prompt_file="$2"
+  cat > "$prompt_file" <<EOF
+You are improving an opinionated AGENTS.md/CLAUDE.md prompt configuration repo.
+
+Goal: make one small, concrete improvement to the prompt fragments, docs, tests, or scripts.
+
+Rules:
+- Read the repo before editing.
+- Keep the config anonymized and portable.
+- Preserve the opinionated DevOps engineer voice.
+- Keep changes small enough to review.
+- Do not add AI attribution.
+- After editing, run:
+  python scripts/lint_prompts.py
+  python -m pytest -q
+  python scripts/render_prompts.py --out-dir build/generated
+
+Current iteration: $iter
+EOF
+}
+
+main() {
+  validate_options
+  cd "$repo_root"
+  printf 'Baseline score...\n'
+  score
+
+  local selected
+  selected="$(detect_harness)"
+  printf 'Autoimprove harness: %s\n' "$selected"
+
+  for ((i = 1; i <= iterations; i++)); do
+    printf '\n--- iteration %d/%d ---\n' "$i" "$iterations"
+    local before
+    before="$(worktree_changes)"
+    local prompt_file
+    prompt_file="$(mktemp)"
+    make_prompt "$i" "$prompt_file"
+
+    if ! run_harness "$selected" "$prompt_file"; then
+      rm -f "$prompt_file"
+      printf 'Harness run failed; stopping before changes are accepted.\n' >&2
+      return 1
+    fi
+    rm -f "$prompt_file"
+
+    if [[ -z "$(worktree_changes)" ]]; then
+      printf 'No changes proposed; stopping.\n'
+      break
+    fi
+
+    if score; then
+      printf 'Verified improvement candidate. Diff summary:\n'
+      change_summary
+      if [[ "$mode" == "step" ]]; then
+        printf 'Step mode: review the diff, then commit or continue manually.\n'
+        break
+      fi
+    else
+      printf 'Verification failed. Leaving the diff in place for review; previous state summary was:\n%s\n' "$before" >&2
+      return 1
+    fi
+  done
+}
+
+main "$@"
