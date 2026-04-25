@@ -25,6 +25,9 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Install test dependencies
+        run: python -m pip install pytest
+
       - name: Lint prompt sources
         run: python scripts/lint_prompts.py
 
