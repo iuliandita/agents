@@ -108,7 +108,7 @@ scripts/sync-ai-prompts --dry-run
 ## GitHub Actions
 
 - `.github/workflows/ci.yml` runs the repo's prompt lint, prompt-injection scan, workflow lint, tests, shell syntax checks, Python compile checks, and dry-run render.
-- `.github/workflows/security.yml` runs CodeQL, Gitleaks, and dependency review.
+- `.github/workflows/security.yml` runs CodeQL and Gitleaks.
 - `.github/workflows/promptfoo-code-scan.yml` wires in Promptfoo's LLM security scanner for prompt-sensitive PRs when `PROMPTFOO_API_KEY` is configured. The Promptfoo GitHub App is the cleaner no-key setup if you want hosted PR comments without storing a token.
 
 ## License
