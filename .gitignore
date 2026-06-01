@@ -7,6 +7,7 @@ SECURITY-AUDIT.md
 /CLAUDE.md
 /AGENT.md
 /AGENTS.md
+/GEMINI.md
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
