@@ -1,5 +1,8 @@
 .backups/
 build/
+docs/local/
+docs/superpowers/
+plans/
 prompts/private.md
 prompts/private-patterns.txt
 SECURITY-AUDIT.md
