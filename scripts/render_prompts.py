@@ -258,7 +258,8 @@ def resolve_deploy_targets(harnesses: list[Harness]) -> tuple[dict[Harness, Path
 def target_collisions(resolved: dict[Harness, Path]) -> dict[Path, list[Harness]]:
     by_path: dict[Path, list[Harness]] = {}
     for harness, dest in resolved.items():
-        by_path.setdefault(dest, []).append(harness)
+        key = dest.expanduser().resolve(strict=False)
+        by_path.setdefault(key, []).append(harness)
     return {dest: harnesses for dest, harnesses in by_path.items() if len(harnesses) > 1}
 
 

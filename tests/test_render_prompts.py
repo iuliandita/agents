@@ -422,6 +422,18 @@ def test_sync_ai_prompts_check_mode_validates_render_shape():
 
 def test_sync_ai_prompts_dry_run_reports_manual_skips_and_collisions():
     repo = Path(__file__).resolve().parents[1]
+    scrubbed_env = {
+        key: value
+        for key, value in os.environ.items()
+        if key
+        not in {
+            "KIMI_AGENTS_PATH",
+            "HERMES_AGENTS_PATH",
+            "NANOCLAW_AGENTS_PATH",
+            "GEMINI_AGENTS_PATH",
+            "ANTIGRAVITY_AGENTS_PATH",
+        }
+    }
 
     result = subprocess.run(
         ["scripts/sync-ai-prompts", "--dry-run"],
@@ -429,6 +441,7 @@ def test_sync_ai_prompts_dry_run_reports_manual_skips_and_collisions():
         check=False,
         capture_output=True,
         text=True,
+        env=scrubbed_env,
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
@@ -455,9 +468,12 @@ def test_backup_existing_preserves_multiple_backups_for_same_target(tmp_path):
     assert {path.read_text(encoding="utf-8") for path in backups} == {"first\n", "second\n"}
 
 
-def test_deploy_skips_manual_harness_without_override(tmp_path, capsys):
+def test_deploy_skips_manual_harness_without_override(tmp_path, capsys, monkeypatch):
     renderer = load_renderer()
     repo = Path(__file__).resolve().parents[1]
+    monkeypatch.delenv("KIMI_AGENTS_PATH", raising=False)
+    monkeypatch.delenv("HERMES_AGENTS_PATH", raising=False)
+    monkeypatch.delenv("NANOCLAW_AGENTS_PATH", raising=False)
 
     deployed = renderer.deploy(
         repo_root=repo,
@@ -495,13 +511,15 @@ def test_deploy_refuses_colliding_targets_before_writing(tmp_path, monkeypatch):
     renderer = load_renderer()
     repo = Path(__file__).resolve().parents[1]
     target = tmp_path / "GEMINI.md"
+    non_colliding_target = tmp_path / "codex" / "AGENTS.md"
     monkeypatch.setenv("GEMINI_AGENTS_PATH", str(target))
     monkeypatch.setenv("ANTIGRAVITY_AGENTS_PATH", str(target))
+    monkeypatch.setenv("CODEX_AGENTS_PATH", str(non_colliding_target))
 
     try:
         renderer.deploy(
             repo_root=repo,
-            selected=["gemini,antigravity"],
+            selected=["gemini,antigravity,codex"],
             stamp="2026-06-15",
             dry_run=False,
             backup_dir=tmp_path / "backups",
@@ -516,6 +534,39 @@ def test_deploy_refuses_colliding_targets_before_writing(tmp_path, monkeypatch):
     assert "antigravity (Antigravity CLI)" in message
     assert str(target) in message
     assert not target.exists()
+    assert not non_colliding_target.exists()
+
+
+def test_deploy_refuses_normalized_colliding_targets_before_writing(tmp_path, monkeypatch):
+    renderer = load_renderer()
+    repo = Path(__file__).resolve().parents[1]
+    (tmp_path / "alias").mkdir()
+    alias_target = tmp_path / "alias" / ".." / "same" / "GEMINI.md"
+    direct_target = tmp_path / "same" / "GEMINI.md"
+    non_colliding_target = tmp_path / "codex" / "AGENTS.md"
+    monkeypatch.setenv("GEMINI_AGENTS_PATH", str(alias_target))
+    monkeypatch.setenv("ANTIGRAVITY_AGENTS_PATH", str(direct_target))
+    monkeypatch.setenv("CODEX_AGENTS_PATH", str(non_colliding_target))
+
+    try:
+        renderer.deploy(
+            repo_root=repo,
+            selected=["gemini,antigravity,codex"],
+            stamp="2026-06-15",
+            dry_run=False,
+            backup_dir=tmp_path / "backups",
+        )
+    except SystemExit as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("deploy did not reject normalized colliding targets")
+
+    assert "Deploy target collision detected" in message
+    assert "gemini (Gemini CLI)" in message
+    assert "antigravity (Antigravity CLI)" in message
+    assert str(direct_target.resolve(strict=False)) in message
+    assert not direct_target.exists()
+    assert not non_colliding_target.exists()
 
 
 def prepare_autoimprove_repo(tmp_path):
