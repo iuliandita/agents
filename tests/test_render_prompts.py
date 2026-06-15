@@ -71,6 +71,51 @@ def test_harness_catalog_expands_beyond_claude_codex_opencode():
     }.issubset(harnesses)
 
 
+def test_harness_catalog_includes_public_first_wave_targets():
+    renderer = load_renderer()
+
+    harnesses = {harness.name: harness for harness in renderer.HARNESSES}
+
+    assert {
+        "antigravity",
+        "pi",
+        "openclaw",
+        "crush",
+        "kimi",
+        "hermes",
+        "nanoclaw",
+    }.issubset(harnesses)
+    assert harnesses["antigravity"].display == "Antigravity CLI"
+    assert harnesses["pi"].display == "Pi Coding Agent"
+    assert harnesses["openclaw"].display == "OpenClaw"
+    assert harnesses["crush"].display == "Crush"
+    assert harnesses["kimi"].display == "Kimi Code"
+    assert harnesses["hermes"].display == "Hermes Agent"
+    assert harnesses["nanoclaw"].display == "NanoClaw"
+
+
+def test_harness_support_levels_are_exposed_in_registry():
+    renderer = load_renderer()
+
+    levels = {harness.name: harness.support_level for harness in renderer.HARNESSES}
+
+    assert renderer.DEPLOYABLE == "deployable"
+    assert renderer.MANUAL == "manual"
+    assert renderer.DOCUMENTED_NO_TARGET == "documented-no-target"
+    assert renderer.SUPPORT_LEVELS == {
+        "deployable",
+        "manual",
+        "documented-no-target",
+    }
+    assert levels["antigravity"] == "deployable"
+    assert levels["pi"] == "deployable"
+    assert levels["openclaw"] == "deployable"
+    assert levels["crush"] == "deployable"
+    assert levels["kimi"] == "manual"
+    assert levels["hermes"] == "manual"
+    assert levels["nanoclaw"] == "manual"
+
+
 def test_target_path_uses_home_and_env_override(tmp_path):
     renderer = load_renderer()
 

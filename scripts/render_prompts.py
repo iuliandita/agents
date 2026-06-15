@@ -10,20 +10,49 @@ from tempfile import TemporaryDirectory
 from typing import NamedTuple
 
 
+DEPLOYABLE = "deployable"
+MANUAL = "manual"
+DOCUMENTED_NO_TARGET = "documented-no-target"
+SUPPORT_LEVELS = {DEPLOYABLE, MANUAL, DOCUMENTED_NO_TARGET}
+
+
 class Harness(NamedTuple):
     name: str
     display: str
     fragment: str
     output_name: str
-    target_template: str
+    target_template: str | None
     env_var: str
+    support_level: str = DEPLOYABLE
+    notes: str = ""
+
+    @property
+    def renderable(self) -> bool:
+        return self.support_level != DOCUMENTED_NO_TARGET
 
 
 HARNESSES: tuple[Harness, ...] = (
     Harness("claude", "Claude Code", "claude.md", "CLAUDE.md", "{home}/.claude/CLAUDE.md", "CLAUDE_AGENTS_PATH"),
     Harness("codex", "OpenAI Codex", "codex.md", "AGENTS.md", "{home}/AGENTS.md", "CODEX_AGENTS_PATH"),
     Harness("opencode", "OpenCode", "opencode.md", "AGENTS.md", "{home}/.config/opencode/AGENTS.md", "OPENCODE_AGENTS_PATH"),
-    Harness("gemini", "Gemini CLI", "gemini.md", "GEMINI.md", "{home}/.gemini/GEMINI.md", "GEMINI_AGENTS_PATH"),
+    Harness(
+        "gemini",
+        "Gemini CLI",
+        "gemini.md",
+        "GEMINI.md",
+        "{home}/.gemini/GEMINI.md",
+        "GEMINI_AGENTS_PATH",
+        notes="Legacy Google CLI target; consumer Gemini CLI users transition to Antigravity CLI after 2026-06-18.",
+    ),
+    Harness(
+        "antigravity",
+        "Antigravity CLI",
+        "antigravity.md",
+        "GEMINI.md",
+        "{home}/.gemini/GEMINI.md",
+        "ANTIGRAVITY_AGENTS_PATH",
+        notes="Forward Google CLI target; shares the default GEMINI.md path with Gemini CLI.",
+    ),
     Harness("cursor", "Cursor", "cursor.md", "AGENTS.md", "{home}/.cursor/AGENTS.md", "CURSOR_AGENTS_PATH"),
     Harness("windsurf", "Windsurf", "windsurf.md", "AGENTS.md", "{home}/.windsurf/AGENTS.md", "WINDSURF_AGENTS_PATH"),
     Harness("copilot", "GitHub Copilot CLI", "copilot.md", "AGENTS.md", "{home}/.copilot/AGENTS.md", "COPILOT_AGENTS_PATH"),
@@ -38,6 +67,39 @@ HARNESSES: tuple[Harness, ...] = (
     Harness("kiro", "Kiro", "kiro.md", "AGENTS.md", "{home}/.kiro/AGENTS.md", "KIRO_AGENTS_PATH"),
     Harness("augment", "Augment", "augment.md", "AGENTS.md", "{home}/.augment/AGENTS.md", "AUGMENT_AGENTS_PATH"),
     Harness("openhands", "OpenHands", "openhands.md", "AGENTS.md", "{home}/.openhands/AGENTS.md", "OPENHANDS_AGENTS_PATH"),
+    Harness("pi", "Pi Coding Agent", "pi.md", "AGENTS.md", "{home}/.pi/agent/AGENTS.md", "PI_AGENTS_PATH"),
+    Harness("openclaw", "OpenClaw", "openclaw.md", "AGENTS.md", "{home}/.openclaw/workspace/AGENTS.md", "OPENCLAW_AGENTS_PATH"),
+    Harness("crush", "Crush", "crush.md", "CRUSH.md", "{home}/.config/crush/CRUSH.md", "CRUSH_AGENTS_PATH"),
+    Harness(
+        "kimi",
+        "Kimi Code",
+        "kimi.md",
+        "AGENTS.md",
+        None,
+        "KIMI_AGENTS_PATH",
+        MANUAL,
+        "Render-only unless KIMI_AGENTS_PATH points at a project AGENTS.md or .kimi/AGENTS.md file.",
+    ),
+    Harness(
+        "hermes",
+        "Hermes Agent",
+        "hermes.md",
+        "HERMES.md",
+        None,
+        "HERMES_AGENTS_PATH",
+        MANUAL,
+        "Render-only unless HERMES_AGENTS_PATH points at a project HERMES.md, .hermes.md, or AGENTS.md file.",
+    ),
+    Harness(
+        "nanoclaw",
+        "NanoClaw",
+        "nanoclaw.md",
+        "CLAUDE.md",
+        None,
+        "NANOCLAW_AGENTS_PATH",
+        MANUAL,
+        "Render-only unless NANOCLAW_AGENTS_PATH points at a per-agent CLAUDE.md file.",
+    ),
 )
 
 
@@ -60,6 +122,8 @@ def harness_display_names() -> list[str]:
 def harness_target_rows(home: str = "~") -> list[tuple[str, str]]:
     rows: list[tuple[str, str]] = []
     for harness in HARNESSES:
+        if harness.target_template is None:
+            continue
         target = harness.target_template.format(home=home)
         rows.append((harness.display, target))
     return rows
