@@ -207,11 +207,15 @@ def test_full_catalog_render_places_colliding_outputs_in_harness_subdirectories(
         out_dir=tmp_path / "out",
         stamp="2026-04-25",
     )
+    output_counts = {}
+    for harness in renderer.HARNESSES:
+        if harness.renderable:
+            output_counts[harness.output_name] = output_counts.get(harness.output_name, 0) + 1
 
     for harness, path in written.items():
         item = renderer.harness_by_name(harness)
-        if item.output_name == "AGENTS.md":
-            assert path == tmp_path / "out" / harness / "AGENTS.md"
+        if output_counts[item.output_name] > 1:
+            assert path == tmp_path / "out" / harness / item.output_name
 
 
 def test_single_selected_agents_output_stays_top_level(tmp_path):
@@ -284,10 +288,14 @@ def test_new_harness_fragments_describe_operational_scope():
     hermes = (harness_dir / "hermes.md").read_text(encoding="utf-8")
     nanoclaw = (harness_dir / "nanoclaw.md").read_text(encoding="utf-8")
 
+    assert "operational rules file" in antigravity
     assert "GEMINI.md" in antigravity
+    assert "context hierarchically" in pi
     assert "AGENTS.md" in pi
     assert "Do not create persona" in openclaw
+    assert "operational coding-agent guidance" in crush
     assert "CRUSH.md" in crush
+    assert "Do not infer global config" in kimi
     assert ".kimi/AGENTS.md" in kimi
     assert "Do not generate `SOUL.md`" in hermes
     assert "per-agent operational instructions" in nanoclaw
