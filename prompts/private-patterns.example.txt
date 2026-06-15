@@ -1,0 +1,5 @@
+# Optional local-only markers for scripts/lint_prompts.py.
+# Copy to prompts/private-patterns.txt and add one marker per line.
+# Keep prompts/private-patterns.txt out of git.
+internal.example
+company.internal

@@ -6,7 +6,14 @@ import os
 import shutil
 from datetime import date
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import NamedTuple
+
+
+DEPLOYABLE = "deployable"
+MANUAL = "manual"
+DOCUMENTED_NO_TARGET = "documented-no-target"
+SUPPORT_LEVELS = {DEPLOYABLE, MANUAL, DOCUMENTED_NO_TARGET}
 
 
 class Harness(NamedTuple):
@@ -14,15 +21,38 @@ class Harness(NamedTuple):
     display: str
     fragment: str
     output_name: str
-    target_template: str
+    target_template: str | None
     env_var: str
+    support_level: str = DEPLOYABLE
+    notes: str = ""
+
+    @property
+    def renderable(self) -> bool:
+        return self.support_level != DOCUMENTED_NO_TARGET
 
 
 HARNESSES: tuple[Harness, ...] = (
     Harness("claude", "Claude Code", "claude.md", "CLAUDE.md", "{home}/.claude/CLAUDE.md", "CLAUDE_AGENTS_PATH"),
     Harness("codex", "OpenAI Codex", "codex.md", "AGENTS.md", "{home}/AGENTS.md", "CODEX_AGENTS_PATH"),
     Harness("opencode", "OpenCode", "opencode.md", "AGENTS.md", "{home}/.config/opencode/AGENTS.md", "OPENCODE_AGENTS_PATH"),
-    Harness("gemini", "Gemini CLI", "gemini.md", "GEMINI.md", "{home}/.gemini/GEMINI.md", "GEMINI_AGENTS_PATH"),
+    Harness(
+        "gemini",
+        "Gemini CLI",
+        "gemini.md",
+        "GEMINI.md",
+        "{home}/.gemini/GEMINI.md",
+        "GEMINI_AGENTS_PATH",
+        notes="Legacy Google CLI target; consumer Gemini CLI users transition to Antigravity CLI after 2026-06-18.",
+    ),
+    Harness(
+        "antigravity",
+        "Antigravity CLI",
+        "antigravity.md",
+        "GEMINI.md",
+        "{home}/.gemini/GEMINI.md",
+        "ANTIGRAVITY_AGENTS_PATH",
+        notes="Forward Google CLI target; shares the default GEMINI.md path with Gemini CLI.",
+    ),
     Harness("cursor", "Cursor", "cursor.md", "AGENTS.md", "{home}/.cursor/AGENTS.md", "CURSOR_AGENTS_PATH"),
     Harness("windsurf", "Windsurf", "windsurf.md", "AGENTS.md", "{home}/.windsurf/AGENTS.md", "WINDSURF_AGENTS_PATH"),
     Harness("copilot", "GitHub Copilot CLI", "copilot.md", "AGENTS.md", "{home}/.copilot/AGENTS.md", "COPILOT_AGENTS_PATH"),
@@ -37,6 +67,39 @@ HARNESSES: tuple[Harness, ...] = (
     Harness("kiro", "Kiro", "kiro.md", "AGENTS.md", "{home}/.kiro/AGENTS.md", "KIRO_AGENTS_PATH"),
     Harness("augment", "Augment", "augment.md", "AGENTS.md", "{home}/.augment/AGENTS.md", "AUGMENT_AGENTS_PATH"),
     Harness("openhands", "OpenHands", "openhands.md", "AGENTS.md", "{home}/.openhands/AGENTS.md", "OPENHANDS_AGENTS_PATH"),
+    Harness("pi", "Pi Coding Agent", "pi.md", "AGENTS.md", "{home}/.pi/agent/AGENTS.md", "PI_AGENTS_PATH"),
+    Harness("openclaw", "OpenClaw", "openclaw.md", "AGENTS.md", "{home}/.openclaw/workspace/AGENTS.md", "OPENCLAW_AGENTS_PATH"),
+    Harness("crush", "Crush", "crush.md", "CRUSH.md", "{home}/.config/crush/CRUSH.md", "CRUSH_AGENTS_PATH"),
+    Harness(
+        "kimi",
+        "Kimi Code",
+        "kimi.md",
+        "AGENTS.md",
+        None,
+        "KIMI_AGENTS_PATH",
+        MANUAL,
+        "Render-only unless KIMI_AGENTS_PATH points at a project AGENTS.md or .kimi/AGENTS.md file.",
+    ),
+    Harness(
+        "hermes",
+        "Hermes Agent",
+        "hermes.md",
+        "HERMES.md",
+        None,
+        "HERMES_AGENTS_PATH",
+        MANUAL,
+        "Render-only unless HERMES_AGENTS_PATH points at a project HERMES.md, .hermes.md, or AGENTS.md file.",
+    ),
+    Harness(
+        "nanoclaw",
+        "NanoClaw",
+        "nanoclaw.md",
+        "CLAUDE.md",
+        None,
+        "NANOCLAW_AGENTS_PATH",
+        MANUAL,
+        "Render-only unless NANOCLAW_AGENTS_PATH points at a per-agent CLAUDE.md file.",
+    ),
 )
 
 
@@ -52,6 +115,25 @@ def harness_names() -> list[str]:
     return [harness.name for harness in HARNESSES]
 
 
+def harness_display_names() -> list[str]:
+    return [harness.display for harness in HARNESSES]
+
+
+def default_target_label(harness: Harness, home: str = "~") -> str:
+    if harness.target_template is None:
+        return f"manual override via {harness.env_var}"
+    return harness.target_template.format(home=home)
+
+
+def harness_target_rows(home: str = "~") -> list[tuple[str, str, str, str]]:
+    rows: list[tuple[str, str, str, str]] = []
+    for harness in HARNESSES:
+        if not harness.renderable:
+            continue
+        rows.append((harness.display, harness.support_level, default_target_label(harness, home), harness.notes))
+    return rows
+
+
 def selected_harnesses(selected: list[str] | None) -> list[Harness]:
     if not selected:
         return list(HARNESSES)
@@ -62,11 +144,14 @@ def selected_harnesses(selected: list[str] | None) -> list[Harness]:
     return [harness_by_name(name) for name in names]
 
 
-def target_path(harness: str, home: str | Path | None = None, env: dict[str, str] | None = None) -> Path:
+def target_path(harness: str, home: str | Path | None = None, env: dict[str, str] | None = None) -> Path | None:
     item = harness_by_name(harness)
     values = os.environ if env is None else env
     if item.env_var in values and values[item.env_var]:
         return Path(values[item.env_var]).expanduser()
+
+    if item.target_template is None:
+        return None
 
     home_path = Path.home() if home is None else Path(home)
     return Path(item.target_template.format(home=home_path)).expanduser()
@@ -118,7 +203,7 @@ def render_all(
     selected: list[str] | None = None,
     stamp: str | None = None,
 ) -> dict[str, Path]:
-    harnesses = selected_harnesses(selected)
+    harnesses = [harness for harness in selected_harnesses(selected) if harness.renderable]
     output_counts: dict[str, int] = {}
     for harness in harnesses:
         output_counts[harness.output_name] = output_counts.get(harness.output_name, 0) + 1
@@ -140,6 +225,51 @@ def render_all(
         dest.write_text(rendered, encoding="utf-8")
         written[harness.name] = dest
     return written
+
+
+def check_render_shape(repo_root: Path, selected: list[str] | None = None) -> int:
+    with TemporaryDirectory() as temp_dir:
+        out_dir = Path(temp_dir)
+        written = render_all(repo_root, out_dir, selected=selected, stamp="check")
+        paths = list(written.values())
+        if len(paths) != len(set(paths)):
+            print("ERROR: render output paths collide")
+            return 1
+        for harness, path in written.items():
+            if not path.exists():
+                print(f"ERROR: missing rendered output for {harness}: {path}")
+                return 1
+        print("Render shape check passed")
+        return 0
+
+
+def resolve_deploy_targets(harnesses: list[Harness]) -> tuple[dict[Harness, Path], list[Harness]]:
+    resolved: dict[Harness, Path] = {}
+    skipped: list[Harness] = []
+    for harness in harnesses:
+        dest = target_path(harness.name)
+        if dest is None:
+            skipped.append(harness)
+            continue
+        resolved[harness] = dest
+    return resolved, skipped
+
+
+def target_collisions(resolved: dict[Harness, Path]) -> dict[Path, list[Harness]]:
+    by_path: dict[Path, list[Harness]] = {}
+    for harness, dest in resolved.items():
+        key = dest.expanduser().resolve(strict=False)
+        by_path.setdefault(key, []).append(harness)
+    return {dest: harnesses for dest, harnesses in by_path.items() if len(harnesses) > 1}
+
+
+def format_target_collision(collisions: dict[Path, list[Harness]]) -> str:
+    lines = ["Deploy target collision detected:"]
+    for dest, harnesses in sorted(collisions.items(), key=lambda item: str(item[0])):
+        labels = ", ".join(f"{harness.name} ({harness.display})" for harness in harnesses)
+        lines.append(f"- {dest}: {labels}")
+    lines.append("Select one target with --target or override one path with its *_AGENTS_PATH env var.")
+    return "\n".join(lines)
 
 
 def backup_existing(path: Path, backup_dir: Path) -> None:
@@ -166,10 +296,19 @@ def deploy(
     harnesses = selected_harnesses(selected)
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
     private = read_private(repo_root)
-    deployed: dict[str, Path] = {}
+    resolved, skipped = resolve_deploy_targets(harnesses)
 
-    for harness in harnesses:
-        dest = target_path(harness.name)
+    for harness in skipped:
+        print(f"skipping {harness.name}: manual target requires {harness.env_var}")
+
+    collisions = target_collisions(resolved)
+    if collisions and not dry_run:
+        raise SystemExit(format_target_collision(collisions))
+    if collisions and dry_run:
+        print(format_target_collision(collisions))
+
+    deployed: dict[str, Path] = {}
+    for harness, dest in resolved.items():
         rendered = render_document(
             harness.name,
             read_fragment(repo_root, harness),
@@ -201,6 +340,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--stamp", help="Override generated date, useful for tests.")
     parser.add_argument("--deploy", action="store_true", help="Write rendered files to global harness paths.")
     parser.add_argument("--dry-run", action="store_true", help="Print deploy targets without writing.")
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Validate render output shape without writing persistent output.",
+    )
     parser.add_argument("--list-targets", action="store_true", help="List supported harnesses and output paths.")
     parser.add_argument(
         "--backup-dir",
@@ -215,8 +359,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if args.list_targets:
         for harness in selected_harnesses(args.target):
-            print(f"{harness.name}\t{harness.display}\t{target_path(harness.name)}")
+            dest = target_path(harness.name)
+            target = str(dest) if dest is not None else f"manual override via {harness.env_var}"
+            print(f"{harness.name}\t{harness.display}\t{harness.support_level}\t{target}")
         return 0
+
+    if args.check:
+        return check_render_shape(args.repo_root, args.target)
 
     if args.deploy or args.dry_run:
         deploy(args.repo_root, args.target, args.stamp, args.dry_run, args.backup_dir)

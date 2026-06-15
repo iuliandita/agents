@@ -70,8 +70,8 @@ def is_hidden_codepoint(char: str) -> bool:
     return TAG_RANGE_START <= ord(char) <= TAG_RANGE_END
 
 
-NEGATING_WORDS = re.compile(
-    r"\b(avoid|block|blocked|deny|do not|don't|forbid|forbidden|never|reject|refuse|warn)\b",
+DIRECT_COMMAND_NEGATION = re.compile(
+    r"\b(avoid|deny|do not|don't|forbid|never|reject|refuse)\b.{0,40}\b(run|execute|use|pipe|bootstrap)\b",
     re.IGNORECASE,
 )
 
@@ -188,6 +188,11 @@ def hidden_codepoints(line: str) -> list[str]:
     return [char for char in line if is_hidden_codepoint(char)]
 
 
+def is_directly_negated(line: str, match_start: int) -> bool:
+    prefix = line[max(0, match_start - 80) : match_start]
+    return bool(DIRECT_COMMAND_NEGATION.search(prefix))
+
+
 def scan_file(path: Path, root: Path) -> list[Finding]:
     findings: list[Finding] = []
     text = path.read_text(encoding="utf-8", errors="replace")
@@ -204,18 +209,20 @@ def scan_file(path: Path, root: Path) -> list[Finding]:
                 )
             )
         for rule in RULES:
-            if rule.skip_if_negated and NEGATING_WORDS.search(line):
+            match = rule.pattern.search(line)
+            if not match:
                 continue
-            if rule.pattern.search(line):
-                findings.append(
-                    Finding(
-                        path=rel_path,
-                        line_no=line_no,
-                        rule=rule.name,
-                        message=rule.message,
-                        line=visible_text(line),
-                    )
+            if rule.skip_if_negated and is_directly_negated(line, match.start()):
+                continue
+            findings.append(
+                Finding(
+                    path=rel_path,
+                    line_no=line_no,
+                    rule=rule.name,
+                    message=rule.message,
+                    line=visible_text(line),
                 )
+            )
     return findings
 
 

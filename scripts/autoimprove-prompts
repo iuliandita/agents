@@ -42,17 +42,29 @@ validate_options() {
   fi
 }
 
+require_option_value() {
+  local option="$1"
+  if (($# < 2)) || [[ "$2" == --* ]]; then
+    printf '%s requires a value\n' "$option" >&2
+    usage >&2
+    exit 2
+  fi
+}
+
 while (($#)); do
   case "$1" in
     --iterations)
+      require_option_value "$@"
       iterations="$2"
       shift 2
       ;;
     --harness)
+      require_option_value "$@"
       harness="$2"
       shift 2
       ;;
     --mode)
+      require_option_value "$@"
       mode="$2"
       shift 2
       ;;
@@ -77,6 +89,13 @@ score() {
 
 worktree_changes() {
   git status --porcelain --untracked-files=normal
+}
+
+has_worktree_changed_since() {
+  local before="$1"
+  local after
+  after="$(worktree_changes)"
+  [[ "$after" != "$before" ]]
 }
 
 change_summary() {
@@ -175,7 +194,7 @@ main() {
     fi
     rm -f "$prompt_file"
 
-    if [[ -z "$(worktree_changes)" ]]; then
+    if ! has_worktree_changed_since "$before"; then
       printf 'No changes proposed; stopping.\n'
       break
     fi
