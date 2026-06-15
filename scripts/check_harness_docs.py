@@ -19,11 +19,9 @@ def main() -> int:
             failures.append(f"INSTALL.md missing harness table row: {display}")
 
     for display, support, target, notes in harness_target_rows():
-        expected = f"| {display} | {support} | `{target}` |"
+        expected = f"| {display} | {support} | `{target}` | {notes} |"
         if expected not in install:
-            failures.append(f"INSTALL.md target row drifted for {display}: {support} {target}")
-        if notes and notes not in install:
-            failures.append(f"INSTALL.md missing harness notes for {display}: {notes}")
+            failures.append(f"INSTALL.md target row drifted for {display}: {support} {target} {notes}")
 
     if failures:
         for failure in failures:
