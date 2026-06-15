@@ -25,11 +25,13 @@ scripts/sync-ai-prompts
 
 Harnesses that share an output filename, such as `AGENTS.md`, render into per-harness subdirectories so targets do not overwrite each other.
 
-Deploy to global paths:
+Deploy selected harnesses to global paths:
 
 ```bash
-scripts/sync-ai-prompts --deploy
+scripts/sync-ai-prompts --target claude,codex --deploy
 ```
+
+Full-catalog deploy can fail when deployable harnesses share a target, such as Gemini CLI and Antigravity CLI both using `~/.gemini/GEMINI.md`. Use `--target` for routine deploys, or override one shared path with its `*_AGENTS_PATH` env var.
 
 Preview deploy paths without writing:
 

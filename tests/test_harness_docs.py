@@ -27,6 +27,17 @@ def test_install_docs_describe_support_levels():
     assert "| Kimi Code | manual | `manual override via KIMI_AGENTS_PATH` |" in install
 
 
+def test_deploy_docs_warn_about_full_catalog_collision():
+    repo = Path(__file__).resolve().parents[1]
+    readme = (repo / "README.md").read_text(encoding="utf-8")
+    install = (repo / "INSTALL.md").read_text(encoding="utf-8")
+
+    assert "Full-catalog deploy can fail when deployable harnesses share a target" in readme
+    assert "Use `--target` for routine deploys" in readme
+    assert "Full-catalog deploy can fail when deployable harnesses share a target" in install
+    assert "Use `--target` for routine deploys" in install
+
+
 def test_harness_docs_check_binds_notes_to_matching_install_row(tmp_path):
     repo = Path(__file__).resolve().parents[1]
     fixture = tmp_path / "repo"

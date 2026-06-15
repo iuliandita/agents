@@ -203,7 +203,7 @@ def render_all(
     selected: list[str] | None = None,
     stamp: str | None = None,
 ) -> dict[str, Path]:
-    harnesses = selected_harnesses(selected)
+    harnesses = [harness for harness in selected_harnesses(selected) if harness.renderable]
     output_counts: dict[str, int] = {}
     for harness in harnesses:
         output_counts[harness.output_name] = output_counts.get(harness.output_name, 0) + 1

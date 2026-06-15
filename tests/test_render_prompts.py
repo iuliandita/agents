@@ -218,6 +218,33 @@ def test_full_catalog_render_places_colliding_outputs_in_harness_subdirectories(
             assert path == tmp_path / "out" / harness / item.output_name
 
 
+def test_render_all_skips_documented_no_target_harness(tmp_path, monkeypatch):
+    renderer = load_renderer()
+    repo = tmp_path / "repo"
+    (repo / "prompts" / "harnesses").mkdir(parents=True)
+    (repo / "prompts" / "core.md").write_text("# Core\nshared\n", encoding="utf-8")
+    documented = renderer.Harness(
+        "provider",
+        "Provider Only",
+        "provider.md",
+        "AGENTS.md",
+        None,
+        "PROVIDER_AGENTS_PATH",
+        renderer.DOCUMENTED_NO_TARGET,
+        "Documented only.",
+    )
+    monkeypatch.setattr(renderer, "HARNESSES", (documented,))
+
+    written = renderer.render_all(
+        repo_root=repo,
+        out_dir=tmp_path / "out",
+        stamp="2026-06-15",
+    )
+
+    assert written == {}
+    assert not (tmp_path / "out").exists()
+
+
 def test_single_selected_agents_output_stays_top_level(tmp_path):
     renderer = load_renderer()
     repo = Path(__file__).resolve().parents[1]
