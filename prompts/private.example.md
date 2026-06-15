@@ -8,8 +8,8 @@ Examples:
 
 ```markdown
 ## Local Paths
-- Canonical skills repo: `~/priv/code/example/skills`
-- Canonical agents repo: `~/priv/code/example/agents`
+- Canonical skills repo: `~/code/example/skills`
+- Canonical agents repo: `~/code/example/agents`
 
 ## Local Shell Rules
 - Local interactive shell is zsh, fish, bash, or another shell.
