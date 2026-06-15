@@ -11,7 +11,7 @@ Rendered files go to `build/generated/`. Harnesses that share the same output fi
 ## Deploy
 
 ```bash
-scripts/sync-ai-prompts --deploy
+scripts/sync-ai-prompts --target claude,codex --deploy
 ```
 
 Existing files are backed up under `.backups/` before replacement. Deploy writes only to harnesses with resolved target paths. Manual harnesses are skipped unless their environment variable points at a project or per-agent operational rules file.

@@ -32,6 +32,8 @@ def test_deploy_docs_warn_about_full_catalog_collision():
     readme = (repo / "README.md").read_text(encoding="utf-8")
     install = (repo / "INSTALL.md").read_text(encoding="utf-8")
 
+    assert "scripts/sync-ai-prompts --target claude,codex --deploy" in readme
+    assert "scripts/sync-ai-prompts --target claude,codex --deploy" in install
     assert "Full-catalog deploy can fail when deployable harnesses share a target" in readme
     assert "Use `--target` for routine deploys" in readme
     assert "Full-catalog deploy can fail when deployable harnesses share a target" in install
