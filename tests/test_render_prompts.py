@@ -420,6 +420,26 @@ def test_sync_ai_prompts_check_mode_validates_render_shape():
     assert "Render shape check passed" in result.stdout
 
 
+def test_sync_ai_prompts_dry_run_reports_manual_skips_and_collisions():
+    repo = Path(__file__).resolve().parents[1]
+
+    result = subprocess.run(
+        ["scripts/sync-ai-prompts", "--dry-run"],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "skipping kimi: manual target requires KIMI_AGENTS_PATH" in result.stdout
+    assert "skipping hermes: manual target requires HERMES_AGENTS_PATH" in result.stdout
+    assert "skipping nanoclaw: manual target requires NANOCLAW_AGENTS_PATH" in result.stdout
+    assert "Deploy target collision detected" in result.stdout
+    assert "gemini (Gemini CLI)" in result.stdout
+    assert "antigravity (Antigravity CLI)" in result.stdout
+
+
 def test_backup_existing_preserves_multiple_backups_for_same_target(tmp_path):
     renderer = load_renderer()
     target = tmp_path / "AGENTS.md"
@@ -433,6 +453,69 @@ def test_backup_existing_preserves_multiple_backups_for_same_target(tmp_path):
     backups = sorted(backup_dir.iterdir())
     assert len(backups) == 2
     assert {path.read_text(encoding="utf-8") for path in backups} == {"first\n", "second\n"}
+
+
+def test_deploy_skips_manual_harness_without_override(tmp_path, capsys):
+    renderer = load_renderer()
+    repo = Path(__file__).resolve().parents[1]
+
+    deployed = renderer.deploy(
+        repo_root=repo,
+        selected=["kimi"],
+        stamp="2026-06-15",
+        dry_run=True,
+        backup_dir=tmp_path / "backups",
+    )
+
+    captured = capsys.readouterr()
+    assert deployed == {}
+    assert "skipping kimi: manual target requires KIMI_AGENTS_PATH" in captured.out
+
+
+def test_deploy_allows_manual_harness_with_env_override(tmp_path, monkeypatch):
+    renderer = load_renderer()
+    repo = Path(__file__).resolve().parents[1]
+    target = tmp_path / ".kimi" / "AGENTS.md"
+    monkeypatch.setenv("KIMI_AGENTS_PATH", str(target))
+
+    deployed = renderer.deploy(
+        repo_root=repo,
+        selected=["kimi"],
+        stamp="2026-06-15",
+        dry_run=False,
+        backup_dir=tmp_path / "backups",
+    )
+
+    assert deployed == {"kimi": target}
+    assert target.exists()
+    assert "# Kimi Code" in target.read_text(encoding="utf-8")
+
+
+def test_deploy_refuses_colliding_targets_before_writing(tmp_path, monkeypatch):
+    renderer = load_renderer()
+    repo = Path(__file__).resolve().parents[1]
+    target = tmp_path / "GEMINI.md"
+    monkeypatch.setenv("GEMINI_AGENTS_PATH", str(target))
+    monkeypatch.setenv("ANTIGRAVITY_AGENTS_PATH", str(target))
+
+    try:
+        renderer.deploy(
+            repo_root=repo,
+            selected=["gemini,antigravity"],
+            stamp="2026-06-15",
+            dry_run=False,
+            backup_dir=tmp_path / "backups",
+        )
+    except SystemExit as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("deploy did not reject colliding targets")
+
+    assert "Deploy target collision detected" in message
+    assert "gemini (Gemini CLI)" in message
+    assert "antigravity (Antigravity CLI)" in message
+    assert str(target) in message
+    assert not target.exists()
 
 
 def prepare_autoimprove_repo(tmp_path):

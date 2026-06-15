@@ -243,6 +243,34 @@ def check_render_shape(repo_root: Path, selected: list[str] | None = None) -> in
         return 0
 
 
+def resolve_deploy_targets(harnesses: list[Harness]) -> tuple[dict[Harness, Path], list[Harness]]:
+    resolved: dict[Harness, Path] = {}
+    skipped: list[Harness] = []
+    for harness in harnesses:
+        dest = target_path(harness.name)
+        if dest is None:
+            skipped.append(harness)
+            continue
+        resolved[harness] = dest
+    return resolved, skipped
+
+
+def target_collisions(resolved: dict[Harness, Path]) -> dict[Path, list[Harness]]:
+    by_path: dict[Path, list[Harness]] = {}
+    for harness, dest in resolved.items():
+        by_path.setdefault(dest, []).append(harness)
+    return {dest: harnesses for dest, harnesses in by_path.items() if len(harnesses) > 1}
+
+
+def format_target_collision(collisions: dict[Path, list[Harness]]) -> str:
+    lines = ["Deploy target collision detected:"]
+    for dest, harnesses in sorted(collisions.items(), key=lambda item: str(item[0])):
+        labels = ", ".join(f"{harness.name} ({harness.display})" for harness in harnesses)
+        lines.append(f"- {dest}: {labels}")
+    lines.append("Select one target with --target or override one path with its *_AGENTS_PATH env var.")
+    return "\n".join(lines)
+
+
 def backup_existing(path: Path, backup_dir: Path) -> None:
     if not path.exists() and not path.is_symlink():
         return
@@ -267,10 +295,19 @@ def deploy(
     harnesses = selected_harnesses(selected)
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
     private = read_private(repo_root)
-    deployed: dict[str, Path] = {}
+    resolved, skipped = resolve_deploy_targets(harnesses)
 
-    for harness in harnesses:
-        dest = target_path(harness.name)
+    for harness in skipped:
+        print(f"skipping {harness.name}: manual target requires {harness.env_var}")
+
+    collisions = target_collisions(resolved)
+    if collisions and not dry_run:
+        raise SystemExit(format_target_collision(collisions))
+    if collisions and dry_run:
+        print(format_target_collision(collisions))
+
+    deployed: dict[str, Path] = {}
+    for harness, dest in resolved.items():
         rendered = render_document(
             harness.name,
             read_fragment(repo_root, harness),
