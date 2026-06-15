@@ -272,6 +272,27 @@ def test_vendor_harnesses_define_model_ladders():
     assert "Pro = strongest reasoning" in gemini
 
 
+def test_new_harness_fragments_describe_operational_scope():
+    repo = Path(__file__).resolve().parents[1]
+    harness_dir = repo / "prompts" / "harnesses"
+
+    antigravity = (harness_dir / "antigravity.md").read_text(encoding="utf-8")
+    pi = (harness_dir / "pi.md").read_text(encoding="utf-8")
+    openclaw = (harness_dir / "openclaw.md").read_text(encoding="utf-8")
+    crush = (harness_dir / "crush.md").read_text(encoding="utf-8")
+    kimi = (harness_dir / "kimi.md").read_text(encoding="utf-8")
+    hermes = (harness_dir / "hermes.md").read_text(encoding="utf-8")
+    nanoclaw = (harness_dir / "nanoclaw.md").read_text(encoding="utf-8")
+
+    assert "GEMINI.md" in antigravity
+    assert "AGENTS.md" in pi
+    assert "Do not create persona" in openclaw
+    assert "CRUSH.md" in crush
+    assert ".kimi/AGENTS.md" in kimi
+    assert "Do not generate `SOUL.md`" in hermes
+    assert "per-agent operational instructions" in nanoclaw
+
+
 def test_effort_guidance_is_general_with_vendor_caveats():
     repo = Path(__file__).resolve().parents[1]
 
