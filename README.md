@@ -8,7 +8,7 @@ This is not a neutral baseline. It is a working config shaped by 20+ years in IT
 
 - Stores canonical prompt fragments in `prompts/`.
 - Merges an optional gitignored private overlay from `prompts/private.md`.
-- Renders harness-specific global files for Claude, Codex, OpenCode, Gemini, Cursor, Windsurf, Copilot, Aider, Goose, Amp, Continue, Cline, Roo, Qwen, Warp, Kiro, Augment, and OpenHands.
+- Renders harness-specific global files for Claude Code, OpenAI Codex, OpenCode, Gemini CLI, Cursor, Windsurf, GitHub Copilot CLI, Aider, Goose, Amp, Continue, Cline, Roo Code, Qwen Code, Warp, Kiro, Augment, and OpenHands.
 - Deploys rendered files to global paths with backups.
 - Lints public prompt sources, including `prompts/private.example.md`, for private paths, token-like secrets, missing harness fragments, and non-ASCII drift.
 - Provides a Karpathy-style score -> improve -> verify loop in `scripts/autoimprove-prompts`.
@@ -89,6 +89,8 @@ cp prompts/private.example.md prompts/private.md
 
 `prompts/private.md` is gitignored and appended after the shared core during render/deploy, so it can override or extend the public config without leaking into the repo.
 
+For local leak checks that should not be committed, copy `prompts/private-patterns.example.txt` to `prompts/private-patterns.txt` or set `AGENTS_PRIVATE_PATTERNS` to comma- or newline-separated markers.
+
 ## Supported Harnesses
 
 List targets and global output paths:
@@ -101,12 +103,20 @@ Each target path can be overridden with an environment variable such as `CLAUDE_
 
 ## Verification
 
+Inside a virtual environment, install test dependencies first:
+
+```bash
+python -m pip install -r requirements-dev.txt
+```
+
 ```bash
 python scripts/lint_prompts.py
 python scripts/scan_prompt_sources.py
+python scripts/check_harness_docs.py
 python -m pytest -q
 bash -n scripts/sync-ai-prompts scripts/autoimprove-prompts
-python -m py_compile scripts/render_prompts.py scripts/lint_prompts.py scripts/scan_prompt_sources.py
+python -m py_compile scripts/render_prompts.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py
+scripts/sync-ai-prompts --check
 scripts/sync-ai-prompts --dry-run
 ```
 

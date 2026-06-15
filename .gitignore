@@ -1,6 +1,7 @@
 .backups/
 build/
 prompts/private.md
+prompts/private-patterns.txt
 SECURITY-AUDIT.md
 /.claude/
 /.codex

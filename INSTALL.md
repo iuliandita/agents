@@ -52,20 +52,20 @@ WINDSURF_AGENTS_PATH="$HOME/.codeium/windsurf/AGENTS.md" scripts/sync-ai-prompts
 
 | Harness | Default target |
 |---|---|
-| Claude | `~/.claude/CLAUDE.md` |
-| Codex | `~/AGENTS.md` |
+| Claude Code | `~/.claude/CLAUDE.md` |
+| OpenAI Codex | `~/AGENTS.md` |
 | OpenCode | `~/.config/opencode/AGENTS.md` |
-| Gemini | `~/.gemini/GEMINI.md` |
+| Gemini CLI | `~/.gemini/GEMINI.md` |
 | Cursor | `~/.cursor/AGENTS.md` |
 | Windsurf | `~/.windsurf/AGENTS.md` |
-| Copilot | `~/.copilot/AGENTS.md` |
+| GitHub Copilot CLI | `~/.copilot/AGENTS.md` |
 | Aider | `~/.aider/AGENTS.md` |
 | Goose | `~/.config/goose/AGENTS.md` |
 | Amp | `~/.amp/AGENTS.md` |
 | Continue | `~/.continue/AGENTS.md` |
 | Cline | `~/.cline/AGENTS.md` |
-| Roo | `~/.roo/AGENTS.md` |
-| Qwen | `~/.qwen/AGENTS.md` |
+| Roo Code | `~/.roo/AGENTS.md` |
+| Qwen Code | `~/.qwen/AGENTS.md` |
 | Warp | `~/.warp/AGENTS.md` |
 | Kiro | `~/.kiro/AGENTS.md` |
 | Augment | `~/.augment/AGENTS.md` |

@@ -19,11 +19,33 @@ def load_linter():
 def test_lint_file_flags_private_path_marker(tmp_path):
     linter = load_linter()
     target = tmp_path / "core.md"
-    target.write_text("Render from ~/.config/ai/prompt-core.md instead.\n", encoding="utf-8")
+    target.write_text("Render from internal.example/prompt-core.md instead.\n", encoding="utf-8")
 
-    failures = linter.lint_file(target)
+    failures = linter.lint_file(target, private_patterns=("internal.example",))
 
     assert failures == 1
+
+
+def test_load_private_patterns_from_file(tmp_path):
+    linter = load_linter()
+    repo = tmp_path / "repo"
+    (repo / "prompts").mkdir(parents=True)
+    (repo / "prompts" / "private-patterns.txt").write_text(
+        "# comments are ignored\ninternal.example\n\n",
+        encoding="utf-8",
+    )
+
+    assert "internal.example" in linter.load_private_patterns(repo)
+
+
+def test_linter_source_uses_configurable_private_markers():
+    repo = Path(__file__).resolve().parents[1]
+    source = (repo / "scripts" / "lint_prompts.py").read_text(encoding="utf-8")
+
+    assert "load_private_patterns" in source
+    assert "AGENTS_PRIVATE_PATTERNS" in source
+    assert 'prompts" / "private-patterns.txt' in source
+    assert "PRIVATE_PATTERNS = (" not in source
 
 
 def test_lint_file_flags_token_like_secret(tmp_path):
@@ -179,8 +201,9 @@ def test_main_lints_private_example_when_present(tmp_path, capsys):
         (prompts / "harnesses" / harness.fragment).write_text(
             "## Fragment\nclean line\n", encoding="utf-8"
         )
+    (prompts / "private-patterns.txt").write_text("internal.example\n", encoding="utf-8")
     (prompts / "private.example.md").write_text(
-        "# Example\nLeaks /home/id/secret path.\n", encoding="utf-8"
+        "# Example\nLeaks internal.example/secret path.\n", encoding="utf-8"
     )
 
     fake_script = scripts_dir / "lint_prompts.py"

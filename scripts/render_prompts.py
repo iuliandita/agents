@@ -6,6 +6,7 @@ import os
 import shutil
 from datetime import date
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import NamedTuple
 
 
@@ -50,6 +51,18 @@ def harness_by_name(name: str) -> Harness:
 
 def harness_names() -> list[str]:
     return [harness.name for harness in HARNESSES]
+
+
+def harness_display_names() -> list[str]:
+    return [harness.display for harness in HARNESSES]
+
+
+def harness_target_rows(home: str = "~") -> list[tuple[str, str]]:
+    rows: list[tuple[str, str]] = []
+    for harness in HARNESSES:
+        target = harness.target_template.format(home=home)
+        rows.append((harness.display, target))
+    return rows
 
 
 def selected_harnesses(selected: list[str] | None) -> list[Harness]:
@@ -142,6 +155,22 @@ def render_all(
     return written
 
 
+def check_render_shape(repo_root: Path, selected: list[str] | None = None) -> int:
+    with TemporaryDirectory() as temp_dir:
+        out_dir = Path(temp_dir)
+        written = render_all(repo_root, out_dir, selected=selected, stamp="check")
+        paths = list(written.values())
+        if len(paths) != len(set(paths)):
+            print("ERROR: render output paths collide")
+            return 1
+        for harness, path in written.items():
+            if not path.exists():
+                print(f"ERROR: missing rendered output for {harness}: {path}")
+                return 1
+        print("Render shape check passed")
+        return 0
+
+
 def backup_existing(path: Path, backup_dir: Path) -> None:
     if not path.exists() and not path.is_symlink():
         return
@@ -201,6 +230,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--stamp", help="Override generated date, useful for tests.")
     parser.add_argument("--deploy", action="store_true", help="Write rendered files to global harness paths.")
     parser.add_argument("--dry-run", action="store_true", help="Print deploy targets without writing.")
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Validate render output shape without writing persistent output.",
+    )
     parser.add_argument("--list-targets", action="store_true", help="List supported harnesses and output paths.")
     parser.add_argument(
         "--backup-dir",
@@ -217,6 +251,9 @@ def main(argv: list[str] | None = None) -> int:
         for harness in selected_harnesses(args.target):
             print(f"{harness.name}\t{harness.display}\t{target_path(harness.name)}")
         return 0
+
+    if args.check:
+        return check_render_shape(args.repo_root, args.target)
 
     if args.deploy or args.dry_run:
         deploy(args.repo_root, args.target, args.stamp, args.dry_run, args.backup_dir)

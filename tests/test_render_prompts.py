@@ -124,6 +124,36 @@ def test_render_all_writes_selected_harnesses_to_output_dir(tmp_path):
     assert "local only" in written["codex"].read_text(encoding="utf-8")
 
 
+def test_full_catalog_render_places_colliding_outputs_in_harness_subdirectories(tmp_path):
+    renderer = load_renderer()
+    repo = Path(__file__).resolve().parents[1]
+
+    written = renderer.render_all(
+        repo_root=repo,
+        out_dir=tmp_path / "out",
+        stamp="2026-04-25",
+    )
+
+    for harness, path in written.items():
+        item = renderer.harness_by_name(harness)
+        if item.output_name == "AGENTS.md":
+            assert path == tmp_path / "out" / harness / "AGENTS.md"
+
+
+def test_single_selected_agents_output_stays_top_level(tmp_path):
+    renderer = load_renderer()
+    repo = Path(__file__).resolve().parents[1]
+
+    written = renderer.render_all(
+        repo_root=repo,
+        out_dir=tmp_path / "out",
+        selected=["codex"],
+        stamp="2026-04-25",
+    )
+
+    assert written["codex"] == tmp_path / "out" / "AGENTS.md"
+
+
 def test_common_guidance_lives_in_core_not_harness_fragments():
     repo = Path(__file__).resolve().parents[1]
     core = (repo / "prompts" / "core.md").read_text(encoding="utf-8")
@@ -177,7 +207,7 @@ def test_effort_guidance_is_general_with_vendor_caveats():
     gemini = (repo / "prompts" / "harnesses" / "gemini.md").read_text(encoding="utf-8")
 
     assert "Reasoning or effort levels are vendor-specific" in core
-    assert "Opus 4.7 adds `xhigh`" in claude
+    assert "Effort names vary by model" in claude
     assert "Codex/OpenAI reasoning effort names" in codex
     assert "Gemini exposes thinking controls differently" in gemini
 
@@ -256,7 +286,7 @@ def test_prompt_line_limits_are_enforced():
     )
 
     assert result.returncode == 0
-    assert "WARN: " in result.stdout
+    assert "WARN: " not in result.stdout
 
 
 def test_gitignore_covers_security_audit_and_tool_caches():
@@ -278,6 +308,21 @@ def test_gitignore_covers_security_audit_and_tool_caches():
         "*.pyc",
     ):
         assert pattern in ignored
+
+
+def test_sync_ai_prompts_check_mode_validates_render_shape():
+    repo = Path(__file__).resolve().parents[1]
+
+    result = subprocess.run(
+        ["scripts/sync-ai-prompts", "--check"],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Render shape check passed" in result.stdout
 
 
 def test_backup_existing_preserves_multiple_backups_for_same_target(tmp_path):
@@ -326,6 +371,37 @@ def test_autoimprove_rejects_unknown_mode(tmp_path):
     assert "Unsupported mode: bogus" in result.stderr
 
 
+def test_autoimprove_rejects_missing_option_values(tmp_path):
+    repo = prepare_autoimprove_repo(tmp_path)
+
+    for option in ("--iterations", "--harness", "--mode"):
+        result = subprocess.run(
+            ["bash", "scripts/autoimprove-prompts", option],
+            cwd=repo,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 2
+        assert f"{option} requires a value" in result.stderr
+
+
+def test_autoimprove_rejects_option_name_as_value(tmp_path):
+    repo = prepare_autoimprove_repo(tmp_path)
+
+    result = subprocess.run(
+        ["bash", "scripts/autoimprove-prompts", "--iterations", "--mode", "step"],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert "--iterations requires a value" in result.stderr
+
+
 def test_autoimprove_detects_untracked_agent_output(tmp_path):
     repo = prepare_autoimprove_repo(tmp_path)
     fake_bin = tmp_path / "bin"
@@ -356,6 +432,41 @@ def test_autoimprove_detects_untracked_agent_output(tmp_path):
     assert result.returncode == 0, result.stderr
     assert "Verified improvement candidate" in result.stdout
     assert "AGENT_OUTPUT.md" in result.stdout
+
+
+def test_autoimprove_ignores_preexisting_dirty_state_when_harness_noops(tmp_path):
+    repo = prepare_autoimprove_repo(tmp_path)
+    (repo / "PREEXISTING_NOTE.md").write_text("local note\n", encoding="utf-8")
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_claude = fake_bin / "claude"
+    fake_claude.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    fake_claude.chmod(0o755)
+
+    env = {
+        **os.environ,
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "AGENTS_AUTOIMPROVE_HARNESS": "claude",
+    }
+
+    result = subprocess.run(
+        ["bash", "scripts/autoimprove-prompts", "--iterations", "1", "--mode", "step"],
+        cwd=repo,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "No changes proposed; stopping." in result.stdout
+    assert "Verified improvement candidate" not in result.stdout
 
 
 def test_autoimprove_score_runs_prompt_source_scan(tmp_path):

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -19,12 +20,11 @@ SECRET_PATTERNS = (
     re.compile(r"npm_[A-Za-z0-9]{36}"),
 )
 
-PRIVATE_PATTERNS = (
-    "/home/id/",
-    "/home/id",
-    "iuliandita",
-    "ditas.cc",
-    "~/.config/ai",
+DEFAULT_LOCAL_MARKERS = (
+    "/home/yourname/",
+    "/Users/yourname/",
+    "internal.example",
+    "company.internal",
 )
 
 CORE_WARN_LINES = 85
@@ -53,14 +53,37 @@ def lint_line_count(path: Path, warn_at: int, max_lines: int) -> int:
     return 0
 
 
-def lint_file(path: Path) -> int:
+def split_env_patterns(raw: str) -> list[str]:
+    parts: list[str] = []
+    for chunk in raw.replace(",", "\n").splitlines():
+        value = chunk.strip()
+        if value:
+            parts.append(value)
+    return parts
+
+
+def load_private_patterns(repo_root: Path) -> tuple[str, ...]:
+    patterns: list[str] = list(DEFAULT_LOCAL_MARKERS)
+    patterns.extend(split_env_patterns(os.environ.get("AGENTS_PRIVATE_PATTERNS", "")))
+
+    pattern_file = repo_root / "prompts" / "private-patterns.txt"
+    if pattern_file.exists():
+        for line in pattern_file.read_text(encoding="utf-8").splitlines():
+            value = line.strip()
+            if value and not value.startswith("#"):
+                patterns.append(value)
+
+    return tuple(dict.fromkeys(patterns))
+
+
+def lint_file(path: Path, private_patterns: tuple[str, ...] = DEFAULT_LOCAL_MARKERS) -> int:
     failures = 0
     raw = path.read_bytes()
     if b"\r\n" in raw:
         error(f"{path}: contains CRLF line endings; convert to LF")
         failures += 1
     text = raw.decode("utf-8", errors="replace")
-    for needle in PRIVATE_PATTERNS:
+    for needle in private_patterns:
         if needle in text:
             error(f"{path}: contains private path or name marker: {needle}")
             failures += 1
@@ -84,6 +107,7 @@ def lint_file(path: Path) -> int:
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
     prompt_root = repo_root / "prompts"
+    private_patterns = load_private_patterns(repo_root)
     failures = 0
 
     core = prompt_root / "core.md"
@@ -92,7 +116,7 @@ def main() -> int:
         failures += 1
     else:
         failures += lint_line_count(core, CORE_WARN_LINES, CORE_MAX_LINES)
-        failures += lint_file(core)
+        failures += lint_file(core, private_patterns=private_patterns)
 
     registered_fragments = {harness.fragment for harness in HARNESSES}
     for harness in HARNESSES:
@@ -102,7 +126,7 @@ def main() -> int:
             failures += 1
             continue
         failures += lint_line_count(fragment, HARNESS_WARN_LINES, HARNESS_MAX_LINES)
-        failures += lint_file(fragment)
+        failures += lint_file(fragment, private_patterns=private_patterns)
 
     harness_dir = prompt_root / "harnesses"
     if harness_dir.is_dir():
@@ -125,7 +149,7 @@ def main() -> int:
             PRIVATE_EXAMPLE_WARN_LINES,
             PRIVATE_EXAMPLE_MAX_LINES,
         )
-        failures += lint_file(private_example)
+        failures += lint_file(private_example, private_patterns=private_patterns)
 
     if failures:
         print(f"Prompt lint failed: {failures} issue(s)")
