@@ -130,6 +130,35 @@ def test_target_path_uses_home_and_env_override(tmp_path):
     assert override_path == Path("/custom/AGENTS.md")
 
 
+def test_manual_target_path_requires_env_override(tmp_path):
+    renderer = load_renderer()
+
+    assert renderer.target_path("kimi", home=tmp_path, env={}) is None
+    assert renderer.target_path("hermes", home=tmp_path, env={}) is None
+    assert renderer.target_path("nanoclaw", home=tmp_path, env={}) is None
+
+    assert renderer.target_path(
+        "kimi",
+        home=tmp_path,
+        env={"KIMI_AGENTS_PATH": "/project/.kimi/AGENTS.md"},
+    ) == Path("/project/.kimi/AGENTS.md")
+
+
+def test_harness_target_rows_include_support_level_and_manual_label():
+    renderer = load_renderer()
+
+    rows = {
+        display: (support, target, notes)
+        for display, support, target, notes in renderer.harness_target_rows()
+    }
+
+    assert rows["Antigravity CLI"][0] == "deployable"
+    assert rows["Antigravity CLI"][1] == "~/.gemini/GEMINI.md"
+    assert rows["Kimi Code"][0] == "manual"
+    assert rows["Kimi Code"][1] == "manual override via KIMI_AGENTS_PATH"
+    assert "project AGENTS.md" in rows["Kimi Code"][2]
+
+
 def test_selected_harnesses_accept_comma_separated_targets():
     renderer = load_renderer()
 

@@ -119,13 +119,18 @@ def harness_display_names() -> list[str]:
     return [harness.display for harness in HARNESSES]
 
 
-def harness_target_rows(home: str = "~") -> list[tuple[str, str]]:
-    rows: list[tuple[str, str]] = []
+def default_target_label(harness: Harness, home: str = "~") -> str:
+    if harness.target_template is None:
+        return f"manual override via {harness.env_var}"
+    return harness.target_template.format(home=home)
+
+
+def harness_target_rows(home: str = "~") -> list[tuple[str, str, str, str]]:
+    rows: list[tuple[str, str, str, str]] = []
     for harness in HARNESSES:
-        if harness.target_template is None:
+        if not harness.renderable:
             continue
-        target = harness.target_template.format(home=home)
-        rows.append((harness.display, target))
+        rows.append((harness.display, harness.support_level, default_target_label(harness, home), harness.notes))
     return rows
 
 
@@ -139,11 +144,14 @@ def selected_harnesses(selected: list[str] | None) -> list[Harness]:
     return [harness_by_name(name) for name in names]
 
 
-def target_path(harness: str, home: str | Path | None = None, env: dict[str, str] | None = None) -> Path:
+def target_path(harness: str, home: str | Path | None = None, env: dict[str, str] | None = None) -> Path | None:
     item = harness_by_name(harness)
     values = os.environ if env is None else env
     if item.env_var in values and values[item.env_var]:
         return Path(values[item.env_var]).expanduser()
+
+    if item.target_template is None:
+        return None
 
     home_path = Path.home() if home is None else Path(home)
     return Path(item.target_template.format(home=home_path)).expanduser()
@@ -313,7 +321,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if args.list_targets:
         for harness in selected_harnesses(args.target):
-            print(f"{harness.name}\t{harness.display}\t{target_path(harness.name)}")
+            dest = target_path(harness.name)
+            target = str(dest) if dest is not None else f"manual override via {harness.env_var}"
+            print(f"{harness.name}\t{harness.display}\t{harness.support_level}\t{target}")
         return 0
 
     if args.check:
