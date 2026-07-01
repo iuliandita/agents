@@ -8,7 +8,7 @@ This is not a neutral baseline. It is a working config shaped by 20+ years in IT
 
 - Stores canonical prompt fragments in `prompts/`.
 - Merges an optional gitignored private overlay from `prompts/private.md`.
-- Renders public operational-rule variants for Claude Code, OpenAI Codex, OpenCode, Gemini CLI, Antigravity CLI, Cursor, Windsurf, GitHub Copilot CLI, Aider, Goose, Amp, Continue, Cline, Roo Code, Qwen Code, Warp, Kiro, Augment, OpenHands, Pi Coding Agent, OpenClaw, Crush, Kimi Code, Hermes Agent, and NanoClaw.
+- Renders public operational-rule variants for Claude Code, OpenAI Codex, OpenCode, Command Code, Gemini CLI, Antigravity CLI, Cursor, Windsurf, GitHub Copilot CLI, Aider, Goose, Amp, Continue, Cline, Roo Code, Qwen Code, Warp, Kiro, Augment, OpenHands, Pi Coding Agent, OpenClaw, Crush, Kimi Code, Hermes Agent, and NanoClaw.
 - Separates deployable global targets from manual project-local targets when no verified global operational rules path is known.
 - Does not generate persona, identity, memory, provider credential, model settings, MCP, plugin, or assistant-profile files.
 - Deploys rendered files to resolved global paths with backups.

@@ -51,7 +51,7 @@ def test_harness_catalog_expands_beyond_claude_codex_opencode():
 
     harnesses = set(renderer.harness_names())
 
-    assert {"claude", "codex", "opencode"}.issubset(harnesses)
+    assert {"claude", "codex", "opencode", "commandcode"}.issubset(harnesses)
     assert {
         "gemini",
         "cursor",
@@ -89,6 +89,7 @@ def test_harness_catalog_includes_public_first_wave_targets():
     assert harnesses["pi"].display == "Pi Coding Agent"
     assert harnesses["openclaw"].display == "OpenClaw"
     assert harnesses["crush"].display == "Crush"
+    assert harnesses["commandcode"].display == "Command Code"
     assert harnesses["kimi"].display == "Kimi Code"
     assert harnesses["hermes"].display == "Hermes Agent"
     assert harnesses["nanoclaw"].display == "NanoClaw"
@@ -111,6 +112,7 @@ def test_harness_support_levels_are_exposed_in_registry():
     assert levels["pi"] == "deployable"
     assert levels["openclaw"] == "deployable"
     assert levels["crush"] == "deployable"
+    assert levels["commandcode"] == "deployable"
     assert levels["kimi"] == "manual"
     assert levels["hermes"] == "manual"
     assert levels["nanoclaw"] == "manual"

@@ -35,6 +35,7 @@ HARNESSES: tuple[Harness, ...] = (
     Harness("claude", "Claude Code", "claude.md", "CLAUDE.md", "{home}/.claude/CLAUDE.md", "CLAUDE_AGENTS_PATH"),
     Harness("codex", "OpenAI Codex", "codex.md", "AGENTS.md", "{home}/AGENTS.md", "CODEX_AGENTS_PATH"),
     Harness("opencode", "OpenCode", "opencode.md", "AGENTS.md", "{home}/.config/opencode/AGENTS.md", "OPENCODE_AGENTS_PATH"),
+    Harness("commandcode", "Command Code", "commandcode.md", "AGENTS.md", "{home}/.commandcode/AGENTS.md", "COMMANDCODE_AGENTS_PATH"),
     Harness(
         "gemini",
         "Gemini CLI",

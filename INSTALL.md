@@ -71,6 +71,7 @@ ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/ANTIGRAVITY.md" scripts/sync-ai-prompts -
 | Claude Code | deployable | `~/.claude/CLAUDE.md` |  |
 | OpenAI Codex | deployable | `~/AGENTS.md` |  |
 | OpenCode | deployable | `~/.config/opencode/AGENTS.md` |  |
+| Command Code | deployable | `~/.commandcode/AGENTS.md` |  |
 | Gemini CLI | deployable | `~/.gemini/GEMINI.md` | Legacy Google CLI target; consumer Gemini CLI users transition to Antigravity CLI after 2026-06-18. |
 | Antigravity CLI | deployable | `~/.gemini/GEMINI.md` | Forward Google CLI target; shares the default GEMINI.md path with Gemini CLI. |
 | Cursor | deployable | `~/.cursor/AGENTS.md` |  |
