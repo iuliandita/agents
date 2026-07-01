@@ -95,6 +95,31 @@ cp prompts/private.example.md prompts/private.md
 
 For local leak checks that should not be committed, copy `prompts/private-patterns.example.txt` to `prompts/private-patterns.txt` or set `AGENTS_PRIVATE_PATTERNS` to comma- or newline-separated markers.
 
+## Invariants Reinforcement
+
+Global memory files are advisory: harnesses drift on them deep in long sessions, and subagents never receive them at all (a subagent's system prompt is its own definition plus the dispatch prompt, not your `CLAUDE.md`). `prompts/invariants.md` holds a short block of non-negotiable rules for the cases where that drift is expensive.
+
+```bash
+scripts/render-invariants
+```
+
+This renders three artifacts into `build/generated/invariants/` from the single source:
+
+- `invariants-userpromptsubmit.sh` — a Claude Code `UserPromptSubmit` hook. Its stdout is injected into the main loop every turn, so the invariants survive context compaction.
+- `claude-settings-snippet.json` — the hook wiring, for reference or manual merge.
+- `subagent-block.md` — paste into custom subagent definitions, the only channel that reaches subagents.
+
+Install the hook the same way prompts deploy — dry-run first, then deploy:
+
+```bash
+scripts/render-invariants --dry-run
+scripts/render-invariants --deploy
+```
+
+`--deploy` copies the hook to `~/.claude/hooks/` and **idempotently appends** its entry to `hooks.UserPromptSubmit` in `~/.claude/settings.json`, backing up anything it overwrites into `.backups/`. It never removes or rewrites existing hooks, so an already-configured `UserPromptSubmit` (or any other setting) is preserved; re-running is a no-op. Override targets for testing with `CLAUDE_HOOKS_DIR`, `CLAUDE_SETTINGS_PATH`, `--hooks-dir`, or `--settings-path`.
+
+Per-turn injection is intentional: `SessionStart` runs once and gets buried, whereas `UserPromptSubmit` re-asserts the rules each turn for roughly 60 tokens. Hooks fire on main-loop events only, so they do not reach subagents; that is why the subagent block is a separate delivery path and stays a manual paste. Per-prompt injection support varies by harness (Claude Code and OpenCode have it; Codex, Gemini/Antigravity, Cursor, Windsurf, and Aider expose context/rules files but no programmatic per-turn hook) — verify current support before relying on it.
+
 ## Supported Harnesses
 
 This is a public catalog, not a reflection of what is installed on one machine. Deployable targets have verified default operational-rule paths. Manual targets render into `build/generated/`, but deploy only when their `*_AGENTS_PATH` environment variable points at a project or per-agent rules file.
