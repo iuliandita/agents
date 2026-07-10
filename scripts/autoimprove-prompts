@@ -14,7 +14,7 @@ Run a Karpathy-style score -> improve -> verify -> keep/revert loop for this pro
 
 Options:
   --iterations N        Maximum improvement attempts (default: 3)
-  --harness NAME        claude, codex, opencode, or auto (default: auto)
+  --harness NAME        claude, codex, opencode, commandcode, or auto (default: auto)
   --mode MODE           step or auto (default: step)
   --help                Show this help
 
@@ -81,14 +81,20 @@ while (($#)); do
 done
 
 score() {
-  python "$repo_root/scripts/lint_prompts.py"
-  python "$repo_root/scripts/scan_prompt_sources.py"
-  python -m pytest -q "$repo_root/tests"
-  python "$repo_root/scripts/render_prompts.py" --repo-root "$repo_root" --out-dir "$repo_root/build/generated" >/dev/null
+  # Chain with && so a failure fails the whole gate even when the caller
+  # wraps this in `if score`, which disables errexit inside the function.
+  python "$repo_root/scripts/lint_prompts.py" &&
+    python "$repo_root/scripts/scan_prompt_sources.py" &&
+    python -m pytest -q "$repo_root/tests" &&
+    python "$repo_root/scripts/render_prompts.py" --repo-root "$repo_root" --out-dir "$repo_root/build/generated" >/dev/null
 }
 
 worktree_changes() {
-  git status --porcelain --untracked-files=normal
+  # Status alone misses new edits to already-dirty files (same " M" entry),
+  # so fingerprint tracked diffs and untracked file contents as well.
+  git status --porcelain --untracked-files=all
+  git diff HEAD
+  git ls-files --others --exclude-standard -z | sort -z | xargs -0 -r sha256sum
 }
 
 has_worktree_changed_since() {
@@ -103,6 +109,17 @@ change_summary() {
   git ls-files --others --exclude-standard
 }
 
+commandcode_bin() {
+  local candidate
+  for candidate in commandcode command-code cmd; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      printf '%s\n' "$candidate"
+      return
+    fi
+  done
+  return 1
+}
+
 detect_harness() {
   if [[ "$harness" != "auto" ]]; then
     printf '%s\n' "$harness"
@@ -115,6 +132,8 @@ detect_harness() {
     printf 'codex\n'
   elif command -v opencode >/dev/null 2>&1; then
     printf 'opencode\n'
+  elif commandcode_bin >/dev/null; then
+    printf 'commandcode\n'
   else
     printf 'none\n'
   fi
@@ -133,6 +152,9 @@ run_harness() {
       ;;
     opencode)
       opencode run "$(cat "$prompt_file")"
+      ;;
+    commandcode)
+      "$(commandcode_bin)" -p "$(cat "$prompt_file")"
       ;;
     none)
       printf 'No AI harness detected. Prompt written to %s\n' "$prompt_file" >&2
@@ -207,7 +229,8 @@ main() {
         break
       fi
     else
-      printf 'Verification failed. Leaving the diff in place for review; previous state summary was:\n%s\n' "$before" >&2
+      printf 'Verification failed. Leaving the diff in place for review:\n' >&2
+      change_summary >&2
       return 1
     fi
   done
