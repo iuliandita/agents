@@ -1,9 +1,7 @@
 import json
 from pathlib import Path
 
-import sys
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+import pytest
 
 import render_invariants as ri
 
@@ -31,6 +29,12 @@ def test_hook_is_executable_and_emits_invariants(tmp_path):
     assert text.startswith("#!/usr/bin/env bash")
     assert "Never add AI attribution" in text
     assert hook.stat().st_mode & 0o111  # executable bit set
+
+
+def test_render_hook_rejects_bare_heredoc_delimiter_line():
+    poisoned = "safe line\nINVARIANTS\nrm -rf /\n"
+    with pytest.raises(SystemExit, match="bare 'INVARIANTS' line"):
+        ri.render_hook(poisoned)
 
 
 def test_settings_snippet_is_valid_json_userpromptsubmit(tmp_path):
@@ -86,11 +90,8 @@ def test_load_settings_handles_missing_empty_and_bad(tmp_path):
     assert ri.load_settings(empty) == {}
     bad = tmp_path / "bad.json"
     bad.write_text("{not json", encoding="utf-8")
-    try:
+    with pytest.raises(SystemExit, match="not valid JSON"):
         ri.load_settings(bad)
-        assert False, "expected SystemExit on invalid JSON"
-    except SystemExit:
-        pass
 
 
 def test_deploy_installs_hook_and_merges_settings(tmp_path):
