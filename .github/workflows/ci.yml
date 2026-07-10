@@ -49,10 +49,10 @@ jobs:
         run: python -m pytest -q
 
       - name: Syntax-check shell scripts
-        run: bash -n scripts/sync-ai-prompts scripts/autoimprove-prompts
+        run: bash -n scripts/sync-ai-prompts scripts/autoimprove-prompts scripts/render-invariants
 
       - name: Syntax-check Python scripts
-        run: python -m py_compile scripts/render_prompts.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py
+        run: python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py
 
       - name: Check render output shape
         run: scripts/sync-ai-prompts --check

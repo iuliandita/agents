@@ -50,23 +50,33 @@ scripts/sync-ai-prompts --target claude,codex,opencode
 ```text
 prompts/
   core.md                 # shared rules
+  invariants.md           # non-negotiable rules for hook/subagent reinforcement
   private.example.md      # tracked template for private local rules
   private.md              # optional gitignored local overlay
+  private-patterns.example.txt  # template for local leak-check markers
   harnesses/
     claude.md             # prepended to Claude output
     codex.md              # prepended to Codex output
     opencode.md           # prepended to OpenCode output
+    AGENTS.md             # generic fragment for tools without a bespoke one (Warp)
     ...
 scripts/
   render_prompts.py       # renderer and deploy logic
   sync-ai-prompts         # wrapper for render/deploy
+  render_invariants.py    # invariants hook/subagent-block renderer
+  render-invariants       # wrapper for the invariants renderer
   lint_prompts.py         # prompt-source linter
   scan_prompt_sources.py  # prompt-injection scanner
+  check_harness_docs.py   # README/INSTALL harness-table drift check
   autoimprove-prompts     # score -> improve -> verify loop
 tests/
+  test_ci_config.py
+  test_harness_docs.py
   test_lint_prompts.py
+  test_render_invariants.py
   test_render_prompts.py
   test_scan_prompt_sources.py
+docs/                     # design notes and specs
 ```
 
 ## Autoimprove
@@ -97,7 +107,7 @@ For local leak checks that should not be committed, copy `prompts/private-patter
 
 ## Invariants Reinforcement
 
-Global memory files are advisory: harnesses drift on them deep in long sessions, and subagents never receive them at all (a subagent's system prompt is its own definition plus the dispatch prompt, not your `CLAUDE.md`). `prompts/invariants.md` holds a short block of non-negotiable rules for the cases where that drift is expensive.
+Global memory files are advisory: harnesses drift on them deep in long sessions, and memory loading varies by agent (Claude Code's built-in Explore and Plan subagents skip `CLAUDE.md` entirely; custom and general-purpose subagents load it but still drift). `prompts/invariants.md` holds a short block of non-negotiable rules for the cases where that drift is expensive.
 
 ```bash
 scripts/render-invariants
@@ -105,11 +115,11 @@ scripts/render-invariants
 
 This renders three artifacts into `build/generated/invariants/` from the single source:
 
-- `invariants-userpromptsubmit.sh` — a Claude Code `UserPromptSubmit` hook. Its stdout is injected into the main loop every turn, so the invariants survive context compaction.
-- `claude-settings-snippet.json` — the hook wiring, for reference or manual merge.
-- `subagent-block.md` — paste into custom subagent definitions, the only channel that reaches subagents.
+- `invariants-userpromptsubmit.sh` - a Claude Code `UserPromptSubmit` hook. Its stdout is injected into the main loop every turn, so the invariants survive context compaction.
+- `claude-settings-snippet.json` - the hook wiring, for reference or manual merge.
+- `subagent-block.md` - paste into custom subagent definitions; reinforcement that holds regardless of which memory files a given agent type loads.
 
-Install the hook the same way prompts deploy — dry-run first, then deploy:
+Install the hook the same way prompts deploy - dry-run first, then deploy:
 
 ```bash
 scripts/render-invariants --dry-run
@@ -118,13 +128,13 @@ scripts/render-invariants --deploy
 
 `--deploy` copies the hook to `~/.claude/hooks/` and **idempotently appends** its entry to `hooks.UserPromptSubmit` in `~/.claude/settings.json`, backing up anything it overwrites into `.backups/`. It never removes or rewrites existing hooks, so an already-configured `UserPromptSubmit` (or any other setting) is preserved; re-running is a no-op. Override targets for testing with `CLAUDE_HOOKS_DIR`, `CLAUDE_SETTINGS_PATH`, `--hooks-dir`, or `--settings-path`.
 
-Per-turn injection is intentional: `SessionStart` runs once and gets buried, whereas `UserPromptSubmit` re-asserts the rules each turn for roughly 60 tokens. Hooks fire on main-loop events only, so they do not reach subagents; that is why the subagent block is a separate delivery path and stays a manual paste. Per-prompt injection support varies by harness (Claude Code and OpenCode have it; Codex, Gemini/Antigravity, Cursor, Windsurf, and Aider expose context/rules files but no programmatic per-turn hook) — verify current support before relying on it.
+Per-turn injection is intentional: `SessionStart` runs once and gets buried, whereas `UserPromptSubmit` re-asserts the rules each turn for roughly 60 tokens. `UserPromptSubmit` fires on user prompts in the main loop, not on subagent dispatches; that is why the subagent block is a separate delivery path and stays a manual paste. Per-prompt injection support varies by harness (Claude Code, OpenCode, and current Codex expose lifecycle hooks; Gemini/Antigravity, Cursor, Windsurf, and Aider expose context/rules files but no programmatic per-turn hook) - verify current support before relying on it.
 
 ## Supported Harnesses
 
 This is a public catalog, not a reflection of what is installed on one machine. Deployable targets have verified default operational-rule paths. Manual targets render into `build/generated/`, but deploy only when their `*_AGENTS_PATH` environment variable points at a project or per-agent rules file.
 
-Gemini CLI remains in the catalog as a legacy Google target. As of 2026-06-15, the forward Google CLI target is Antigravity CLI; both use `GEMINI.md` by default, so real deploys refuse that same-path collision unless you select one target or override one path.
+Gemini CLI remains in the catalog as a legacy Google target. Since June 2026 the forward Google CLI target is Antigravity CLI; both use `GEMINI.md` by default, so real deploys refuse that same-path collision unless you select one target or override one path.
 
 List targets, support levels, and resolved paths:
 
@@ -153,8 +163,8 @@ python scripts/lint_prompts.py
 python scripts/scan_prompt_sources.py
 python scripts/check_harness_docs.py
 python -m pytest -q
-bash -n scripts/sync-ai-prompts scripts/autoimprove-prompts
-python -m py_compile scripts/render_prompts.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py
+bash -n scripts/sync-ai-prompts scripts/autoimprove-prompts scripts/render-invariants
+python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py
 scripts/sync-ai-prompts --check
 scripts/sync-ai-prompts --dry-run
 ```
