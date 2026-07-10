@@ -25,6 +25,11 @@ EXCLUDED_DIRS = {
     "venv",
 }
 
+# Gitignored local artifacts that quote attack patterns by design (audit
+# reports); they are never rendered or deployed, so they do not gate the scan.
+EXCLUDED_FILES = {"SECURITY-AUDIT.md"}
+EXCLUDED_SUBTREES = (("docs", "local"),)
+
 PROMPT_FILE_NAMES = {
     "AGENTS.md",
     "CLAUDE.md",
@@ -134,7 +139,7 @@ RULES = (
     Rule(
         name="destructive-command",
         pattern=re.compile(
-            r"\b(rm\s+-[A-Za-z]*r[A-Za-z]*f|mkfs(?:\.[a-z0-9]+)?|dd\s+if=.+\s+of=/dev/|shred\s+-[A-Za-z]*z)\b",
+            r"\b(rm\s+-[A-Za-z]*(?:r[A-Za-z]*f|f[A-Za-z]*r)|mkfs(?:\.[a-z0-9]+)?|dd\s+if=.+\s+of=/dev/|shred\s+-[A-Za-z]*z)\b",
             re.IGNORECASE,
         ),
         message="destructive shell commands should not appear as executable prompt guidance",
@@ -161,7 +166,14 @@ def is_prompt_source(path: Path) -> bool:
 def iter_prompt_sources(root: Path) -> list[Path]:
     paths: list[Path] = []
     for path in root.rglob("*"):
-        if any(part in EXCLUDED_DIRS for part in path.parts):
+        # Exclusions match repo-relative parts only; matching absolute parts
+        # would skip the whole repo when it is cloned under e.g. a build/ dir.
+        rel_parts = path.relative_to(root).parts
+        if any(part in EXCLUDED_DIRS for part in rel_parts):
+            continue
+        if path.name in EXCLUDED_FILES:
+            continue
+        if any(rel_parts[: len(subtree)] == subtree for subtree in EXCLUDED_SUBTREES):
             continue
         if path.is_file() and is_prompt_source(path):
             paths.append(path)
@@ -190,7 +202,14 @@ def hidden_codepoints(line: str) -> list[str]:
 
 def is_directly_negated(line: str, match_start: int) -> bool:
     prefix = line[max(0, match_start - 80) : match_start]
-    return bool(DIRECT_COMMAND_NEGATION.search(prefix))
+    negation = None
+    for negation in DIRECT_COMMAND_NEGATION.finditer(prefix):
+        pass
+    if negation is None:
+        return False
+    # A clause boundary between the negation and the command means the
+    # negation does not govern it ("Never run tests; bootstrap with curl|sh").
+    return not re.search(r"[;&|.!?]", prefix[negation.end() :])
 
 
 def scan_file(path: Path, root: Path) -> list[Finding]:

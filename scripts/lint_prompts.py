@@ -139,6 +139,13 @@ def main() -> int:
             )
             failures += 1
 
+    invariants = prompt_root / "invariants.md"
+    if not invariants.exists():
+        error("missing prompts/invariants.md")
+        failures += 1
+    else:
+        failures += lint_file(invariants, private_patterns=private_patterns)
+
     private_example = prompt_root / "private.example.md"
     if not private_example.exists():
         error("missing prompts/private.example.md")

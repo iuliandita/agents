@@ -33,7 +33,15 @@ class Harness(NamedTuple):
 
 HARNESSES: tuple[Harness, ...] = (
     Harness("claude", "Claude Code", "claude.md", "CLAUDE.md", "{home}/.claude/CLAUDE.md", "CLAUDE_AGENTS_PATH"),
-    Harness("codex", "OpenAI Codex", "codex.md", "AGENTS.md", "{home}/AGENTS.md", "CODEX_AGENTS_PATH"),
+    Harness(
+        "codex",
+        "OpenAI Codex",
+        "codex.md",
+        "AGENTS.md",
+        "{home}/.codex/AGENTS.md",
+        "CODEX_AGENTS_PATH",
+        notes="Global path follows $CODEX_HOME (default ~/.codex); set CODEX_AGENTS_PATH when CODEX_HOME is customized.",
+    ),
     Harness("opencode", "OpenCode", "opencode.md", "AGENTS.md", "{home}/.config/opencode/AGENTS.md", "OPENCODE_AGENTS_PATH"),
     Harness("commandcode", "Command Code", "commandcode.md", "AGENTS.md", "{home}/.commandcode/AGENTS.md", "COMMANDCODE_AGENTS_PATH"),
     Harness(
@@ -43,7 +51,7 @@ HARNESSES: tuple[Harness, ...] = (
         "GEMINI.md",
         "{home}/.gemini/GEMINI.md",
         "GEMINI_AGENTS_PATH",
-        notes="Legacy Google CLI target; consumer Gemini CLI users transition to Antigravity CLI after 2026-06-18.",
+        notes="Legacy Google CLI target; consumer Gemini CLI transitioned to Antigravity CLI in June 2026.",
     ),
     Harness(
         "antigravity",
@@ -142,6 +150,8 @@ def selected_harnesses(selected: list[str] | None) -> list[Harness]:
     names: list[str] = []
     for item in selected:
         names.extend(part.strip() for part in item.split(",") if part.strip())
+    if not names:
+        raise SystemExit("No harness names parsed from --target; nothing to do")
     return [harness_by_name(name) for name in names]
 
 
@@ -159,7 +169,6 @@ def target_path(harness: str, home: str | Path | None = None, env: dict[str, str
 
 
 def render_document(
-    harness: str,
     fragment: str,
     core: str,
     private: str = "",
@@ -217,7 +226,6 @@ def render_all(
         dest = output_path(out_dir, harness, collisions)
         dest.parent.mkdir(parents=True, exist_ok=True)
         rendered = render_document(
-            harness.name,
             read_fragment(repo_root, harness),
             core,
             private=private,
@@ -284,6 +292,10 @@ def backup_existing(path: Path, backup_dir: Path) -> None:
     while backup.exists() or backup.is_symlink():
         backup = backup_dir / f"{backup_stem}-{counter}.bak"
         counter += 1
+    if path.is_symlink() and not path.exists():
+        # Dangling symlink: copy the link itself; following it would crash.
+        shutil.copy2(path, backup, follow_symlinks=False)
+        return
     shutil.copy2(path, backup)
 
 
@@ -311,7 +323,6 @@ def deploy(
     deployed: dict[str, Path] = {}
     for harness, dest in resolved.items():
         rendered = render_document(
-            harness.name,
             read_fragment(repo_root, harness),
             core,
             private=private,

@@ -59,7 +59,7 @@ Use this before deploys when checking the current harness names, support levels,
 Use env vars when a tool's real operational rules path differs from the default:
 
 ```bash
-CODEX_AGENTS_PATH="$HOME/.codex/AGENTS.md" scripts/sync-ai-prompts --target codex --deploy
+CODEX_AGENTS_PATH="$CODEX_HOME/AGENTS.md" scripts/sync-ai-prompts --target codex --deploy
 WINDSURF_AGENTS_PATH="$HOME/.codeium/windsurf/AGENTS.md" scripts/sync-ai-prompts --target windsurf --deploy
 ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/ANTIGRAVITY.md" scripts/sync-ai-prompts --target antigravity --deploy
 ```
@@ -69,10 +69,10 @@ ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/ANTIGRAVITY.md" scripts/sync-ai-prompts -
 | Harness | Support | Target | Notes |
 |---|---|---|---|
 | Claude Code | deployable | `~/.claude/CLAUDE.md` |  |
-| OpenAI Codex | deployable | `~/AGENTS.md` |  |
+| OpenAI Codex | deployable | `~/.codex/AGENTS.md` | Global path follows $CODEX_HOME (default ~/.codex); set CODEX_AGENTS_PATH when CODEX_HOME is customized. |
 | OpenCode | deployable | `~/.config/opencode/AGENTS.md` |  |
 | Command Code | deployable | `~/.commandcode/AGENTS.md` |  |
-| Gemini CLI | deployable | `~/.gemini/GEMINI.md` | Legacy Google CLI target; consumer Gemini CLI users transition to Antigravity CLI after 2026-06-18. |
+| Gemini CLI | deployable | `~/.gemini/GEMINI.md` | Legacy Google CLI target; consumer Gemini CLI transitioned to Antigravity CLI in June 2026. |
 | Antigravity CLI | deployable | `~/.gemini/GEMINI.md` | Forward Google CLI target; shares the default GEMINI.md path with Gemini CLI. |
 | Cursor | deployable | `~/.cursor/AGENTS.md` |  |
 | Windsurf | deployable | `~/.windsurf/AGENTS.md` |  |
