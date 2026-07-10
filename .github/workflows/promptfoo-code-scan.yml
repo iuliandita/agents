@@ -38,7 +38,7 @@ jobs:
 
       - name: Run Promptfoo code scan
         if: env.PROMPTFOO_API_KEY != ''
-        uses: promptfoo/code-scan-action@ea0cdcdfcb554efea4f5826f9b0b1b41d54e4442 # v0.1.7
+        uses: promptfoo/code-scan-action@148e01f35bc65bd992b9f44679577aa9123be6ab # v0.1.8
         env:
           PROMPTFOO_API_KEY: ${{ env.PROMPTFOO_API_KEY }}
         with:
