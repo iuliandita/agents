@@ -66,6 +66,8 @@
 
 ## Security
 - Never pass secrets on the CLI when process listings can expose them. Use env vars, stdin, files with strict permissions, or a secret manager.
+- Keep secrets and private infrastructure out of tracked files, commit messages, and PR titles and bodies, not only code. Parameterize anything private that must exist in CI through secrets or variables.
+- Fix leaks forward: correct the new commit before pushing. Do not rewrite already-published history for privacy, since it breaks clones and open PRs for little gain; rotate any exposed secret instead.
 - Use least privilege for IAM, RBAC, tokens, and secrets.
 - Keep permissions narrow. Confirm destructive or broad shell actions before execution.
 - Set sandbox and approval explicitly in automation. Treat sandbox, container, browser, and IDE state as explicit context.
