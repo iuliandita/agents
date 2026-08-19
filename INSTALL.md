@@ -41,7 +41,7 @@ scripts/sync-ai-prompts --target antigravity --deploy
 Manual targets render by default, but deploy only with an explicit path:
 
 ```bash
-KIMI_AGENTS_PATH="$PWD/.kimi/AGENTS.md" scripts/sync-ai-prompts --target kimi --deploy
+scripts/sync-ai-prompts --target kimi --deploy
 HERMES_AGENTS_PATH="$PWD/HERMES.md" scripts/sync-ai-prompts --target hermes --deploy
 NANOCLAW_AGENTS_PATH="$PWD/agents/nano/CLAUDE.md" scripts/sync-ai-prompts --target nanoclaw --deploy
 ```
@@ -91,7 +91,7 @@ ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/ANTIGRAVITY.md" scripts/sync-ai-prompts -
 | Pi Coding Agent | deployable | `~/.pi/agent/AGENTS.md` |  |
 | OpenClaw | deployable | `~/.openclaw/workspace/AGENTS.md` |  |
 | Crush | deployable | `~/.config/crush/CRUSH.md` |  |
-| Kimi Code | manual | `manual override via KIMI_AGENTS_PATH` | Render-only unless KIMI_AGENTS_PATH points at a project AGENTS.md or .kimi/AGENTS.md file. |
+| Kimi Code | deployable | `~/.kimi-code/AGENTS.md` | Global path follows $KIMI_CODE_HOME (default ~/.kimi-code); set KIMI_AGENTS_PATH when KIMI_CODE_HOME is customized. |
 | Hermes Agent | manual | `manual override via HERMES_AGENTS_PATH` | Render-only unless HERMES_AGENTS_PATH points at a project HERMES.md, .hermes.md, or AGENTS.md file. |
 | NanoClaw | manual | `manual override via NANOCLAW_AGENTS_PATH` | Render-only unless NANOCLAW_AGENTS_PATH points at a per-agent CLAUDE.md file. |
 

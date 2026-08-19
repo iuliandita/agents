@@ -99,7 +99,7 @@ def test_harness_support_levels_are_exposed_in_registry():
     assert levels["openclaw"] == "deployable"
     assert levels["crush"] == "deployable"
     assert levels["commandcode"] == "deployable"
-    assert levels["kimi"] == "manual"
+    assert levels["kimi"] == "deployable"
     assert levels["hermes"] == "manual"
     assert levels["nanoclaw"] == "manual"
 
@@ -119,7 +119,7 @@ def test_target_path_uses_home_and_env_override(tmp_path):
 
 def test_manual_target_path_requires_env_override(tmp_path):
 
-    assert renderer.target_path("kimi", home=tmp_path, env={}) is None
+    assert renderer.target_path("kimi", home=tmp_path, env={}) == tmp_path / ".kimi-code" / "AGENTS.md"
     assert renderer.target_path("hermes", home=tmp_path, env={}) is None
     assert renderer.target_path("nanoclaw", home=tmp_path, env={}) is None
 
@@ -139,9 +139,9 @@ def test_harness_target_rows_include_support_level_and_manual_label():
 
     assert rows["Antigravity CLI"][0] == "deployable"
     assert rows["Antigravity CLI"][1] == "~/.gemini/GEMINI.md"
-    assert rows["Kimi Code"][0] == "manual"
-    assert rows["Kimi Code"][1] == "manual override via KIMI_AGENTS_PATH"
-    assert "project AGENTS.md" in rows["Kimi Code"][2]
+    assert rows["Kimi Code"][0] == "deployable"
+    assert rows["Kimi Code"][1] == "~/.kimi-code/AGENTS.md"
+    assert "KIMI_CODE_HOME" in rows["Kimi Code"][2]
 
 
 def test_selected_harnesses_accept_comma_separated_targets():
@@ -302,8 +302,8 @@ def test_new_harness_fragments_describe_operational_scope():
     assert "Do not create persona" in openclaw
     assert "operational coding-agent guidance" in crush
     assert "CRUSH.md" in crush
-    assert "Do not infer global config" in kimi
-    assert ".kimi/AGENTS.md" in kimi
+    assert "Do not infer provider keys" in kimi
+    assert ".kimi-code/AGENTS.md" in kimi
     assert "Do not generate `SOUL.md`" in hermes
     assert "per-agent operational instructions" in nanoclaw
 
@@ -452,7 +452,6 @@ def test_sync_ai_prompts_dry_run_reports_manual_skips_and_collisions():
         for key, value in os.environ.items()
         if key
         not in {
-            "KIMI_AGENTS_PATH",
             "HERMES_AGENTS_PATH",
             "NANOCLAW_AGENTS_PATH",
             "GEMINI_AGENTS_PATH",
@@ -470,9 +469,9 @@ def test_sync_ai_prompts_dry_run_reports_manual_skips_and_collisions():
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "skipping kimi: manual target requires KIMI_AGENTS_PATH" in result.stdout
     assert "skipping hermes: manual target requires HERMES_AGENTS_PATH" in result.stdout
     assert "skipping nanoclaw: manual target requires NANOCLAW_AGENTS_PATH" in result.stdout
+    assert "would update kimi:" in result.stdout
     assert "Deploy target collision detected" in result.stdout
     assert "gemini (Gemini CLI)" in result.stdout
     assert "antigravity (Antigravity CLI)" in result.stdout
@@ -511,13 +510,12 @@ def test_selected_harnesses_reject_empty_target_list():
 
 def test_deploy_skips_manual_harness_without_override(tmp_path, capsys, monkeypatch):
     repo = Path(__file__).resolve().parents[1]
-    monkeypatch.delenv("KIMI_AGENTS_PATH", raising=False)
     monkeypatch.delenv("HERMES_AGENTS_PATH", raising=False)
     monkeypatch.delenv("NANOCLAW_AGENTS_PATH", raising=False)
 
     deployed = renderer.deploy(
         repo_root=repo,
-        selected=["kimi"],
+        selected=["hermes"],
         stamp="2026-06-15",
         dry_run=True,
         backup_dir=tmp_path / "backups",
@@ -525,25 +523,25 @@ def test_deploy_skips_manual_harness_without_override(tmp_path, capsys, monkeypa
 
     captured = capsys.readouterr()
     assert deployed == {}
-    assert "skipping kimi: manual target requires KIMI_AGENTS_PATH" in captured.out
+    assert "skipping hermes: manual target requires HERMES_AGENTS_PATH" in captured.out
 
 
 def test_deploy_allows_manual_harness_with_env_override(tmp_path, monkeypatch):
     repo = Path(__file__).resolve().parents[1]
-    target = tmp_path / ".kimi" / "AGENTS.md"
-    monkeypatch.setenv("KIMI_AGENTS_PATH", str(target))
+    target = tmp_path / "HERMES.md"
+    monkeypatch.setenv("HERMES_AGENTS_PATH", str(target))
 
     deployed = renderer.deploy(
         repo_root=repo,
-        selected=["kimi"],
+        selected=["hermes"],
         stamp="2026-06-15",
         dry_run=False,
         backup_dir=tmp_path / "backups",
     )
 
-    assert deployed == {"kimi": target}
+    assert deployed == {"hermes": target}
     assert target.exists()
-    assert "# Kimi Code" in target.read_text(encoding="utf-8")
+    assert "## Hermes-Specific Notes" in target.read_text(encoding="utf-8")
 
 
 def test_deploy_refuses_colliding_targets_before_writing(tmp_path, monkeypatch):

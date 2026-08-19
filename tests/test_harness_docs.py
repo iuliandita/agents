@@ -24,7 +24,7 @@ def test_install_docs_describe_support_levels():
 
     assert "| Harness | Support | Target | Notes |" in install
     assert "| Antigravity CLI | deployable | `~/.gemini/GEMINI.md` |" in install
-    assert "| Kimi Code | manual | `manual override via KIMI_AGENTS_PATH` |" in install
+    assert "| Kimi Code | deployable | `~/.kimi-code/AGENTS.md` |" in install
 
 
 def test_deploy_docs_warn_about_full_catalog_collision():
