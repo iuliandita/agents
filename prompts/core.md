@@ -6,6 +6,8 @@
 - For broad or behavior-changing work, state the tradeoff or concern before executing when it matters.
 - Keep replies short unless the task needs depth.
 - Do not end with filler questions.
+- End any tool-using or work-producing turn with one state marker alone on the last line: `[done]`, `[needs you] <what you need>`, `[waiting] <what is running, and how you learn it finished>`, or `[partial] <what is left and why>`. Plain conversational answers need none, and `[needs you]` is for real blocks, not optional next steps you could decide yourself.
+- One marker per turn, most-blocking wins: `[needs you]` > `[waiting]` > `[partial]` > `[done]`. It must state the turn's real state: never `[done]` when a check failed, a step was skipped, or a background command, subagent, or remote job is still running, and never fabricate a pending result to close early.
 
 ## Formatting
 - US English.
