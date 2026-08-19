@@ -41,7 +41,6 @@ scripts/sync-ai-prompts --target antigravity --deploy
 Manual targets render by default, but deploy only with an explicit path:
 
 ```bash
-scripts/sync-ai-prompts --target kimi --deploy
 HERMES_AGENTS_PATH="$PWD/HERMES.md" scripts/sync-ai-prompts --target hermes --deploy
 NANOCLAW_AGENTS_PATH="$PWD/agents/nano/CLAUDE.md" scripts/sync-ai-prompts --target nanoclaw --deploy
 ```
