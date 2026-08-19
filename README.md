@@ -142,7 +142,7 @@ List targets, support levels, and resolved paths:
 scripts/sync-ai-prompts --list-targets
 ```
 
-Each deployable target path can be overridden with an environment variable such as `CLAUDE_AGENTS_PATH`, `CODEX_AGENTS_PATH`, `ANTIGRAVITY_AGENTS_PATH`, or `PI_AGENTS_PATH`. Manual targets require an explicit override such as `KIMI_AGENTS_PATH`, `HERMES_AGENTS_PATH`, or `NANOCLAW_AGENTS_PATH` before deploy writes anything.
+Each deployable target path can be overridden with an environment variable such as `CLAUDE_AGENTS_PATH`, `CODEX_AGENTS_PATH`, `ANTIGRAVITY_AGENTS_PATH`, or `PI_AGENTS_PATH`. Manual targets require an explicit override such as `HERMES_AGENTS_PATH` or `NANOCLAW_AGENTS_PATH` before deploy writes anything.
 
 ## Watchlist
 

@@ -84,10 +84,9 @@ HARNESSES: tuple[Harness, ...] = (
         "Kimi Code",
         "kimi.md",
         "AGENTS.md",
-        None,
+        "{home}/.kimi-code/AGENTS.md",
         "KIMI_AGENTS_PATH",
-        MANUAL,
-        "Render-only unless KIMI_AGENTS_PATH points at a project AGENTS.md or .kimi/AGENTS.md file.",
+        notes="Global path follows $KIMI_CODE_HOME (default ~/.kimi-code); set KIMI_AGENTS_PATH when KIMI_CODE_HOME is customized.",
     ),
     Harness(
         "hermes",
