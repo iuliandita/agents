@@ -367,6 +367,16 @@ def test_generic_workflow_guidance_stays_in_core():
         assert phrase not in harness_text
 
 
+def test_turn_state_marker_is_required_in_core():
+    repo = Path(__file__).resolve().parents[1]
+    core = (repo / "prompts" / "core.md").read_text(encoding="utf-8")
+
+    assert "End any tool-using or work-producing turn with one state marker" in core
+    for marker in ("`[done]`", "`[needs you]`", "`[waiting]`", "`[partial]`"):
+        assert marker in core
+    assert "One marker per turn, most-blocking wins" in core
+
+
 def test_destructive_infra_commands_require_confirmation():
     repo = Path(__file__).resolve().parents[1]
     core = (repo / "prompts" / "core.md").read_text(encoding="utf-8")
