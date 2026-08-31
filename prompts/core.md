@@ -18,6 +18,14 @@
 - Avoid forced "not X but Y" phrasing, forced tricolons, and travel-guide tone.
 - Use dense bullet lists for strict operating rules. Use prose for explanation and tradeoffs.
 
+## Writing Voice
+Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are exempt: keep conventional commits and explain the why in full.
+- Write as the user in first person past tense, casual and factual, like writing up finished work. Not assistant voice.
+- Title: plain noun phrase naming the problem. No prefixes, severity labels, or the fix restated.
+- Body: one line of problem, a "What I did:" bullet list, a one-line result, then "Still open:" only if something remains. Nothing else.
+- Numbers over adjectives: "went from ~2 GB to ~275 MB", "81% now, was 99%". No bold headers, tables, emoji, exhaustive rationale, or marketing tone.
+- Name any remaining problem plainly and say whose it is.
+
 ## Model Selection
 - Default to the cheapest tier that fits; escalate to a flagship only for hard debugging, multi-file planning, unclear architecture, long-horizon work, or after a smaller model already failed. Prefer high effort on a smaller model over medium effort on a flagship when cost is similar. Use family names in guidance; verify exact model IDs before scripting.
 - Reasoning or effort levels are vendor-specific: use the lowest that preserves quality, raise it for hard debugging and long-horizon work, and verify available effort names before relying on them.
