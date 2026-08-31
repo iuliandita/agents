@@ -273,14 +273,31 @@ def test_vendor_harnesses_define_model_ladders():
     gemini = (repo / "prompts" / "harnesses" / "gemini.md").read_text(encoding="utf-8")
 
     assert "Haiku = lower cost/fast" in claude
-    assert "Sonnet = default balanced" in claude
-    assert "Mythos-class (Fable" in claude
+    assert "Sonnet = balanced default" in claude
+    assert "Fable = tier above Opus" in claude
     assert "Luna-class) = lower cost" in codex
     assert "flagship (Sol-class" in codex
     assert "do not freeze stale names" in codex
     assert "Flash-Lite = lower cost/high throughput" in gemini
     assert "Flash = balanced speed and capability" in gemini
     assert "Pro = strongest reasoning" in gemini
+
+
+def test_harness_fragments_track_current_agent_behavior():
+    repo = Path(__file__).resolve().parents[1]
+    harness_dir = repo / "prompts" / "harnesses"
+
+    claude = (harness_dir / "claude.md").read_text(encoding="utf-8")
+    codex = (harness_dir / "codex.md").read_text(encoding="utf-8")
+    opencode = (harness_dir / "opencode.md").read_text(encoding="utf-8")
+
+    assert "--safe-mode" in claude
+    assert "Auto mode is the default permission mode" in claude
+    assert "run in the background by default" in claude
+    assert "Untrusted projects do not contribute project-level" in codex
+    assert "codex queue" in codex
+    assert "Skills are native, no plugin required" in opencode
+    assert "opencode.jsonc" in opencode
 
 
 def test_new_harness_fragments_describe_operational_scope():
