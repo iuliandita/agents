@@ -300,6 +300,29 @@ def test_harness_fragments_track_current_agent_behavior():
     assert "opencode.jsonc" in opencode
 
 
+def test_fragments_track_fable_5_1_and_current_cli_defaults():
+    repo = Path(__file__).resolve().parents[1]
+    core = (repo / "prompts" / "core.md").read_text(encoding="utf-8")
+    claude = (repo / "prompts" / "harnesses" / "claude.md").read_text(encoding="utf-8")
+    codex = (repo / "prompts" / "harnesses" / "codex.md").read_text(encoding="utf-8")
+
+    assert "do not map to the same depth across models" in core
+    assert "Edit surgically rather than rewriting whole files" in core
+    assert "reported as follow-ups, not fixed in the same change" in core
+    assert "do not promote scratch checks to permanent test files" in core
+    assert "a plan, or a promise about work not yet done" in core
+
+    assert "the default `high` fits most work on Fable 5.1 and Opus 5" in claude
+    assert "/effort xhigh" not in claude
+    assert "--restricted" in claude
+    assert "CLAUDE_CODE_SUBAGENT_MODEL" in claude
+
+    assert "`ultra`" in codex
+    assert "--approve-for-me" in codex
+    assert "`codex mcp-server` is deprecated" in codex
+    assert "AGENTS.override.md" in codex
+
+
 def test_new_harness_fragments_describe_operational_scope():
     repo = Path(__file__).resolve().parents[1]
     harness_dir = repo / "prompts" / "harnesses"
@@ -343,9 +366,9 @@ def test_effort_guidance_is_general_with_vendor_caveats():
     codex = (repo / "prompts" / "harnesses" / "codex.md").read_text(encoding="utf-8")
     gemini = (repo / "prompts" / "harnesses" / "gemini.md").read_text(encoding="utf-8")
 
-    assert "Reasoning or effort levels are vendor-specific" in core
+    assert "Effort names are vendor-specific" in core
     assert "Effort names vary by model" in claude
-    assert "Codex/OpenAI reasoning effort names" in codex
+    assert "verify current CLI/docs first" in codex
     assert "Gemini exposes thinking controls differently" in gemini
 
 
