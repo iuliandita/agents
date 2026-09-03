@@ -565,8 +565,8 @@ def render_commandcode(spec: AgentSpec, resolved: Resolved, invariants: str) -> 
     return "\n".join(lines) + "\n" + markdown_body(spec, invariants, salt=salt)
 
 
+# claude is rendered directly by render_harness (it needs the guard path).
 RENDERERS = {
-    "claude": render_claude,
     "codex": render_codex,
     "opencode": render_opencode,
     "commandcode": render_commandcode,
@@ -672,9 +672,8 @@ def render_all(
             guard.write_text(render_guard(guard_wrappers(overrides)), encoding="utf-8")
             guard.chmod(0o755)
         # Prune renders of agents that no longer exist; only our own files.
-        for path in sorted(dest_dir.glob(f"*{EXTENSIONS[harness]}")):
-            if path.name != GUARD_NAME and path.name not in files and is_generated(path):
-                path.unlink()
+        for path in stale_outputs(dest_dir, EXTENSIONS[harness], files):
+            path.unlink()
         written[harness] = paths
     print_notices(notices)
     return written
@@ -739,6 +738,27 @@ def is_generated(path: Path) -> bool:
     return text is not None and GENERATED_MARKER in text
 
 
+def stale_outputs(directory: Path, extension: str, files: dict[str, str]) -> list[Path]:
+    """Generated files in directory that no current agent produces; never the guard."""
+    if not directory.is_dir():
+        return []
+    return [
+        path
+        for path in sorted(directory.glob(f"*{extension}"))
+        if path.name != GUARD_NAME and path.name not in files and is_generated(path)
+    ]
+
+
+def print_dry_run(harness: str, dest: Path, text: str) -> None:
+    existing = read_text_or_none(dest)
+    if existing is None:
+        print(f"would create {harness}: {dest}")
+    elif existing == text:
+        print(f"unchanged {harness}: {dest}")
+    else:
+        print(f"would replace {harness}: {dest}")
+
+
 def deploy(
     repo_root: Path, selected: list[str] | None, overrides: dict, dry_run: bool, backup_dir: Path
 ) -> None:
@@ -756,32 +776,13 @@ def deploy(
         target = agent_target_dir(harness)
         extension = EXTENSIONS[harness]
 
-        stale = []
-        if target.is_dir():
-            stale = [
-                path
-                for path in sorted(target.glob(f"*{extension}"))
-                if path.name != GUARD_NAME and path.name not in files and is_generated(path)
-            ]
+        stale = stale_outputs(target, extension, files)
 
         if dry_run:
             if guard_path is not None:
-                existing = read_text_or_none(guard_path)
-                if existing is None:
-                    print(f"would create {harness}: {guard_path}")
-                elif existing == guard_text:
-                    print(f"unchanged {harness}: {guard_path}")
-                else:
-                    print(f"would replace {harness}: {guard_path}")
+                print_dry_run(harness, guard_path, guard_text)
             for filename, text in files.items():
-                dest = target / filename
-                existing = read_text_or_none(dest)
-                if existing is None:
-                    print(f"would create {harness}: {dest}")
-                elif existing == text:
-                    print(f"unchanged {harness}: {dest}")
-                else:
-                    print(f"would replace {harness}: {dest}")
+                print_dry_run(harness, target / filename, text)
             for path in stale:
                 print(f"would remove stale {harness}: {path}")
             continue

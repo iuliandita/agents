@@ -704,3 +704,18 @@ def test_deploy_dry_run_reports_guard(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert f"would create claude: {tmp_path / 'h' / ra.GUARD_NAME}" in out
     assert not (tmp_path / "h").exists()
+
+
+def test_readme_roster_table_matches_agent_sources():
+    readme = (REPO / "README.md").read_text(encoding="utf-8")
+    rows = {}
+    for line in readme.splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) == 5 and cells[0] not in {"agent", "---"} and cells[1] in ra.TIERS:
+            rows[cells[0]] = cells
+    specs = {spec.name: spec for spec in ra.load_agents(REPO)}
+    assert set(rows) == set(specs)
+    for name, spec in specs.items():
+        assert rows[name][1] == spec.tier, name
+        assert rows[name][2] == spec.effort, name
+        assert rows[name][3] == ", ".join(spec.tools), name
