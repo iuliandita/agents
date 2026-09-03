@@ -252,6 +252,7 @@ def test_common_guidance_lives_in_core_not_harness_fragments():
         "Functional status markers are fine",
         "Use dense bullet lists",
         "environment scrubbing can hide",
+        "user's explicit instructions take precedence over skill guidance",
     ):
         assert phrase in core
 

@@ -126,11 +126,6 @@ def test_load_agent_allows_missing_max_turns(tmp_path):
     assert spec.max_turns is None
 
 
-def test_opencode_ro_bash_excludes_find_includes_git_grep():
-    assert "find *" not in ra.OPENCODE_RO_BASH
-    assert "git grep *" in ra.OPENCODE_RO_BASH
-
-
 def test_load_agents_reads_repo_roster():
     specs = ra.load_agents(REPO)
     assert [spec.name for spec in specs] == [
@@ -166,10 +161,10 @@ def test_resolve_claude_defaults():
     assert resolved.notices == []
 
 
-def test_resolve_codex_apex_falls_back_to_flagship_with_notice():
+def test_resolve_codex_apex_uses_astra():
     resolved = ra.resolve(spec(tier="apex"), "codex", {})
-    assert resolved.model == "gpt-5.6-sol"
-    assert any("apex" in notice for notice in resolved.notices)
+    assert resolved.model == "gpt-6-astra"
+    assert resolved.notices == []
 
 
 def test_resolve_opencode_inherits_without_override():
@@ -232,7 +227,7 @@ def test_render_claude_frontmatter_and_body():
     assert fields == {
         "name": "sample",
         "description": "Sample.",
-        "tools": "Read, Grep, Glob, Bash",
+        "tools": "Read, Grep, Glob",
         "model": "haiku",
         "effort": "low",
         "maxTurns": "30",
@@ -263,6 +258,10 @@ def test_render_codex_is_valid_toml_with_sandbox():
     assert tomllib.loads(writer)["sandbox_mode"] == "workspace-write"
 
 
+def test_default_codex_apex_model_is_astra():
+    assert ra.DEFAULT_MODELS["codex"]["apex"] == "gpt-6-astra"
+
+
 def test_render_codex_escapes_description_quotes():
     text = ra.render_codex(spec(description='Say "hi" \\ now'), ra.resolve(spec(), "codex", {}), INVARIANTS)
     assert tomllib.loads(text)["description"] == 'Say "hi" \\ now'
@@ -288,8 +287,7 @@ def test_render_opencode_permission_map_for_shell_ro():
     assert "  task: deny" in head
     assert "  todowrite: deny" in head
     assert "  question: deny" in head
-    assert '    "*": deny' in head
-    assert '    "git diff *": allow' in head
+    assert "  bash: deny" in head
 
 
 def test_render_opencode_full_shell_and_inherit():
@@ -297,6 +295,35 @@ def test_render_opencode_full_shell_and_inherit():
     head = text.split("---")[1]
     assert "model:" not in head
     assert "  bash: allow" in head
+
+
+def test_shell_ro_omits_shell_without_a_hard_read_only_sandbox():
+    claude = ra.render_claude(
+        spec(tools=("read", "search", "shell-ro")),
+        ra.resolve(spec(), "claude", {}),
+        INVARIANTS,
+    )
+    assert "Bash" not in yaml.safe_load(claude.split("---")[1])["tools"]
+
+    opencode = ra.render_opencode(
+        spec(tools=("read", "search", "shell-ro")),
+        ra.resolve(
+            spec(),
+            "opencode",
+            {"opencode": {"shell_ro_wrappers": ["rtk"]}},
+        ),
+        INVARIANTS,
+    )
+    assert yaml.safe_load(opencode.split("---")[1])["permission"]["bash"] == "deny"
+
+    commandcode = ra.render_commandcode(
+        spec(tools=("read", "search", "shell-ro")),
+        ra.resolve(spec(), "commandcode", {}),
+        INVARIANTS,
+    )
+    tools = yaml.safe_load(commandcode.split("---")[1])["tools"]
+    assert "shell_command" not in tools
+    assert "run_command" not in tools
 
 
 def test_render_harness_notices_when_every_model_inherits():
@@ -347,8 +374,7 @@ def test_render_all_writes_every_harness(tmp_path):
             if harness == "opencode":
                 assert data["permission"]["task"] == "deny"
                 if path.stem in ("explorer", "reviewer"):
-                    assert isinstance(data["permission"]["bash"], dict)
-                    assert data["permission"]["bash"]["*"] == "deny"
+                    assert data["permission"]["bash"] == "deny"
 
 
 def test_check_fails_when_marker_missing(monkeypatch, capsys):
@@ -459,6 +485,26 @@ def test_deploy_target_dir_is_a_file(tmp_path, monkeypatch):
         ra.deploy(REPO, selected=["claude"], overrides={}, dry_run=False, backup_dir=tmp_path / "b")
 
 
+def test_deploy_preflights_every_target_before_any_write(tmp_path, monkeypatch):
+    codex_target = tmp_path / "codex-agents"
+    claude_target = tmp_path / "claude-agents"
+    claude_target.write_text("not a directory\n", encoding="utf-8")
+    monkeypatch.setenv("CODEX_AGENTS_DIR", str(codex_target))
+    monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(claude_target))
+    monkeypatch.setenv("CLAUDE_HOOKS_DIR", str(tmp_path / "claude-hooks"))
+
+    with pytest.raises(SystemExit, match="not a directory"):
+        ra.deploy(
+            REPO,
+            selected=["codex", "claude"],
+            overrides={},
+            dry_run=False,
+            backup_dir=tmp_path / "b",
+        )
+
+    assert not codex_target.exists()
+
+
 def test_deploy_dry_run_writes_nothing(tmp_path, monkeypatch, capsys):
     target = tmp_path / "codex-agents"
     monkeypatch.setenv("CODEX_AGENTS_DIR", str(target))
@@ -514,32 +560,7 @@ def test_render_all_prunes_stale_generated_outputs(tmp_path):
     assert foreign.exists()
 
 
-# --- shell-ro enforcement -------------------------------------------------
-
-
-def test_opencode_ro_bash_patterns_use_space_star():
-    assert "ls *" in ra.OPENCODE_RO_BASH
-    assert "git grep *" in ra.OPENCODE_RO_BASH
-    assert all(pattern.endswith(" *") for pattern in ra.OPENCODE_RO_BASH)
-
-
-def test_ro_commands_feed_opencode_patterns():
-    assert ra.OPENCODE_RO_BASH == tuple(f"{cmd} *" for cmd in ra.RO_COMMANDS)
-
-
-def test_render_opencode_emits_wrapper_patterns():
-    overrides = {"opencode": {"shell_ro_wrappers": ["rtk"]}}
-    resolved = ra.resolve(spec(), "opencode", overrides)
-    assert resolved.wrappers == ("rtk",)
-    text = ra.render_opencode(spec(tools=("read", "shell-ro")), resolved, INVARIANTS)
-    head = text.split("---")[1]
-    assert '    "ls *": allow' in head
-    assert '    "rtk ls *": allow' in head
-    assert '    "rtk git grep *": allow' in head
-
-
-def test_resolve_wrappers_default_empty():
-    assert ra.resolve(spec(), "opencode", {}).wrappers == ()
+# --- shell-ro compatibility -----------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -560,149 +581,54 @@ def test_load_overrides_rejects_bad_wrappers(tmp_path, payload):
         ra.load_overrides(tmp_path)
 
 
-def test_validate_overrides_accepts_wrappers():
+def test_validate_overrides_accepts_legacy_wrappers():
     data = ra.validate_overrides(
         {"claude": {"shell_ro_wrappers": ["rtk", "/usr/bin/env"]}}, Path("models.local.json")
     )
     assert data["claude"]["shell_ro_wrappers"] == ["rtk", "/usr/bin/env"]
 
 
-def test_render_claude_adds_guard_hook_for_shell_ro():
-    path = "/tmp/hooks/agents-shell-ro-guard.py"
-    text = ra.render_claude(
-        spec(tools=("read", "shell-ro")), ra.resolve(spec(), "claude", {}), INVARIANTS, guard_command=path
-    )
-    head = text.split("---")[1]
-    assert "hooks:" in head
-    assert "matcher: Bash" in head
-    data = yaml.safe_load(head)
-    assert data["hooks"]["PreToolUse"][0]["matcher"] == "Bash"
-    assert data["hooks"]["PreToolUse"][0]["hooks"][0]["type"] == "command"
-    assert data["hooks"]["PreToolUse"][0]["hooks"][0]["command"] == path
-
-
-def test_render_claude_omits_guard_hook_without_shell_ro():
-    text = ra.render_claude(
-        spec(tools=("read", "edit", "shell")),
-        ra.resolve(spec(), "claude", {}),
-        INVARIANTS,
-        guard_command="/tmp/hooks/agents-shell-ro-guard.py",
-    )
-    head = text.split("---")[1]
-    assert "hooks:" not in head
-    assert yaml.safe_load(head).get("hooks") is None
-
-
-def test_render_claude_omits_guard_hook_without_command():
+def test_render_claude_omits_guard_hook():
     text = ra.render_claude(spec(tools=("read", "shell-ro")), ra.resolve(spec(), "claude", {}), INVARIANTS)
     assert "hooks:" not in text.split("---")[1]
 
 
-def guard_path(tmp_path):
-    path = tmp_path / ra.GUARD_NAME
-    path.write_text(ra.render_guard(("rtk",)), encoding="utf-8")
-    return path
-
-
-def run_guard(path, payload):
-    import subprocess
-    import sys
-
-    return subprocess.run(
-        [sys.executable, str(path)], input=payload, capture_output=True, text=True
-    )
-
-
-@pytest.mark.parametrize(
-    "command",
-    [
-        "git diff --stat",
-        "rtk ls -la scripts",
-        "sed -n 1,5p x.py",
-        "git log --oneline | head -5",
-        "ls",
-    ],
-)
-def test_guard_allows_read_only_commands(tmp_path, command):
-    payload = __import__("json").dumps({"tool_input": {"command": command}})
-    result = run_guard(guard_path(tmp_path), payload)
-    assert result.returncode == 0, result.stderr
-
-
-@pytest.mark.parametrize(
-    "command",
-    [
-        "ls; rm -rf x",
-        "cat a > b",
-        "echo $(id)",
-        "sed -n -i s/a/b/ x",
-        "find . -delete",
-        "rtk rm x",
-        "cat a `id`",
-        "rg foo --output x",
-    ],
-)
-def test_guard_blocks_non_read_only_commands(tmp_path, command):
-    payload = __import__("json").dumps({"tool_input": {"command": command}})
-    result = run_guard(guard_path(tmp_path), payload)
-    assert result.returncode == 2
-    assert "shell-ro guard" in result.stderr
-
-
-@pytest.mark.parametrize("payload", ["", '{"tool_input":{}}', "not json"])
-def test_guard_blocks_unreadable_input(tmp_path, payload):
-    result = run_guard(guard_path(tmp_path), payload)
-    assert result.returncode == 2
-    assert "shell-ro guard: unreadable hook input" in result.stderr
-
-
-def test_render_guard_is_marked_and_parses(tmp_path):
-    import ast
-
-    text = ra.render_guard(())
-    assert ra.GENERATED_MARKER in text
-    assert text.startswith("#!/usr/bin/env python3\n")
-    ast.parse(text)
-    assert ra.render_guard(("rtk",)) != text
-
-
-def test_render_all_writes_executable_guard(tmp_path):
+def test_render_all_does_not_emit_a_shell_guard(tmp_path):
     ra.render_all(REPO, tmp_path, selected=["claude"], overrides={})
-    guard = tmp_path / "claude" / "agents-shell-ro-guard.py"
-    assert guard.is_file()
-    assert guard.stat().st_mode & 0o111
+    assert not (tmp_path / "claude" / ra.GUARD_NAME).exists()
 
 
-def test_deploy_installs_guard_and_references_it(tmp_path, monkeypatch, capsys):
+def test_render_all_removes_a_stale_generated_shell_guard(tmp_path):
+    claude_dir = tmp_path / "claude"
+    claude_dir.mkdir()
+    guard = claude_dir / ra.GUARD_NAME
+    guard.write_text(f"# {ra.GENERATED_MARKER}\n", encoding="utf-8")
+
+    ra.render_all(REPO, tmp_path, selected=["claude"], overrides={})
+
+    assert not guard.exists()
+
+
+def test_deploy_does_not_install_or_reference_a_guard(tmp_path, monkeypatch):
     agents_dir = tmp_path / "claude-agents"
     hooks_dir = tmp_path / "claude-hooks"
     monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(agents_dir))
     monkeypatch.setenv("CLAUDE_HOOKS_DIR", str(hooks_dir))
 
     ra.deploy(REPO, selected=["claude"], overrides={}, dry_run=False, backup_dir=tmp_path / "b")
-    guard = hooks_dir / ra.GUARD_NAME
-    assert guard.is_file()
-    assert guard.stat().st_mode & 0o111
+    assert not hooks_dir.exists()
     explorer = (agents_dir / "explorer.md").read_text(encoding="utf-8")
-    assert str(guard) in explorer
     data = yaml.safe_load(explorer.split("---")[1])
-    assert data["hooks"]["PreToolUse"][0]["hooks"][0]["command"] == str(guard)
-    assert "builder" not in yaml.safe_load((agents_dir / "builder.md").read_text(encoding="utf-8").split("---")[1]).get("hooks", {})
-
-    capsys.readouterr()
-    ra.deploy(REPO, selected=["claude"], overrides={}, dry_run=False, backup_dir=tmp_path / "b")
-    out = capsys.readouterr().out
-    assert f"unchanged claude: {guard}" in out
-    assert "updated" not in out
-    assert guard.is_file()
+    assert "Bash" not in data["tools"]
+    assert "hooks" not in data
 
 
-def test_deploy_dry_run_reports_guard(tmp_path, monkeypatch, capsys):
+def test_deploy_dry_run_does_not_report_guard(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(tmp_path / "a"))
     monkeypatch.setenv("CLAUDE_HOOKS_DIR", str(tmp_path / "h"))
     ra.deploy(REPO, selected=["claude"], overrides={}, dry_run=True, backup_dir=tmp_path / "b")
     out = capsys.readouterr().out
-    assert f"would create claude: {tmp_path / 'h' / ra.GUARD_NAME}" in out
+    assert ra.GUARD_NAME not in out
     assert not (tmp_path / "h").exists()
 
 

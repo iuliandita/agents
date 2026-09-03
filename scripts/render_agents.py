@@ -8,19 +8,16 @@ invariants, and writes build/agents/<harness>/. Deploy is explicit.
 from __future__ import annotations
 
 import argparse
-import ast
 import hashlib
 import json
 import os
 import re
-import subprocess
-import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from render_invariants import HOOKS_DIR_ENV, resolve_hooks_dir, read_invariants
+from render_invariants import read_invariants
 from render_prompts import backup_existing
 
 
@@ -73,8 +70,8 @@ def parse_frontmatter(text: str, source: Path) -> tuple[dict[str, str], str]:
         if not line.strip():
             continue
         if line[0] in " \t":
-            # Indented continuation of a nested block (the rendered claude
-            # hooks: block). Frontmatter sources stay flat by contract.
+            # Indented continuation of a nested rendered frontmatter block.
+            # Frontmatter sources stay flat by contract.
             continue
         if ":" not in line:
             raise SystemExit(f"{source}: frontmatter line without a colon: {line.strip()}")
@@ -174,7 +171,12 @@ def load_agents(repo_root: Path) -> list[AgentSpec]:
 
 DEFAULT_MODELS: dict[str, dict[str, str | None]] = {
     "claude": {"cheap": "haiku", "mid": "sonnet", "flagship": "opus", "apex": "fable"},
-    "codex": {"cheap": "gpt-5.6-luna", "mid": "gpt-5.6-terra", "flagship": "gpt-5.6-sol", "apex": None},
+    "codex": {
+        "cheap": "gpt-5.6-luna",
+        "mid": "gpt-5.6-terra",
+        "flagship": "gpt-5.6-sol",
+        "apex": "gpt-6-astra",
+    },
     # No generic aliases; commonly self-hosted or routed. Inherit the session model
     # unless prompts/models.local.json names provider/model IDs.
     "opencode": {tier: None for tier in TIERS},
@@ -196,7 +198,6 @@ class Resolved:
     effort: str
     effort_key: str
     notices: list[str]
-    wrappers: tuple[str, ...] = ()
 
 
 def validate_overrides(data: object, source: Path) -> dict:
@@ -237,6 +238,8 @@ def validate_overrides(data: object, source: Path) -> dict:
                 allowed = TIERS if key == "tier" else EFFORTS
                 if value not in allowed:
                     raise SystemExit(f"{label}: '{harness}.agents.{name}.{key}' = '{value}' is invalid")
+        # Accepted for backward compatibility with existing ignored local
+        # overrides. Unsafe harnesses no longer grant shell-ro access.
         wrappers = entry.get("shell_ro_wrappers", [])
         if not isinstance(wrappers, list):
             raise SystemExit(f"{label}: '{harness}.shell_ro_wrappers' must be a list of strings")
@@ -293,7 +296,6 @@ def resolve(spec: AgentSpec, harness: str, overrides: dict) -> Resolved:
         effort=effort,
         effort_key=effort_key,
         notices=notices,
-        wrappers=tuple(entry.get("shell_ro_wrappers", [])),
     )
 
 
@@ -303,7 +305,7 @@ CLAUDE_TOOLS = {
     "edit": ("Edit",),
     "write": ("Write",),
     "shell": ("Bash",),
-    "shell-ro": ("Bash",),
+    "shell-ro": (),
     "web": ("WebFetch", "WebSearch"),
 }
 COMMANDCODE_TOOLS = {
@@ -312,7 +314,7 @@ COMMANDCODE_TOOLS = {
     "edit": ("edit_file",),
     "write": ("write_file",),
     "shell": ("shell_command", "run_command"),
-    "shell-ro": ("shell_command",),
+    "shell-ro": (),
     "web": ("web_fetch", "web_search"),
 }
 OPENCODE_TOOLS = {
@@ -321,108 +323,11 @@ OPENCODE_TOOLS = {
     "edit": ("edit",),
     "write": ("edit",),
     "shell": ("bash",),
-    "shell-ro": ("bash",),
+    "shell-ro": (),
     "web": ("webfetch", "websearch"),
 }
 OPENCODE_KNOWN = ("read", "list", "grep", "glob", "edit", "bash", "webfetch", "websearch", "task", "todowrite", "question")
-# Read-only shell commands, the single source for both the OpenCode permission
-# globs and the rendered Claude Code guard.
-RO_COMMANDS = (
-    "git diff",
-    "git log",
-    "git status",
-    "git show",
-    "git blame",
-    "git grep",
-    "ls",
-    "cat",
-    "head",
-    "sed -n",
-    "rg",
-    "grep",
-)
-# OpenCode matches the whole command text with `*` as `.*` and treats a trailing
-# " *" as optional, so "ls *" also matches a bare "ls".
-OPENCODE_RO_BASH = tuple(f"{command} *" for command in RO_COMMANDS)
-# Anything that can write, redirect, or smuggle a second command.
-GUARD_BAD_TOKENS = (">", "$(", "`", "<(", "--output")
 OPENCODE_DENY_ALWAYS = frozenset({"task", "todowrite", "question"})
-
-
-def render_guard(wrappers: tuple[str, ...]) -> str:
-    """Render the Claude Code PreToolUse guard that enforces shell-ro on Bash.
-
-    Claude Code has no per-tool command allowlist in an agent file, so the
-    read-only contract is enforced by a hook: exit 2 blocks the call and the
-    stderr text is shown to the model.
-    """
-    digest = hashlib.sha256(
-        ("guard\n" + "\n".join(RO_COMMANDS) + "\n" + "\n".join(wrappers)).encode("utf-8")
-    ).hexdigest()[:12]
-    header = (
-        f"# {GENERATED_MARKER} (shell-ro Bash guard, hash {digest}). "
-        "Edit scripts/render_agents.py and rerun scripts/render-agents; do not edit this file."
-    )
-    return f'''#!/usr/bin/env python3
-{header}
-"""Claude Code PreToolUse hook: allow only read-only shell commands."""
-import json
-import re
-import sys
-
-RO_COMMANDS = {RO_COMMANDS!r}
-WRAPPERS = {tuple(wrappers)!r}
-BAD_TOKENS = {GUARD_BAD_TOKENS!r}
-SPLIT_RE = re.compile(r"&&|\\|\\||\\||;|\\n")
-
-
-def die(message):
-    sys.stderr.write(message + "\\n")
-    raise SystemExit(2)
-
-
-def blocked(segment):
-    die(
-        "shell-ro guard: blocked '%s'; allowed prefixes: %s"
-        % (segment, ", ".join(RO_COMMANDS))
-    )
-
-
-def main():
-    try:
-        command = json.loads(sys.stdin.read())["tool_input"]["command"]
-    except Exception:
-        die("shell-ro guard: unreadable hook input")
-    if not isinstance(command, str):
-        die("shell-ro guard: unreadable hook input")
-    for raw in SPLIT_RE.split(command):
-        segment = raw.strip()
-        if not segment:
-            continue
-        for token in BAD_TOKENS:
-            if token in segment:
-                blocked(segment)
-        candidate = segment
-        head = candidate.split(None, 1)
-        if head[0] in WRAPPERS:
-            candidate = head[1].strip() if len(head) > 1 else ""
-        if not candidate:
-            blocked(segment)
-        matched = None
-        for name in RO_COMMANDS:
-            if candidate == name or candidate.startswith(name + " "):
-                matched = name
-                break
-        if matched is None:
-            blocked(segment)
-        if matched == "sed -n" and (" -i" in candidate or re.search(r"\\bw\\s", candidate)):
-            blocked(segment)
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-'''
 
 
 def expand_tools(tools: tuple[str, ...], table: dict[str, tuple[str, ...]]) -> list[str]:
@@ -451,9 +356,7 @@ def markdown_body(spec: AgentSpec, invariants: str, salt: str = "") -> str:
     return f"<!-- {generated_header(spec, invariants, salt)} -->\n\n{invariants.rstrip()}\n\n{spec.body}"
 
 
-def render_claude(
-    spec: AgentSpec, resolved: Resolved, invariants: str, guard_command: str | None = None
-) -> str:
+def render_claude(spec: AgentSpec, resolved: Resolved, invariants: str) -> str:
     lines = [
         "---",
         f"name: {spec.name}",
@@ -465,20 +368,8 @@ def render_claude(
     lines.append(f"{resolved.effort_key}: {resolved.effort}")
     if spec.max_turns is not None:
         lines.append(f"maxTurns: {spec.max_turns}")
-    guarded = "shell-ro" in spec.tools and guard_command is not None
-    if guarded:
-        lines.extend(
-            [
-                "hooks:",
-                "  PreToolUse:",
-                "    - matcher: Bash",
-                "      hooks:",
-                "        - type: command",
-                f"          command: {yaml_string(guard_command)}",
-            ]
-        )
     lines.append("---")
-    salt = f"claude:{resolved.model}:{resolved.effort}:{guard_command if guarded else ''}"
+    salt = f"claude:{resolved.model}:{resolved.effort}"
     return "\n".join(lines) + "\n" + markdown_body(spec, invariants, salt=salt)
 
 
@@ -532,15 +423,6 @@ def render_opencode(spec: AgentSpec, resolved: Resolved, invariants: str) -> str
     for tool in OPENCODE_KNOWN:
         if tool in OPENCODE_DENY_ALWAYS:
             lines.append(f"  {tool}: deny")
-        elif tool == "bash" and "shell-ro" in spec.tools:
-            lines.append("  bash:")
-            lines.append('    "*": deny')
-            lines.extend(f"    {yaml_string(pattern)}: allow" for pattern in OPENCODE_RO_BASH)
-            lines.extend(
-                f"    {yaml_string(f'{wrapper} {pattern}')}: allow"
-                for wrapper in resolved.wrappers
-                for pattern in OPENCODE_RO_BASH
-            )
         else:
             lines.append(f"  {tool}: {'allow' if tool in allowed else 'deny'}")
     lines.append("---")
@@ -565,8 +447,8 @@ def render_commandcode(spec: AgentSpec, resolved: Resolved, invariants: str) -> 
     return "\n".join(lines) + "\n" + markdown_body(spec, invariants, salt=salt)
 
 
-# claude is rendered directly by render_harness (it needs the guard path).
 RENDERERS = {
+    "claude": render_claude,
     "codex": render_codex,
     "opencode": render_opencode,
     "commandcode": render_commandcode,
@@ -611,20 +493,11 @@ def agent_target_dir(harness: str, home: Path | None = None, env: dict[str, str]
     return Path(template.format(home=home_path)).expanduser()
 
 
-def guard_wrappers(overrides: dict) -> tuple[str, ...]:
-    return tuple(overrides.get("claude", {}).get("shell_ro_wrappers", []))
-
-
-def guard_dest() -> Path:
-    return resolve_hooks_dir(Path.home(), os.environ) / GUARD_NAME
-
-
 def render_harness(
     specs: list[AgentSpec],
     harness: str,
     overrides: dict,
     invariants: str,
-    guard_command: str | None = None,
 ) -> tuple[dict[str, str], list[str]]:
     rendered: dict[str, str] = {}
     notices: list[str] = []
@@ -633,10 +506,7 @@ def render_harness(
         resolved = resolve(spec, harness, overrides)
         notices.extend(resolved.notices)
         models.append(resolved.model)
-        if harness == "claude":
-            text = render_claude(spec, resolved, invariants, guard_command)
-        else:
-            text = RENDERERS[harness](spec, resolved, invariants)
+        text = RENDERERS[harness](spec, resolved, invariants)
         rendered[spec.name + EXTENSIONS[harness]] = text
     if all(model is None for model in models):
         notices.append(f"{harness}: every tier renders as inherit; set prompts/models.local.json to enable tiering")
@@ -657,8 +527,7 @@ def render_all(
     written: dict[str, list[Path]] = {}
     notices: list[str] = []
     for harness in selected_agent_harnesses(selected):
-        guard_command = str(guard_dest()) if harness == "claude" else None
-        files, harness_notices = render_harness(specs, harness, overrides, invariants, guard_command)
+        files, harness_notices = render_harness(specs, harness, overrides, invariants)
         notices.extend(harness_notices)
         dest_dir = out_dir / harness
         dest_dir.mkdir(parents=True, exist_ok=True)
@@ -667,40 +536,16 @@ def render_all(
             dest = dest_dir / filename
             dest.write_text(text, encoding="utf-8")
             paths.append(dest)
-        if harness == "claude":
-            guard = dest_dir / GUARD_NAME
-            guard.write_text(render_guard(guard_wrappers(overrides)), encoding="utf-8")
-            guard.chmod(0o755)
         # Prune renders of agents that no longer exist; only our own files.
         for path in stale_outputs(dest_dir, EXTENSIONS[harness], files):
             path.unlink()
+        if harness == "claude":
+            legacy_guard = dest_dir / GUARD_NAME
+            if is_generated(legacy_guard):
+                legacy_guard.unlink()
         written[harness] = paths
     print_notices(notices)
     return written
-
-
-GUARD_FIXTURES = (
-    ('{"tool_input":{"command":"git diff --stat"}}', 0),
-    ('{"tool_input":{"command":"ls; rm -rf x"}}', 2),
-)
-
-
-def check_guard(path: Path) -> bool:
-    try:
-        ast.parse(path.read_text(encoding="utf-8"))
-    except SyntaxError as exc:
-        print(f"ERROR: rendered {GUARD_NAME} is not valid Python: {exc}")
-        return False
-    for payload, expected in GUARD_FIXTURES:
-        result = subprocess.run(
-            [sys.executable, str(path)], input=payload, capture_output=True, text=True
-        )
-        if result.returncode != expected:
-            print(
-                f"ERROR: {GUARD_NAME} returned {result.returncode} for {payload}; expected {expected}"
-            )
-            return False
-    return True
 
 
 def check(repo_root: Path, selected: list[str] | None) -> int:
@@ -719,9 +564,6 @@ def check(repo_root: Path, selected: list[str] | None) -> int:
                     tomllib.loads(text)
                 else:
                     parse_frontmatter(text, path)
-        guard = Path(temp_dir) / "claude" / GUARD_NAME
-        if guard.exists() and not check_guard(guard):
-            return 1
     print("Agent render check passed")
     return 0
 
@@ -739,13 +581,13 @@ def is_generated(path: Path) -> bool:
 
 
 def stale_outputs(directory: Path, extension: str, files: dict[str, str]) -> list[Path]:
-    """Generated files in directory that no current agent produces; never the guard."""
+    """Generated files in directory that no current agent produces."""
     if not directory.is_dir():
         return []
     return [
         path
         for path in sorted(directory.glob(f"*{extension}"))
-        if path.name != GUARD_NAME and path.name not in files and is_generated(path)
+        if path.name not in files and is_generated(path)
     ]
 
 
@@ -759,6 +601,19 @@ def print_dry_run(harness: str, dest: Path, text: str) -> None:
         print(f"would replace {harness}: {dest}")
 
 
+def preflight_target(target: Path, files: dict[str, str]) -> None:
+    if target.exists() and not target.is_dir():
+        raise SystemExit(f"{target} exists and is not a directory")
+    if not target.exists():
+        existing_parent = next((parent for parent in target.parents if parent.exists()), None)
+        if existing_parent is not None and not existing_parent.is_dir():
+            raise SystemExit(f"{existing_parent} exists and is not a directory")
+    for filename in files:
+        dest = target / filename
+        if dest.is_symlink() or (dest.exists() and not dest.is_file()):
+            raise SystemExit(f"{dest} is a symlink or not a regular file; move it aside")
+
+
 def deploy(
     repo_root: Path, selected: list[str] | None, overrides: dict, dry_run: bool, backup_dir: Path
 ) -> None:
@@ -766,47 +621,28 @@ def deploy(
     check_override_agents(overrides, specs)
     invariants = read_invariants(repo_root)
     notices: list[str] = []
+    deployments: list[tuple[str, Path, dict[str, str], list[Path]]] = []
     for harness in selected_agent_harnesses(selected):
-        guard_path = guard_dest() if harness == "claude" else None
-        guard_text = render_guard(guard_wrappers(overrides)) if guard_path is not None else None
-        files, harness_notices = render_harness(
-            specs, harness, overrides, invariants, None if guard_path is None else str(guard_path)
-        )
+        files, harness_notices = render_harness(specs, harness, overrides, invariants)
         notices.extend(harness_notices)
         target = agent_target_dir(harness)
         extension = EXTENSIONS[harness]
-
         stale = stale_outputs(target, extension, files)
+        preflight_target(target, files)
+        deployments.append((harness, target, files, stale))
 
+    for harness, target, files, stale in deployments:
         if dry_run:
-            if guard_path is not None:
-                print_dry_run(harness, guard_path, guard_text)
             for filename, text in files.items():
                 print_dry_run(harness, target / filename, text)
             for path in stale:
                 print(f"would remove stale {harness}: {path}")
             continue
 
-        if guard_path is not None:
-            guard_path.parent.mkdir(parents=True, exist_ok=True)
-            if read_text_or_none(guard_path) == guard_text:
-                print(f"unchanged {harness}: {guard_path}")
-            else:
-                backup_existing(guard_path, backup_dir)
-                guard_path.write_text(guard_text, encoding="utf-8")
-                print(f"updated {harness}: {guard_path}")
-            guard_path.chmod(0o755)
-
         try:
             target.mkdir(parents=True, exist_ok=True)
         except (FileExistsError, NotADirectoryError):
             raise SystemExit(f"{target} exists and is not a directory")
-        # Refuse before the first write so a bad entry cannot leave the
-        # directory half-updated.
-        for filename in files:
-            dest = target / filename
-            if dest.is_symlink() or (dest.exists() and not dest.is_file()):
-                raise SystemExit(f"{dest} is a symlink or not a regular file; move it aside")
         for filename, text in files.items():
             dest = target / filename
             if read_text_or_none(dest) == text:

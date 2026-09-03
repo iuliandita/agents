@@ -67,7 +67,7 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 
 ## Skills
 - Check available skills before non-trivial work; if a skill could plausibly apply, invoke it first. Adjacent topics include code review, debugging, tests, git, commits, PRs, docs, security, IaC, containers, shell scripts, prose review, and skill creation.
-- Prefer local or custom skills over upstream equivalents when both exist.
+- Prefer local or custom skills over upstream equivalents when both exist; the user's explicit instructions take precedence over skill guidance.
 - Keep skill metadata tool-agnostic unless a tool explicitly consumes a field.
 
 ## Verification
