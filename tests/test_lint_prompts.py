@@ -187,3 +187,36 @@ def test_main_lints_private_example_when_present(tmp_path, capsys):
     assert rc == 1
     assert "private.example.md" in captured.out
     assert "private path or name marker" in captured.out
+
+
+def test_main_lints_agent_sources(tmp_path, capsys):
+    repo_root = tmp_path / "repo"
+    scripts_dir = repo_root / "scripts"
+    scripts_dir.mkdir(parents=True)
+    prompts = repo_root / "prompts"
+    (prompts / "harnesses").mkdir(parents=True)
+    (prompts / "core.md").write_text("# Core\nclean line\n", encoding="utf-8")
+    (prompts / "invariants.md").write_text("# Invariants\nclean line\n", encoding="utf-8")
+    for harness in linter.HARNESSES:
+        (prompts / "harnesses" / harness.fragment).write_text(
+            "## Fragment\nclean line\n", encoding="utf-8"
+        )
+    (prompts / "private.example.md").write_text("# Example\nclean line\n", encoding="utf-8")
+    agents = repo_root / "agents"
+    agents.mkdir()
+    (agents / "explorer.md").write_text(
+        "---\nname: explorer\n---\nsee /home/yourname/secret\n", encoding="utf-8"
+    )
+
+    fake_script = scripts_dir / "lint_prompts.py"
+    fake_script.write_bytes(Path(linter.__file__).read_bytes())
+    spec = importlib.util.spec_from_file_location("lint_prompts_agents_tmp", fake_script)
+    sandbox = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(sandbox)
+
+    rc = sandbox.main()
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "explorer.md" in captured.out
+    assert "private path or name marker" in captured.out

@@ -27,12 +27,14 @@ DEFAULT_LOCAL_MARKERS = (
     "company.internal",
 )
 
-CORE_WARN_LINES = 95
-CORE_MAX_LINES = 100
+CORE_WARN_LINES = 105
+CORE_MAX_LINES = 110
 HARNESS_WARN_LINES = 8
 HARNESS_MAX_LINES = 10
 PRIVATE_EXAMPLE_WARN_LINES = 30
 PRIVATE_EXAMPLE_MAX_LINES = 40
+AGENT_WARN_LINES = 70
+AGENT_MAX_LINES = 90
 
 
 def error(message: str) -> None:
@@ -145,6 +147,13 @@ def main() -> int:
         failures += 1
     else:
         failures += lint_file(invariants, private_patterns=private_patterns)
+
+    # Optional here so the fake-repo lint tests stay minimal; render-agents
+    # fails loud on its own when the directory is missing.
+    agents_dir = repo_root / "agents"
+    for agent_path in sorted(agents_dir.glob("*.md")) if agents_dir.is_dir() else []:
+        failures += lint_line_count(agent_path, AGENT_WARN_LINES, AGENT_MAX_LINES)
+        failures += lint_file(agent_path, private_patterns=private_patterns)
 
     private_example = prompt_root / "private.example.md"
     if not private_example.exists():

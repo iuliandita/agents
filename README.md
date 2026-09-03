@@ -48,6 +48,7 @@ scripts/sync-ai-prompts --target claude,codex,opencode
 ## Layout
 
 ```text
+agents/                   # tool-agnostic subagent sources
 prompts/
   core.md                 # shared rules
   invariants.md           # non-negotiable rules for hook/subagent reinforcement
@@ -65,6 +66,8 @@ scripts/
   sync-ai-prompts         # wrapper for render/deploy
   render_invariants.py    # invariants hook/subagent-block renderer
   render-invariants       # wrapper for the invariants renderer
+  render-agents           # wrapper for the subagent renderer
+  render_agents.py        # subagent renderer
   lint_prompts.py         # prompt-source linter
   scan_prompt_sources.py  # prompt-injection scanner
   check_harness_docs.py   # README/INSTALL harness-table drift check
@@ -130,6 +133,40 @@ scripts/render-invariants --deploy
 
 Per-turn injection is intentional: `SessionStart` runs once and gets buried, whereas `UserPromptSubmit` re-asserts the rules each turn for roughly 60 tokens. `UserPromptSubmit` fires on user prompts in the main loop, not on subagent dispatches; that is why the subagent block is a separate delivery path and stays a manual paste. Per-prompt injection support varies by harness (Claude Code, OpenCode, and current Codex expose lifecycle hooks; Gemini/Antigravity, Cursor, Windsurf, and Aider expose context/rules files but no programmatic per-turn hook) - verify current support before relying on it.
 
+## Subagent Roster
+
+Specialized subagents beat general-purpose ones for two reasons: a clean context window per dispatch, and a fixed compact output the main thread can consume cheaply. `agents/*.md` defines six roles once, tool-agnostic; `scripts/render-agents` emits native definitions for Claude Code, Codex, OpenCode, and Command Code.
+
+| agent | tier | effort | tools | returns |
+|---|---|---|---|---|
+| explorer | cheap | low | read, search, shell-ro | `path:line` rows with symbol and anchor line |
+| researcher | cheap | medium | read, search, web | cited brief, facts separated from inference |
+| builder | mid | medium | read, search, edit, write, shell | diff receipt for named files and named checks |
+| verifier | mid | low | read, shell | per-command exit, classification, redacted excerpt |
+| reviewer | flagship | high | read, search, shell-ro | one severity-tagged line per finding |
+| planner | flagship | high | read, search, web | numbered `action -> verify: command` steps |
+
+Tiers map to models per harness: Claude Code `haiku`, `sonnet`, `opus`, and `fable` for `apex`; Codex `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol`. OpenCode and Command Code have no generic aliases and are often self-hosted or routed, so they inherit the session model until `prompts/models.local.json` names provider IDs. Copy `prompts/models.local.example.json` to start; it can also promote one agent to a higher tier or effort locally without touching tracked files.
+
+```bash
+scripts/render-agents                # build/agents/<harness>/
+scripts/render-agents --check
+scripts/render-agents --dry-run
+scripts/render-agents --target claude,codex --deploy
+```
+
+Deploy backs up overwritten files into `.backups/` and removes only stale files that carry the generated marker; hand-written agents in the same directory are left alone. The hard invariants are rendered into every agent from `prompts/invariants.md`, so the manual subagent paste is only needed for agents defined outside this repo.
+
+Enforcement of `shell-ro` differs by harness. OpenCode splits a compound command into parts, asks permission per part, and denies the whole call if any part is denied; a redirect rides along inside the matched command text, so `ls > f` still passes a glob allowlist. Claude Code gets a rendered `PreToolUse` guard installed alongside the agents: it blocks any segment that is not one of the allowed read-only commands, and blocks redirects, process and command substitution, and `--output`. Codex relies on `sandbox_mode = "read-only"`, and Command Code has no per-command allowlist, so it relies on the prompt.
+
+The guard is deployed to `~/.claude/hooks/agents-shell-ro-guard.py` (override the directory with `CLAUDE_HOOKS_DIR`) and referenced by absolute path from the frontmatter of every `shell-ro` agent. If your shell rules prefix commands with a wrapper, list it under `shell_ro_wrappers` in `prompts/models.local.json` so both the guard and the OpenCode globs admit it:
+
+```json
+{"claude": {"shell_ro_wrappers": ["rtk"]}, "opencode": {"shell_ro_wrappers": ["rtk"]}}
+```
+
+Codex only uses a custom role when the parent calls `spawn_agent` with `agent_type` set to the role name, and a full-history fork (`fork_turns = "all"`) inherits the parent's model and effort regardless of the role file. The rendered Codex prompt tells the root agent to pass `agent_type` and `fork_turns = "none"`; task prompts must therefore be self-contained.
+
 ## Supported Harnesses
 
 This is a public catalog, not a reflection of what is installed on one machine. Deployable targets have verified default operational-rule paths. Manual targets render into `build/generated/`, but deploy only when their `*_AGENTS_PATH` environment variable points at a project or per-agent rules file.
@@ -163,10 +200,11 @@ python scripts/lint_prompts.py
 python scripts/scan_prompt_sources.py
 python scripts/check_harness_docs.py
 python -m pytest -q
-bash -n scripts/sync-ai-prompts scripts/autoimprove-prompts scripts/render-invariants
-python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py
+bash -n scripts/sync-ai-prompts scripts/autoimprove-prompts scripts/render-invariants scripts/render-agents
+python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/render_agents.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py
 scripts/sync-ai-prompts --check
 scripts/sync-ai-prompts --dry-run
+scripts/render-agents --check
 ```
 
 ## GitHub Actions
