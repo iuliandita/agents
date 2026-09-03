@@ -146,6 +146,8 @@ Specialized subagents beat general-purpose ones for two reasons: a clean context
 | reviewer | flagship | high | read, search, shell-ro | one severity-tagged line per finding |
 | planner | flagship | high | read, search, web | numbered `action -> verify: command` steps |
 
+The core prompt dispatches `verifier` only when check output would flood the main context (full suites, builds); short checks run inline, and work that fits in a handful of tool calls is never delegated.
+
 Tiers map to models per harness: Claude Code `haiku`, `sonnet`, `opus`, and `fable` for `apex`; Codex `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol`. OpenCode and Command Code have no generic aliases and are often self-hosted or routed, so they inherit the session model until `prompts/models.local.json` names provider IDs. Copy `prompts/models.local.example.json` to start; it can also promote one agent to a higher tier or effort locally without touching tracked files.
 
 ```bash
