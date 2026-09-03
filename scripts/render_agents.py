@@ -354,9 +354,9 @@ def render_codex(spec: AgentSpec, resolved: Resolved, invariants: str) -> str:
         lines.append(f"model = {toml_string(resolved.model)}")
     lines.append(f"{resolved.effort_key} = {toml_string(resolved.effort)}")
     lines.append(f"sandbox_mode = {toml_string(sandbox)}")
-    # Fresh context per dispatch: a full-history fork would inherit the parent
-    # model and effort and reject the values above.
-    lines.append('fork_turns = "none"')
+    # fork_turns is a spawn_agent parameter, not a role-file key; Codex rejects
+    # the whole file as malformed if it appears here. The harness fragment tells
+    # the parent to pass agent_type and fork_turns="none" at spawn time.
     lines.append('developer_instructions = """')
     lines.append(instructions.replace("\\", "\\\\").rstrip())
     lines.append('"""')

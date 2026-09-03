@@ -250,7 +250,7 @@ def test_render_codex_is_valid_toml_with_sandbox():
     assert data["model"] == "gpt-5.6-luna"
     assert data["model_reasoning_effort"] == "low"
     assert data["sandbox_mode"] == "read-only"
-    assert data["fork_turns"] == "none"
+    assert "fork_turns" not in data
     assert "Never add AI attribution" in data["developer_instructions"]
     assert data["developer_instructions"].rstrip().endswith("Body.")
 

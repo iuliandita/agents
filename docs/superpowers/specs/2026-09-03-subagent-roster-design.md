@@ -122,7 +122,7 @@ Abstract tool names map per harness in the renderer:
 
 `shell-ro` is enforced only where the harness can express it: OpenCode bash globs and the Codex read-only sandbox. Claude Code and Command Code get the unrestricted shell tool plus prompt-level restriction to read-only commands; that gap is documented in the README.
 
-OpenCode renders an explicit `permission` map: granted tools `allow`, everything else in the known set `deny`, and `task: deny` always. Command Code renders `tools` as a list. Claude Code renders `tools` as a comma list. Codex has no per-tool allowlist; `sandbox_mode` is `read-only` unless `edit`, `write`, or `shell` is granted, in which case it is `workspace-write`. Codex agents also get `fork_turns = "none"` so tier and effort overrides apply and the task prompt must be self-contained.
+OpenCode renders an explicit `permission` map: granted tools `allow`, everything else in the known set `deny`, and `task: deny` always. Command Code renders `tools` as a list. Claude Code renders `tools` as a comma list. Codex has no per-tool allowlist; `sandbox_mode` is `read-only` unless `edit`, `write`, or `shell` is granted, in which case it is `workspace-write`. `fork_turns` is a `spawn_agent` parameter, not a role-file key (Codex rejects a role file that contains it), so the Codex harness fragment instructs the root agent to spawn custom roles with `agent_type` and `fork_turns = "none"`; task prompts must be self-contained.
 
 ## Rendered Outputs
 
@@ -153,7 +153,6 @@ description = "..."
 model = "gpt-5.6-luna"
 model_reasoning_effort = "low"
 sandbox_mode = "read-only"
-fork_turns = "none"
 developer_instructions = """
 <invariants block>
 <prompt body>

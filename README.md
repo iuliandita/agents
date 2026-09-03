@@ -159,6 +159,8 @@ Deploy backs up overwritten files into `.backups/` and removes only stale files 
 
 Enforcement differs by harness. OpenCode gets an explicit permission map with read-only bash globs, Codex gets `sandbox_mode = "read-only"` for non-writing roles, while Claude Code and Command Code expose the full shell tool and rely on the prompt to stay read-only.
 
+Codex only uses a custom role when the parent calls `spawn_agent` with `agent_type` set to the role name, and a full-history fork (`fork_turns = "all"`) inherits the parent's model and effort regardless of the role file. The rendered Codex prompt tells the root agent to pass `agent_type` and `fork_turns = "none"`; task prompts must therefore be self-contained.
+
 ## Supported Harnesses
 
 This is a public catalog, not a reflection of what is installed on one machine. Deployable targets have verified default operational-rule paths. Manual targets render into `build/generated/`, but deploy only when their `*_AGENTS_PATH` environment variable points at a project or per-agent rules file.
