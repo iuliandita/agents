@@ -395,10 +395,12 @@ def test_deploy_writes_backs_up_and_cleans_stale(tmp_path, monkeypatch, capsys):
 def test_deploy_rejects_non_file_dest(tmp_path, monkeypatch):
     target = tmp_path / "claude-agents"
     target.mkdir()
-    (target / "explorer.md").mkdir()
+    # "verifier" sorts after "builder" and "explorer"; nothing may be written before the refusal.
+    (target / "verifier.md").mkdir()
     monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(target))
     with pytest.raises(SystemExit, match="not a regular file"):
         ra.deploy(REPO, selected=["claude"], overrides={}, dry_run=False, backup_dir=tmp_path / "b")
+    assert sorted(path.name for path in target.iterdir()) == ["verifier.md"]
 
 
 def test_deploy_dry_run_writes_nothing(tmp_path, monkeypatch, capsys):

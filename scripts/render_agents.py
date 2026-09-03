@@ -559,10 +559,14 @@ def deploy(
             continue
 
         target.mkdir(parents=True, exist_ok=True)
-        for filename, text in files.items():
+        # Refuse before the first write so a bad entry cannot leave the
+        # directory half-updated.
+        for filename in files:
             dest = target / filename
             if dest.exists() and not dest.is_file():
                 raise SystemExit(f"{dest} exists and is not a regular file; move it aside")
+        for filename, text in files.items():
+            dest = target / filename
             if read_text_or_none(dest) == text:
                 print(f"unchanged {harness}: {dest}")
                 continue
