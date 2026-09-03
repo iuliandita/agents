@@ -21,7 +21,7 @@ In scope:
 
 Out of scope:
 
-- Project-scoped agent directories, per-agent hooks, agent memory fields, worktree isolation.
+- Project-scoped agent directories, agent memory fields, worktree isolation. Per-agent hooks are used for one purpose only: the Claude Code `shell-ro` guard.
 - Harnesses beyond the four above. The registry is extensible but this change adds no others.
 - Automated quality evals of agent output. A manual smoke dispatch per harness is the acceptance check.
 
@@ -99,12 +99,13 @@ Local override file `prompts/models.local.json`, gitignored, with a tracked `pro
     "effort_key": "reasoningEffort"
   },
   "claude": {
-    "agents": {"reviewer": {"tier": "apex", "effort": "xhigh"}}
+    "agents": {"reviewer": {"tier": "apex", "effort": "xhigh"}},
+    "shell_ro_wrappers": ["rtk"]
   }
 }
 ```
 
-Merge order: tracked default, then `tiers` from the local file, then per-agent `agents` entries. Per-agent entries may set `tier` and `effort` only. Any key outside this shape is an error.
+Merge order: tracked default, then `tiers` from the local file, then per-agent `agents` entries. Per-agent entries may set `tier` and `effort` only. Any key outside this shape is an error. Per-harness keys are `tiers`, `agents`, `effort_key`, and `shell_ro_wrappers`; each wrapper must match `^[A-Za-z0-9._/-]+$`.
 
 ## Tool Mapping
 
@@ -117,10 +118,14 @@ Abstract tool names map per harness in the renderer:
 | edit | Edit | edit | edit_file | workspace-write |
 | write | Write | edit | write_file | workspace-write |
 | shell | Bash | bash | shell_command, run_command | workspace-write |
-| shell-ro | Bash | bash: `*: deny`, plus allow globs for `git diff*`, `git log*`, `git status*`, `ls*`, `cat*`, `rg*`, `grep*`, `find*` | shell_command | read-only |
+| shell-ro | Bash plus a rendered `PreToolUse` guard | bash: `*: deny`, plus allow globs `<cmd> *` for each of `RO_COMMANDS` | shell_command | read-only |
 | web | WebFetch, WebSearch | webfetch, websearch | web_fetch, web_search | no field; prompt text only |
 
-`shell-ro` is enforced only where the harness can express it: OpenCode bash globs and the Codex read-only sandbox. Claude Code and Command Code get the unrestricted shell tool plus prompt-level restriction to read-only commands; that gap is documented in the README.
+`RO_COMMANDS` in the renderer is the single source for read-only shell commands: `git diff`, `git log`, `git status`, `git show`, `git blame`, `git grep`, `ls`, `cat`, `head`, `sed -n`, `rg`, `grep`. OpenCode patterns derive from it as `<cmd> *`; OpenCode matches the whole command text with `*` as `.*` and treats a trailing ` *` as optional, so one pattern covers both the bare command and any arguments.
+
+`shell-ro` is enforced three ways. OpenCode splits a compound command into separate command nodes and asks permission for each, denying the whole call if any part is denied; a redirect is part of the matched text, so `ls > f` alone still passes the globs. Codex uses the read-only sandbox. Claude Code, which has no per-command allowlist in an agent file, gets a rendered `PreToolUse` hook that blocks non-allowlisted segments, redirects, command and process substitution, and `--output`. Command Code has no expressible allowlist and keeps prompt-level restriction only; that gap stays documented in the README.
+
+Machine-specific command wrappers (a shell rule that prefixes every command) are admitted through `shell_ro_wrappers` in the local override file: OpenCode gets one extra `"<wrapper> <cmd> *"` allow per wrapper, and the guard strips a leading wrapper token before matching.
 
 OpenCode renders an explicit `permission` map: granted tools `allow`, everything else in the known set `deny`, and `task: deny` always. Command Code renders `tools` as a list. Claude Code renders `tools` as a comma list. Codex has no per-tool allowlist; `sandbox_mode` is `read-only` unless `edit`, `write`, or `shell` is granted, in which case it is `workspace-write`. `fork_turns` is a `spawn_agent` parameter, not a role-file key (Codex rejects a role file that contains it), so the Codex harness fragment instructs the root agent to spawn custom roles with `agent_type` and `fork_turns = "none"`; task prompts must be self-contained.
 
@@ -128,7 +133,7 @@ OpenCode renders an explicit `permission` map: granted tools `allow`, everything
 
 Output root `build/agents/<harness>/`. File names are `<name>.md`, or `<name>.toml` for Codex. Every file starts with a generated header carrying the renderer name, the source path, and a short hash of `prompts/invariants.md` plus the agent source, so staleness is detectable and stale cleanup can identify our files.
 
-Claude Code:
+Claude Code, plus one shared guard script `agents-shell-ro-guard.py` written next to the agent files (mode 0755). The guard is stdlib-only Python 3, carries the same generated marker, and is skipped by stale cleanup:
 
 ```
 ---
@@ -138,6 +143,12 @@ tools: Read, Grep, Glob, Bash
 model: haiku
 effort: low
 maxTurns: 30
+hooks:
+  PreToolUse:
+    - matcher: Bash
+      hooks:
+        - type: command
+          command: "/home/<user>/.claude/hooks/agents-shell-ro-guard.py"
 ---
 <generated header as an HTML comment>
 <invariants block>
@@ -172,6 +183,8 @@ Global deploy targets, overridable by environment variable in the existing style
 | opencode | `~/.config/opencode/agents/` | `OPENCODE_AGENTS_DIR` |
 | commandcode | `~/.commandcode/agents/` | `COMMANDCODE_AGENTS_DIR` |
 
+The Claude Code deploy also installs the guard at `~/.claude/hooks/agents-shell-ro-guard.py`, overridable with `CLAUDE_HOOKS_DIR` (the same variable `render-invariants` uses), and the rendered frontmatter references that absolute path.
+
 ## Renderer Behavior
 
 `scripts/render-agents` wraps `scripts/render_agents.py`. Flags mirror `sync-ai-prompts`:
@@ -183,7 +196,7 @@ Global deploy targets, overridable by environment variable in the existing style
 - `--deploy`: write to global directories, backing up overwritten files through the existing `backup_existing` helper, then remove files in the target directory that carry our generated header but no longer correspond to a source agent. Files without our header are never touched.
 - `--list-targets`: print the table above.
 
-Validation performed on every render: frontmatter schema, name and filename agreement, reserved-name rejection, tier and effort resolvable for the harness, local override shape, TOML output parses with `tomllib`, markdown frontmatter re-parses with the in-repo parser.
+Validation performed on every render: frontmatter schema, name and filename agreement, reserved-name rejection, tier and effort resolvable for the harness, local override shape, TOML output parses with `tomllib`, markdown frontmatter re-parses with the in-repo parser. `--check` additionally parses the rendered guard with `ast` and runs it on two fixtures: an allowed `git diff --stat` must exit 0, and an allowed command chained with a destructive one must exit 2.
 
 ## Core Prompt Change
 

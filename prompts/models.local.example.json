@@ -5,7 +5,8 @@
       "mid": "opencode-go/glm-5.3",
       "flagship": "opencode-go/kimi-k3"
     },
-    "effort_key": "reasoningEffort"
+    "effort_key": "reasoningEffort",
+    "shell_ro_wrappers": ["rtk"]
   },
   "commandcode": {
     "tiers": {
@@ -17,6 +18,7 @@
   "claude": {
     "agents": {
       "reviewer": {"tier": "apex", "effort": "xhigh"}
-    }
+    },
+    "shell_ro_wrappers": ["rtk"]
   }
 }

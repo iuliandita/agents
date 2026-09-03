@@ -105,6 +105,8 @@ ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/ANTIGRAVITY.md" scripts/sync-ai-prompts -
 | OpenCode | `~/.config/opencode/agents/` | `OPENCODE_AGENTS_DIR` |
 | Command Code | `~/.commandcode/agents/` | `COMMANDCODE_AGENTS_DIR` |
 
+The Claude Code deploy also installs the `shell-ro` Bash guard at `~/.claude/hooks/agents-shell-ro-guard.py` (override the directory with `CLAUDE_HOOKS_DIR`) and references it by absolute path from every read-only agent.
+
 Model tiers for OpenCode and Command Code are inherit by default. Copy `prompts/models.local.example.json` to `prompts/models.local.json` and set provider model IDs to enable tiering.
 
 ## Operational Rules Only
