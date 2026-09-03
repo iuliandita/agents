@@ -2,6 +2,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
+import yaml
 
 import render_agents as ra
 
@@ -38,10 +39,30 @@ def test_parse_frontmatter_strips_matching_quotes(tmp_path):
     assert fields["description"] == "Quoted: value"
 
 
+def test_parse_frontmatter_keeps_value_with_interior_matching_quote(tmp_path):
+    path = write_agent(tmp_path / "sample.md", description='"a" and "b"')
+    fields, _ = ra.parse_frontmatter(path.read_text(encoding="utf-8"), path)
+    assert fields["description"] == '"a" and "b"'
+
+
 def test_parse_frontmatter_rejects_missing_delimiters(tmp_path):
     path = tmp_path / "broken.md"
     path.write_text("name: x\nbody\n", encoding="utf-8")
     with pytest.raises(SystemExit, match="frontmatter"):
+        ra.parse_frontmatter(path.read_text(encoding="utf-8"), path)
+
+
+def test_parse_frontmatter_rejects_missing_closing_delimiter(tmp_path):
+    path = tmp_path / "broken.md"
+    path.write_text("---\nname: x\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="closing"):
+        ra.parse_frontmatter(path.read_text(encoding="utf-8"), path)
+
+
+def test_parse_frontmatter_rejects_duplicate_key(tmp_path):
+    path = tmp_path / "dup.md"
+    path.write_text("---\nname: x\nname: y\n---\nbody\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="duplicate"):
         ra.parse_frontmatter(path.read_text(encoding="utf-8"), path)
 
 
@@ -91,6 +112,18 @@ def test_load_agent_rejects_reserved_commandcode_name(tmp_path):
     path = write_agent(tmp_path / "explore.md", name="explore")
     with pytest.raises(SystemExit, match="reserved"):
         ra.load_agent(path)
+
+
+def test_load_agent_rejects_control_character_in_description(tmp_path):
+    path = write_agent(tmp_path / "sample.md", description="bad\x07bell")
+    with pytest.raises(SystemExit, match="control character"):
+        ra.load_agent(path)
+
+
+def test_load_agent_allows_missing_max_turns(tmp_path):
+    path = write_agent(tmp_path / "sample.md", max_turns=None)
+    spec = ra.load_agent(path)
+    assert spec.max_turns is None
 
 
 def test_load_agents_reads_repo_roster():
@@ -161,6 +194,9 @@ def test_resolve_applies_tier_and_agent_overrides():
         {"claude": {"agents": {"sample": {"model": "x"}}}},
         {"claude": {"agents": {"sample": {"tier": "huge"}}}},
         {"claude": {"effort_key": 5}},
+        {"codex": {"tiers": {"cheap": "haiku\ntools: Bash"}}},
+        {"codex": {"tiers": {"cheap": "foo # comment"}}},
+        {"codex": {"effort_key": "a.b"}},
         [],
     ],
 )
@@ -237,7 +273,7 @@ def test_render_opencode_permission_map_for_shell_ro():
     text = ra.render_opencode(spec(tools=("read", "search", "shell-ro"), max_turns=30), resolved, INVARIANTS)
     head = text.split("---")[1]
     assert "mode: subagent" in head
-    assert "model: opencode-go/glm-5.3-flash" in head
+    assert 'model: "opencode-go/glm-5.3-flash"' in head
     assert "reasoningEffort: low" in head
     assert "steps: 30" in head
     assert "  read: allow" in head
@@ -254,6 +290,12 @@ def test_render_opencode_full_shell_and_inherit():
     head = text.split("---")[1]
     assert "model:" not in head
     assert "  bash: allow" in head
+
+
+def test_render_harness_notices_when_every_model_inherits():
+    specs = [spec(name="a", source=Path("agents/a.md")), spec(name="b", source=Path("agents/b.md"))]
+    _, notices = ra.render_harness(specs, "opencode", {}, INVARIANTS)
+    assert any("every tier renders as inherit" in notice for notice in notices)
 
 
 def test_render_commandcode_tools_list():
@@ -282,6 +324,27 @@ def test_render_all_writes_every_harness(tmp_path):
         assert names == ["builder", "explorer", "planner", "researcher", "reviewer", "verifier"]
         assert all(path.suffix == ra.EXTENSIONS[harness] for path in paths)
         assert all(path.parent == tmp_path / harness for path in paths)
+        if harness not in ("claude", "opencode", "commandcode"):
+            continue
+        for path in paths:
+            text = path.read_text(encoding="utf-8")
+            head = text.split("---")[1]
+            data = yaml.safe_load(head)
+            assert isinstance(data, dict)
+            if harness == "opencode":
+                assert data["permission"]["task"] == "deny"
+                if path.stem in ("explorer", "reviewer"):
+                    assert isinstance(data["permission"]["bash"], dict)
+                    assert data["permission"]["bash"]["*"] == "deny"
+
+
+def test_check_fails_when_marker_missing(monkeypatch, capsys):
+    # GENERATED_MARKER itself feeds both the writer (generated_header) and the
+    # checker, so patching the constant alone would not create a mismatch;
+    # patch the writer instead so it stops emitting the real marker.
+    monkeypatch.setattr(ra, "generated_header", lambda spec, invariants: "no marker here")
+    assert ra.check(REPO, None) == 1
+    assert "lacks the generated marker" in capsys.readouterr().out
 
 
 def test_render_all_respects_target_selection(tmp_path):
@@ -305,7 +368,7 @@ def test_agent_target_dir_uses_env_override(tmp_path):
     assert ra.agent_target_dir("codex", home=tmp_path, env={}) == tmp_path / ".codex" / "agents"
 
 
-def test_deploy_writes_backs_up_and_cleans_stale(tmp_path, monkeypatch):
+def test_deploy_writes_backs_up_and_cleans_stale(tmp_path, monkeypatch, capsys):
     target = tmp_path / "claude-agents"
     target.mkdir()
     stale = target / "old.md"
@@ -325,6 +388,17 @@ def test_deploy_writes_backs_up_and_cleans_stale(tmp_path, monkeypatch):
     backups = sorted(path.name for path in backup_dir.iterdir())
     assert any(name.startswith("explorer-") for name in backups)
     assert any(name.startswith("old-") for name in backups)
+    out = capsys.readouterr().out
+    assert f"removed stale claude: {stale} (backup in {backup_dir})" in out
+
+
+def test_deploy_rejects_non_file_dest(tmp_path, monkeypatch):
+    target = tmp_path / "claude-agents"
+    target.mkdir()
+    (target / "explorer.md").mkdir()
+    monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(target))
+    with pytest.raises(SystemExit, match="not a regular file"):
+        ra.deploy(REPO, selected=["claude"], overrides={}, dry_run=False, backup_dir=tmp_path / "b")
 
 
 def test_deploy_dry_run_writes_nothing(tmp_path, monkeypatch, capsys):

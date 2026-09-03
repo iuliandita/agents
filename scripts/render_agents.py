@@ -29,6 +29,8 @@ WRITE_TOOLS = frozenset({"edit", "write", "shell"})
 REQUIRED_KEYS = ("name", "description", "tier", "effort", "tools")
 OPTIONAL_KEYS = ("max_turns",)
 NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
+MODEL_RE = re.compile(r"^[A-Za-z0-9._:/+-]+$")
+KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 
 AGENT_HARNESSES = ("claude", "codex", "opencode", "commandcode")
 # Command Code silently ignores custom files that reuse a built-in name.
@@ -72,7 +74,10 @@ def parse_frontmatter(text: str, source: Path) -> tuple[dict[str, str], str]:
         key = key.strip()
         value = value.strip()
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-            value = value[1:-1]
+            quote = value[0]
+            interior = value[1:-1]
+            if quote not in interior:
+                value = interior
         if key in fields:
             raise SystemExit(f"{source}: duplicate frontmatter key: {key}")
         fields[key] = value
@@ -122,8 +127,10 @@ def load_agent(path: Path) -> AgentSpec:
     if effort not in EFFORTS:
         raise SystemExit(f"{path}: unknown effort '{effort}'; allowed: {', '.join(EFFORTS)}")
     description = fields["description"]
-    if not description or "\n" in description:
+    if not description:
         raise SystemExit(f"{path}: description must be one non-empty line")
+    if any(ord(char) < 32 for char in description):
+        raise SystemExit(f"{path}: description contains a control character")
 
     max_turns: int | None = None
     if "max_turns" in fields:
@@ -203,6 +210,10 @@ def validate_overrides(data: object, source: Path) -> dict:
                 raise SystemExit(f"{label}: '{harness}.tiers.{tier}' is not a tier")
             if not isinstance(model, str) or not model:
                 raise SystemExit(f"{label}: '{harness}.tiers.{tier}' must be a non-empty string")
+            if not MODEL_RE.match(model):
+                raise SystemExit(
+                    f"{label}: '{harness}.tiers.{tier}' has characters outside {MODEL_RE.pattern}"
+                )
         agents = entry.get("agents", {})
         if not isinstance(agents, dict):
             raise SystemExit(f"{label}: '{harness}.agents' must be an object")
@@ -215,9 +226,9 @@ def validate_overrides(data: object, source: Path) -> dict:
                 allowed = TIERS if key == "tier" else EFFORTS
                 if value not in allowed:
                     raise SystemExit(f"{label}: '{harness}.agents.{name}.{key}' = '{value}' is invalid")
-        effort_key = entry.get("effort_key", "x")
-        if not isinstance(effort_key, str) or not effort_key:
-            raise SystemExit(f"{label}: '{harness}.effort_key' must be a non-empty string")
+        effort_key = entry.get("effort_key")
+        if effort_key is not None and (not isinstance(effort_key, str) or not KEY_RE.match(effort_key)):
+            raise SystemExit(f"{label}: '{harness}.effort_key' must match {KEY_RE.pattern}")
     return data
 
 
@@ -316,7 +327,7 @@ def render_claude(spec: AgentSpec, resolved: Resolved, invariants: str) -> str:
         f"tools: {', '.join(expand_tools(spec.tools, CLAUDE_TOOLS))}",
     ]
     if resolved.model is not None:
-        lines.append(f"model: {resolved.model}")
+        lines.append(f"model: {yaml_string(resolved.model)}")
     lines.append(f"{resolved.effort_key}: {resolved.effort}")
     if spec.max_turns is not None:
         lines.append(f"maxTurns: {spec.max_turns}")
@@ -350,7 +361,10 @@ def render_codex(spec: AgentSpec, resolved: Resolved, invariants: str) -> str:
     lines.append(instructions.replace("\\", "\\\\").rstrip())
     lines.append('"""')
     text = "\n".join(lines) + "\n"
-    tomllib.loads(text)
+    try:
+        tomllib.loads(text)
+    except tomllib.TOMLDecodeError as exc:
+        raise SystemExit(f"{spec.source}: rendered codex TOML is invalid: {exc}")
     return text
 
 
@@ -362,7 +376,7 @@ def render_opencode(spec: AgentSpec, resolved: Resolved, invariants: str) -> str
         "mode: subagent",
     ]
     if resolved.model is not None:
-        lines.append(f"model: {resolved.model}")
+        lines.append(f"model: {yaml_string(resolved.model)}")
     lines.append(f"{resolved.effort_key}: {resolved.effort}")
     if spec.max_turns is not None:
         lines.append(f"steps: {spec.max_turns}")
@@ -388,7 +402,7 @@ def render_commandcode(spec: AgentSpec, resolved: Resolved, invariants: str) -> 
         f"tools: {', '.join(expand_tools(spec.tools, COMMANDCODE_TOOLS))}",
     ]
     if resolved.model is not None:
-        lines.append(f"model: {resolved.model}")
+        lines.append(f"model: {yaml_string(resolved.model)}")
     lines.append(f"{resolved.effort_key}: {resolved.effort}")
     if spec.max_turns is not None:
         lines.append(f"maxTurns: {spec.max_turns}")
@@ -447,11 +461,13 @@ def render_harness(
 ) -> tuple[dict[str, str], list[str]]:
     rendered: dict[str, str] = {}
     notices: list[str] = []
+    models: list[str | None] = []
     for spec in specs:
         resolved = resolve(spec, harness, overrides)
         notices.extend(resolved.notices)
+        models.append(resolved.model)
         rendered[spec.name + EXTENSIONS[harness]] = RENDERERS[harness](spec, resolved, invariants)
-    if all(resolve(spec, harness, overrides).model is None for spec in specs):
+    if all(model is None for model in models):
         notices.append(f"{harness}: every tier renders as inherit; set prompts/models.local.json to enable tiering")
     return rendered, notices
 
@@ -484,6 +500,8 @@ def render_all(
 
 
 def check(repo_root: Path, selected: list[str] | None) -> int:
+    # Honors the gitignored local override file, so local and CI renders can
+    # differ by design.
     overrides = load_overrides(repo_root)
     with TemporaryDirectory() as temp_dir:
         written = render_all(repo_root, Path(temp_dir), selected, overrides)
@@ -501,11 +519,16 @@ def check(repo_root: Path, selected: list[str] | None) -> int:
     return 0
 
 
-def is_generated(path: Path) -> bool:
+def read_text_or_none(path: Path) -> str | None:
     try:
-        return GENERATED_MARKER in path.read_text(encoding="utf-8", errors="replace")
+        return path.read_text(encoding="utf-8", errors="replace")
     except OSError:
-        return False
+        return None
+
+
+def is_generated(path: Path) -> bool:
+    text = read_text_or_none(path)
+    return text is not None and GENERATED_MARKER in text
 
 
 def deploy(
@@ -538,7 +561,9 @@ def deploy(
         target.mkdir(parents=True, exist_ok=True)
         for filename, text in files.items():
             dest = target / filename
-            if dest.exists() and dest.read_text(encoding="utf-8", errors="replace") == text:
+            if dest.exists() and not dest.is_file():
+                raise SystemExit(f"{dest} exists and is not a regular file; move it aside")
+            if read_text_or_none(dest) == text:
                 print(f"unchanged {harness}: {dest}")
                 continue
             backup_existing(dest, backup_dir)
@@ -547,7 +572,7 @@ def deploy(
         for path in stale:
             backup_existing(path, backup_dir)
             path.unlink()
-            print(f"removed stale {harness}: {path}")
+            print(f"removed stale {harness}: {path} (backup in {backup_dir})")
     print_notices(notices)
 
 
