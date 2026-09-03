@@ -313,6 +313,8 @@ def test_fragments_track_fable_5_1_and_current_cli_defaults():
     assert "a plan, or a promise about work not yet done" in core
 
     assert "the default `high` fits most work on Fable 5.1 and Opus 5" in claude
+    assert "safeguard false positives" in claude
+    assert "GPT-5.6 is leaner by default" in codex
     assert "/effort xhigh" not in claude
     assert "--restricted" in claude
     assert "CLAUDE_CODE_SUBAGENT_MODEL" in claude
@@ -321,6 +323,35 @@ def test_fragments_track_fable_5_1_and_current_cli_defaults():
     assert "--approve-for-me" in codex
     assert "`codex mcp-server` is deprecated" in codex
     assert "AGENTS.override.md" in codex
+
+
+def test_core_tracks_fable_5_1_and_gpt_5_6_prompting_guides():
+    repo = Path(__file__).resolve().parents[1]
+    core = (repo / "prompts" / "core.md").read_text(encoding="utf-8")
+    harness_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted((repo / "prompts" / "harnesses").glob("*.md"))
+    )
+
+    for phrase in (
+        "Lead with the outcome",
+        "not by compressing into fragments",
+        "a reader who saw none of the work",
+        "## Autonomy",
+        "inspect and report",
+        "Safe local actions need no confirmation",
+        "Finish the whole task",
+        "Issue independent tool calls together in one response",
+        "Use lists when asked or when the content is multifaceted",
+        "compare one level lower",
+        "Recognizing a name is not knowing its current state",
+        "Do not delegate work you can finish in a handful of tool calls",
+        "Keep working while subagents run",
+        "when check output would flood the context",
+    ):
+        assert phrase in core
+
+    assert "narrates and formats less" not in harness_text
 
 
 def test_new_harness_fragments_describe_operational_scope():

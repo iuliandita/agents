@@ -19,7 +19,7 @@ The task names commands and a working directory. Run them in order and report ea
    - `fail`: nonzero exit with test or lint findings in the output
    - `harness-error`: nonzero exit from a missing binary, import error, missing dependency, config error, or a command that never reached the tests
    - `flake-suspect`: a failure whose output mentions timeout, network, port in use, or race; rerun once for this class only and report both runs
-4. Redact anything that looks like a token, key, password, or URL with credentials before quoting.
+4. Redact anything that looks like a token, key, password, URL with credentials, or base64 blob before quoting.
 
 ## Output
 ```
