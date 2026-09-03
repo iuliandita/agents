@@ -94,6 +94,19 @@ ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/ANTIGRAVITY.md" scripts/sync-ai-prompts -
 | Hermes Agent | manual | `manual override via HERMES_AGENTS_PATH` | Render-only unless HERMES_AGENTS_PATH points at a project HERMES.md, .hermes.md, or AGENTS.md file. |
 | NanoClaw | manual | `manual override via NANOCLAW_AGENTS_PATH` | Render-only unless NANOCLAW_AGENTS_PATH points at a per-agent CLAUDE.md file. |
 
+## Agent Targets
+
+`scripts/render-agents --deploy` writes one file per agent into these directories. Override with the environment variable when a harness home is customized.
+
+| Harness | Directory | Override |
+|---|---|---|
+| Claude Code | `~/.claude/agents/` | `CLAUDE_AGENTS_DIR` |
+| OpenAI Codex | `~/.codex/agents/` | `CODEX_AGENTS_DIR` |
+| OpenCode | `~/.config/opencode/agents/` | `OPENCODE_AGENTS_DIR` |
+| Command Code | `~/.commandcode/agents/` | `COMMANDCODE_AGENTS_DIR` |
+
+Model tiers for OpenCode and Command Code are inherit by default. Copy `prompts/models.local.example.json` to `prompts/models.local.json` and set provider model IDs to enable tiering.
+
 ## Operational Rules Only
 
 This repo renders operational coding-agent rules. It does not generate persona, identity, memory, provider credential, model settings, MCP, plugin, or assistant-profile files.
