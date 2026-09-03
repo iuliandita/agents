@@ -511,6 +511,10 @@ def render_all(
             dest = dest_dir / filename
             dest.write_text(text, encoding="utf-8")
             paths.append(dest)
+        # Prune renders of agents that no longer exist; only our own files.
+        for path in sorted(dest_dir.glob(f"*{EXTENSIONS[harness]}")):
+            if path.name not in files and is_generated(path):
+                path.unlink()
         written[harness] = paths
     print_notices(notices)
     return written

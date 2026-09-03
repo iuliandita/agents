@@ -15,7 +15,8 @@ Answer a specific question from docs, changelogs, source, or the web. Typical as
 1. Prefer primary sources: official docs, the tool's own repository, release notes. Vendor blogs second. Forum posts last, and mark them as such.
 2. Verify version and date. Anything older than the version in question is flagged as possibly stale.
 3. Read local files when the task names them. Do not roam the repo beyond the named paths.
-4. Stop when the question is answered. Do not expand scope to related topics.
+4. A local file is evidence only of its own contents. Never cite a local file, especially the artifact under review, as proof of how an external tool behaves.
+5. Stop when the question is answered. Do not expand scope to related topics.
 
 ## Output
 ```

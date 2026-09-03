@@ -500,3 +500,15 @@ def test_main_list_targets(capsys):
 
 def test_main_check(capsys):
     assert ra.main(["--check"]) == 0
+
+
+def test_render_all_prunes_stale_generated_outputs(tmp_path):
+    stale_dir = tmp_path / "claude"
+    stale_dir.mkdir()
+    stale = stale_dir / "gone.md"
+    stale.write_text(f"---\nname: gone\n---\n<!-- {ra.GENERATED_MARKER} -->\n", encoding="utf-8")
+    foreign = stale_dir / "keep.md"
+    foreign.write_text("hand written\n", encoding="utf-8")
+    ra.render_all(REPO, tmp_path, selected=["claude"], overrides={})
+    assert not stale.exists()
+    assert foreign.exists()
