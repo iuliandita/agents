@@ -102,3 +102,80 @@ def test_load_agents_reads_repo_roster():
         "reviewer",
         "verifier",
     ]
+
+
+def spec(**overrides):
+    fields = dict(
+        name="sample",
+        description="Sample.",
+        tier="cheap",
+        effort="low",
+        tools=("read",),
+        max_turns=None,
+        body="Body.\n",
+        source=Path("agents/sample.md"),
+        source_text="",
+    )
+    fields.update(overrides)
+    return ra.AgentSpec(**fields)
+
+
+def test_resolve_claude_defaults():
+    resolved = ra.resolve(spec(tier="flagship", effort="high"), "claude", {})
+    assert resolved.model == "opus"
+    assert resolved.effort == "high"
+    assert resolved.notices == []
+
+
+def test_resolve_codex_apex_falls_back_to_flagship_with_notice():
+    resolved = ra.resolve(spec(tier="apex"), "codex", {})
+    assert resolved.model == "gpt-5.6-sol"
+    assert any("apex" in notice for notice in resolved.notices)
+
+
+def test_resolve_opencode_inherits_without_override():
+    resolved = ra.resolve(spec(tier="mid"), "opencode", {})
+    assert resolved.model is None
+
+
+def test_resolve_applies_tier_and_agent_overrides():
+    overrides = {
+        "opencode": {
+            "tiers": {"cheap": "opencode-go/glm-5.3-flash"},
+            "agents": {"sample": {"tier": "cheap", "effort": "medium"}},
+        }
+    }
+    resolved = ra.resolve(spec(tier="flagship", effort="high"), "opencode", overrides)
+    assert resolved.model == "opencode-go/glm-5.3-flash"
+    assert resolved.effort == "medium"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"nope": {}},
+        {"claude": {"colors": {}}},
+        {"claude": {"tiers": {"huge": "x"}}},
+        {"claude": {"tiers": {"cheap": 3}}},
+        {"claude": {"agents": {"sample": {"model": "x"}}}},
+        {"claude": {"agents": {"sample": {"tier": "huge"}}}},
+        {"claude": {"effort_key": 5}},
+        [],
+    ],
+)
+def test_load_overrides_rejects_bad_shapes(tmp_path, payload):
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "models.local.json").write_text(
+        __import__("json").dumps(payload), encoding="utf-8"
+    )
+    with pytest.raises(SystemExit, match="models.local.json"):
+        ra.load_overrides(tmp_path)
+
+
+def test_load_overrides_missing_file_is_empty(tmp_path):
+    assert ra.load_overrides(tmp_path) == {}
+
+
+def test_tracked_example_overrides_load():
+    example = REPO / "prompts" / "models.local.example.json"
+    ra.validate_overrides(__import__("json").loads(example.read_text(encoding="utf-8")), example)

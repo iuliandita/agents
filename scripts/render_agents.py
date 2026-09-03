@@ -155,3 +155,97 @@ def load_agents(repo_root: Path) -> list[AgentSpec]:
     if not specs:
         raise SystemExit(f"No agent sources found in {agents_dir}")
     return specs
+
+
+DEFAULT_MODELS: dict[str, dict[str, str | None]] = {
+    "claude": {"cheap": "haiku", "mid": "sonnet", "flagship": "opus", "apex": "fable"},
+    "codex": {"cheap": "gpt-5.6-luna", "mid": "gpt-5.6-terra", "flagship": "gpt-5.6-sol", "apex": None},
+    # No generic aliases; commonly self-hosted or routed. Inherit the session model
+    # unless prompts/models.local.json names provider/model IDs.
+    "opencode": {tier: None for tier in TIERS},
+    "commandcode": {tier: None for tier in TIERS},
+}
+DEFAULT_EFFORT_KEYS = {
+    "claude": "effort",
+    "codex": "model_reasoning_effort",
+    "opencode": "reasoningEffort",
+    "commandcode": "reasoningEffort",
+}
+OVERRIDE_KEYS = frozenset({"tiers", "agents", "effort_key"})
+AGENT_OVERRIDE_KEYS = frozenset({"tier", "effort"})
+
+
+@dataclass(frozen=True)
+class Resolved:
+    model: str | None
+    effort: str
+    effort_key: str
+    notices: list[str]
+
+
+def validate_overrides(data: object, source: Path) -> dict:
+    label = f"{source}"
+    if not isinstance(data, dict):
+        raise SystemExit(f"{label}: root must be an object")
+    for harness, entry in data.items():
+        if harness not in AGENT_HARNESSES:
+            raise SystemExit(f"{label}: unknown harness '{harness}'")
+        if not isinstance(entry, dict):
+            raise SystemExit(f"{label}: '{harness}' must be an object")
+        for key in entry:
+            if key not in OVERRIDE_KEYS:
+                raise SystemExit(f"{label}: '{harness}.{key}' is not one of {sorted(OVERRIDE_KEYS)}")
+        tiers = entry.get("tiers", {})
+        if not isinstance(tiers, dict):
+            raise SystemExit(f"{label}: '{harness}.tiers' must be an object")
+        for tier, model in tiers.items():
+            if tier not in TIERS:
+                raise SystemExit(f"{label}: '{harness}.tiers.{tier}' is not a tier")
+            if not isinstance(model, str) or not model:
+                raise SystemExit(f"{label}: '{harness}.tiers.{tier}' must be a non-empty string")
+        agents = entry.get("agents", {})
+        if not isinstance(agents, dict):
+            raise SystemExit(f"{label}: '{harness}.agents' must be an object")
+        for name, fields in agents.items():
+            if not isinstance(fields, dict):
+                raise SystemExit(f"{label}: '{harness}.agents.{name}' must be an object")
+            for key, value in fields.items():
+                if key not in AGENT_OVERRIDE_KEYS:
+                    raise SystemExit(f"{label}: '{harness}.agents.{name}.{key}' is not tier or effort")
+                allowed = TIERS if key == "tier" else EFFORTS
+                if value not in allowed:
+                    raise SystemExit(f"{label}: '{harness}.agents.{name}.{key}' = '{value}' is invalid")
+        effort_key = entry.get("effort_key", "x")
+        if not isinstance(effort_key, str) or not effort_key:
+            raise SystemExit(f"{label}: '{harness}.effort_key' must be a non-empty string")
+    return data
+
+
+def load_overrides(repo_root: Path) -> dict:
+    path = repo_root / "prompts" / "models.local.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"{path}: invalid JSON: {exc}")
+    return validate_overrides(data, path)
+
+
+def resolve(spec: AgentSpec, harness: str, overrides: dict) -> Resolved:
+    entry = overrides.get(harness, {})
+    per_agent = entry.get("agents", {}).get(spec.name, {})
+    tier = per_agent.get("tier", spec.tier)
+    effort = per_agent.get("effort", spec.effort)
+    models = dict(DEFAULT_MODELS[harness])
+    models.update(entry.get("tiers", {}))
+    effort_key = entry.get("effort_key", DEFAULT_EFFORT_KEYS[harness])
+
+    notices: list[str] = []
+    model = models[tier]
+    if tier == "apex" and model is None and models["flagship"] is not None:
+        model = models["flagship"]
+        notices.append(f"{harness}/{spec.name}: no apex model configured; using flagship '{model}'")
+    if spec.name in SHADOWED_NAMES.get(harness, frozenset()):
+        notices.append(f"{harness}/{spec.name}: shadows the built-in agent of the same name")
+    return Resolved(model=model, effort=effort, effort_key=effort_key, notices=notices)

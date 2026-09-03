@@ -1,0 +1,22 @@
+{
+  "opencode": {
+    "tiers": {
+      "cheap": "opencode-go/glm-5.3-flash",
+      "mid": "opencode-go/glm-5.3",
+      "flagship": "opencode-go/kimi-k3"
+    },
+    "effort_key": "reasoningEffort"
+  },
+  "commandcode": {
+    "tiers": {
+      "cheap": "openrouter/deepseek/deepseek-v4-flash",
+      "mid": "ollama/qwen3.6-plus",
+      "flagship": "openrouter/anthropic/claude-opus-5"
+    }
+  },
+  "claude": {
+    "agents": {
+      "reviewer": {"tier": "apex", "effort": "xhigh"}
+    }
+  }
+}
