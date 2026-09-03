@@ -1,3 +1,4 @@
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -179,3 +180,95 @@ def test_load_overrides_missing_file_is_empty(tmp_path):
 def test_tracked_example_overrides_load():
     example = REPO / "prompts" / "models.local.example.json"
     ra.validate_overrides(__import__("json").loads(example.read_text(encoding="utf-8")), example)
+
+
+INVARIANTS = "# Hard Invariants (non-negotiable)\n- Never add AI attribution to git artifacts.\n"
+
+
+def test_render_claude_frontmatter_and_body():
+    text = ra.render_claude(spec(tools=("read", "search", "shell-ro"), max_turns=30), ra.resolve(spec(), "claude", {}), INVARIANTS)
+    fields, body = ra.parse_frontmatter(text, Path("claude/sample.md"))
+    assert fields == {
+        "name": "sample",
+        "description": "Sample.",
+        "tools": "Read, Grep, Glob, Bash",
+        "model": "haiku",
+        "effort": "low",
+        "maxTurns": "30",
+    }
+    assert ra.GENERATED_MARKER in body
+    assert "Never add AI attribution" in body
+    assert body.rstrip().endswith("Body.")
+
+
+def test_render_claude_omits_model_when_inherit():
+    resolved = ra.Resolved(model=None, effort="low", effort_key="effort", notices=[])
+    fields, _ = ra.parse_frontmatter(ra.render_claude(spec(), resolved, INVARIANTS), Path("x.md"))
+    assert "model" not in fields
+
+
+def test_render_codex_is_valid_toml_with_sandbox():
+    read_only = ra.render_codex(spec(tools=("read", "search", "shell-ro")), ra.resolve(spec(), "codex", {}), INVARIANTS)
+    data = tomllib.loads(read_only)
+    assert data["name"] == "sample"
+    assert data["model"] == "gpt-5.6-luna"
+    assert data["model_reasoning_effort"] == "low"
+    assert data["sandbox_mode"] == "read-only"
+    assert data["fork_turns"] == "none"
+    assert "Never add AI attribution" in data["developer_instructions"]
+    assert data["developer_instructions"].rstrip().endswith("Body.")
+
+    writer = ra.render_codex(spec(tools=("read", "edit")), ra.resolve(spec(), "codex", {}), INVARIANTS)
+    assert tomllib.loads(writer)["sandbox_mode"] == "workspace-write"
+
+
+def test_render_codex_escapes_description_quotes():
+    text = ra.render_codex(spec(description='Say "hi" \\ now'), ra.resolve(spec(), "codex", {}), INVARIANTS)
+    assert tomllib.loads(text)["description"] == 'Say "hi" \\ now'
+
+
+def test_render_codex_rejects_triple_quote_in_body():
+    with pytest.raises(SystemExit, match='"""'):
+        ra.render_codex(spec(body='x = """y"""\n'), ra.resolve(spec(), "codex", {}), INVARIANTS)
+
+
+def test_render_opencode_permission_map_for_shell_ro():
+    resolved = ra.resolve(spec(), "opencode", {"opencode": {"tiers": {"cheap": "opencode-go/glm-5.3-flash"}}})
+    text = ra.render_opencode(spec(tools=("read", "search", "shell-ro"), max_turns=30), resolved, INVARIANTS)
+    head = text.split("---")[1]
+    assert "mode: subagent" in head
+    assert "model: opencode-go/glm-5.3-flash" in head
+    assert "reasoningEffort: low" in head
+    assert "steps: 30" in head
+    assert "  read: allow" in head
+    assert "  grep: allow" in head
+    assert "  glob: allow" in head
+    assert "  edit: deny" in head
+    assert "  task: deny" in head
+    assert '    "*": deny' in head
+    assert '    "git diff*": allow' in head
+
+
+def test_render_opencode_full_shell_and_inherit():
+    text = ra.render_opencode(spec(tools=("read", "shell")), ra.resolve(spec(), "opencode", {}), INVARIANTS)
+    head = text.split("---")[1]
+    assert "model:" not in head
+    assert "  bash: allow" in head
+
+
+def test_render_commandcode_tools_list():
+    text = ra.render_commandcode(spec(tools=("read", "search", "web"), max_turns=30), ra.resolve(spec(), "commandcode", {}), INVARIANTS)
+    fields, body = ra.parse_frontmatter(text, Path("x.md"))
+    assert fields["tools"] == "read_file, read_directory, grep, glob, web_fetch, web_search"
+    assert fields["reasoningEffort"] == "low"
+    assert fields["maxTurns"] == "30"
+    assert "model" not in fields
+    assert ra.GENERATED_MARKER in body
+
+
+def test_generated_header_hash_tracks_sources():
+    one = ra.generated_header(spec(source_text="a"), "inv")
+    two = ra.generated_header(spec(source_text="b"), "inv")
+    three = ra.generated_header(spec(source_text="a"), "inv2")
+    assert one != two != three
+    assert ra.GENERATED_MARKER in one
