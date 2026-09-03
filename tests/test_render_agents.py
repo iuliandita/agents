@@ -126,6 +126,11 @@ def test_load_agent_allows_missing_max_turns(tmp_path):
     assert spec.max_turns is None
 
 
+def test_opencode_ro_bash_excludes_find_includes_git_grep():
+    assert "find*" not in ra.OPENCODE_RO_BASH
+    assert "git grep*" in ra.OPENCODE_RO_BASH
+
+
 def test_load_agents_reads_repo_roster():
     specs = ra.load_agents(REPO)
     assert [spec.name for spec in specs] == [
@@ -281,6 +286,8 @@ def test_render_opencode_permission_map_for_shell_ro():
     assert "  glob: allow" in head
     assert "  edit: deny" in head
     assert "  task: deny" in head
+    assert "  todowrite: deny" in head
+    assert "  question: deny" in head
     assert '    "*": deny' in head
     assert '    "git diff*": allow' in head
 
@@ -316,6 +323,12 @@ def test_generated_header_hash_tracks_sources():
     assert ra.GENERATED_MARKER in one
 
 
+def test_generated_header_hash_tracks_salt():
+    one = ra.generated_header(spec(source_text="a"), "inv", salt="claude:sonnet:high")
+    two = ra.generated_header(spec(source_text="a"), "inv", salt="codex:gpt-5.6-terra:high")
+    assert one != two
+
+
 def test_render_all_writes_every_harness(tmp_path):
     written = ra.render_all(REPO, tmp_path, selected=None, overrides={})
     assert set(written) == set(ra.AGENT_HARNESSES)
@@ -342,7 +355,7 @@ def test_check_fails_when_marker_missing(monkeypatch, capsys):
     # GENERATED_MARKER itself feeds both the writer (generated_header) and the
     # checker, so patching the constant alone would not create a mismatch;
     # patch the writer instead so it stops emitting the real marker.
-    monkeypatch.setattr(ra, "generated_header", lambda spec, invariants: "no marker here")
+    monkeypatch.setattr(ra, "generated_header", lambda spec, invariants, salt="": "no marker here")
     assert ra.check(REPO, None) == 1
     assert "lacks the generated marker" in capsys.readouterr().out
 
@@ -355,6 +368,29 @@ def test_render_all_respects_target_selection(tmp_path):
 def test_render_all_rejects_unknown_target(tmp_path):
     with pytest.raises(SystemExit, match="Unknown agent harness"):
         ra.render_all(REPO, tmp_path, selected=["cursor"], overrides={})
+
+
+def test_selected_agent_harnesses_dedupes_preserving_order():
+    assert ra.selected_agent_harnesses(["claude,claude", "claude"]) == ["claude"]
+
+
+def test_check_override_agents_rejects_unknown_name():
+    specs = ra.load_agents(REPO)
+    overrides = {"claude": {"agents": {"nope": {"tier": "mid"}}}}
+    with pytest.raises(SystemExit, match="does not match"):
+        ra.check_override_agents(overrides, specs)
+
+
+def test_render_all_rejects_unknown_override_agent_name(tmp_path):
+    overrides = {"claude": {"agents": {"nope": {"tier": "mid"}}}}
+    with pytest.raises(SystemExit, match="does not match"):
+        ra.render_all(REPO, tmp_path, selected=["claude"], overrides=overrides)
+
+
+def test_validate_overrides_allows_null_tier_for_inherit():
+    overrides = ra.validate_overrides({"claude": {"tiers": {"cheap": None}}}, Path("models.local.json"))
+    resolved = ra.resolve(spec(tier="cheap"), "claude", overrides)
+    assert resolved.model is None
 
 
 def test_check_passes_on_repo(capsys):
@@ -398,9 +434,29 @@ def test_deploy_rejects_non_file_dest(tmp_path, monkeypatch):
     # "verifier" sorts after "builder" and "explorer"; nothing may be written before the refusal.
     (target / "verifier.md").mkdir()
     monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(target))
-    with pytest.raises(SystemExit, match="not a regular file"):
+    with pytest.raises(SystemExit, match="move it aside"):
         ra.deploy(REPO, selected=["claude"], overrides={}, dry_run=False, backup_dir=tmp_path / "b")
     assert sorted(path.name for path in target.iterdir()) == ["verifier.md"]
+
+
+def test_deploy_rejects_symlink_dest(tmp_path, monkeypatch):
+    target = tmp_path / "claude-agents"
+    target.mkdir()
+    outside = tmp_path / "outside.md"
+    outside.write_text("do not touch\n", encoding="utf-8")
+    (target / "verifier.md").symlink_to(outside)
+    monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(target))
+    with pytest.raises(SystemExit, match="move it aside"):
+        ra.deploy(REPO, selected=["claude"], overrides={}, dry_run=False, backup_dir=tmp_path / "b")
+    assert outside.read_text(encoding="utf-8") == "do not touch\n"
+
+
+def test_deploy_target_dir_is_a_file(tmp_path, monkeypatch):
+    target = tmp_path / "claude-agents"
+    target.write_text("not a directory\n", encoding="utf-8")
+    monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(target))
+    with pytest.raises(SystemExit, match="not a directory"):
+        ra.deploy(REPO, selected=["claude"], overrides={}, dry_run=False, backup_dir=tmp_path / "b")
 
 
 def test_deploy_dry_run_writes_nothing(tmp_path, monkeypatch, capsys):
@@ -409,8 +465,19 @@ def test_deploy_dry_run_writes_nothing(tmp_path, monkeypatch, capsys):
     ra.deploy(REPO, selected=["codex"], overrides={}, dry_run=True, backup_dir=tmp_path / "b")
     assert not target.exists()
     out = capsys.readouterr().out
-    assert "would write" in out
+    assert "would create" in out
     assert "explorer.toml" in out
+
+
+def test_deploy_dry_run_reports_unchanged_file(tmp_path, monkeypatch, capsys):
+    target = tmp_path / "codex-agents"
+    monkeypatch.setenv("CODEX_AGENTS_DIR", str(target))
+    ra.deploy(REPO, selected=["codex"], overrides={}, dry_run=False, backup_dir=tmp_path / "b")
+    capsys.readouterr()
+    ra.deploy(REPO, selected=["codex"], overrides={}, dry_run=True, backup_dir=tmp_path / "b")
+    out = capsys.readouterr().out
+    assert "unchanged" in out
+    assert "would replace" not in out
 
 
 def test_deploy_is_idempotent(tmp_path, monkeypatch, capsys):

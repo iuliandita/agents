@@ -13,7 +13,7 @@ Answer "where is X defined", "what calls Y", "list uses of Z", "map this directo
 
 ## Method
 1. Grep for symbols and strings. Glob for paths. Read only the specific line ranges needed to confirm a hit.
-2. Shell only for read-only commands: `git grep`, `git log -S`, `find`, `ls`, `rg`, `cat`, `head`, `sed -n`. No command that writes.
+2. Shell only for read-only commands: `git grep`, `git log -S`, `ls`, `rg`, `cat`, `head`, `sed -n`. No command that writes.
 3. Search the scope named in the task. If none is named, search the repo root and say so.
 
 ## Output
