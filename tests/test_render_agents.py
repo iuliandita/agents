@@ -272,3 +272,88 @@ def test_generated_header_hash_tracks_sources():
     three = ra.generated_header(spec(source_text="a"), "inv2")
     assert one != two != three
     assert ra.GENERATED_MARKER in one
+
+
+def test_render_all_writes_every_harness(tmp_path):
+    written = ra.render_all(REPO, tmp_path, selected=None, overrides={})
+    assert set(written) == set(ra.AGENT_HARNESSES)
+    for harness, paths in written.items():
+        names = sorted(path.stem for path in paths)
+        assert names == ["builder", "explorer", "planner", "researcher", "reviewer", "verifier"]
+        assert all(path.suffix == ra.EXTENSIONS[harness] for path in paths)
+        assert all(path.parent == tmp_path / harness for path in paths)
+
+
+def test_render_all_respects_target_selection(tmp_path):
+    written = ra.render_all(REPO, tmp_path, selected=["claude,codex"], overrides={})
+    assert set(written) == {"claude", "codex"}
+
+
+def test_render_all_rejects_unknown_target(tmp_path):
+    with pytest.raises(SystemExit, match="Unknown agent harness"):
+        ra.render_all(REPO, tmp_path, selected=["cursor"], overrides={})
+
+
+def test_check_passes_on_repo(capsys):
+    assert ra.check(REPO, selected=None) == 0
+    assert "check passed" in capsys.readouterr().out
+
+
+def test_agent_target_dir_uses_env_override(tmp_path):
+    env = {"CLAUDE_AGENTS_DIR": str(tmp_path / "custom")}
+    assert ra.agent_target_dir("claude", home=tmp_path, env=env) == tmp_path / "custom"
+    assert ra.agent_target_dir("codex", home=tmp_path, env={}) == tmp_path / ".codex" / "agents"
+
+
+def test_deploy_writes_backs_up_and_cleans_stale(tmp_path, monkeypatch):
+    target = tmp_path / "claude-agents"
+    target.mkdir()
+    stale = target / "old.md"
+    stale.write_text(f"---\nname: old\n---\n<!-- {ra.GENERATED_MARKER} from agents/old.md (hash 0) -->\n", encoding="utf-8")
+    foreign = target / "mine.md"
+    foreign.write_text("---\nname: mine\n---\nhand written\n", encoding="utf-8")
+    existing = target / "explorer.md"
+    existing.write_text("previous content\n", encoding="utf-8")
+    monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(target))
+    backup_dir = tmp_path / "backups"
+
+    ra.deploy(REPO, selected=["claude"], overrides={}, dry_run=False, backup_dir=backup_dir)
+
+    assert not stale.exists()
+    assert foreign.read_text(encoding="utf-8") == "---\nname: mine\n---\nhand written\n"
+    assert ra.GENERATED_MARKER in existing.read_text(encoding="utf-8")
+    backups = sorted(path.name for path in backup_dir.iterdir())
+    assert any(name.startswith("explorer-") for name in backups)
+    assert any(name.startswith("old-") for name in backups)
+
+
+def test_deploy_dry_run_writes_nothing(tmp_path, monkeypatch, capsys):
+    target = tmp_path / "codex-agents"
+    monkeypatch.setenv("CODEX_AGENTS_DIR", str(target))
+    ra.deploy(REPO, selected=["codex"], overrides={}, dry_run=True, backup_dir=tmp_path / "b")
+    assert not target.exists()
+    out = capsys.readouterr().out
+    assert "would write" in out
+    assert "explorer.toml" in out
+
+
+def test_deploy_is_idempotent(tmp_path, monkeypatch, capsys):
+    target = tmp_path / "cc-agents"
+    monkeypatch.setenv("COMMANDCODE_AGENTS_DIR", str(target))
+    ra.deploy(REPO, selected=["commandcode"], overrides={}, dry_run=False, backup_dir=tmp_path / "b")
+    capsys.readouterr()
+    ra.deploy(REPO, selected=["commandcode"], overrides={}, dry_run=False, backup_dir=tmp_path / "b")
+    out = capsys.readouterr().out
+    assert "unchanged" in out
+    assert "updated" not in out
+
+
+def test_main_list_targets(capsys):
+    assert ra.main(["--list-targets"]) == 0
+    out = capsys.readouterr().out
+    for harness in ra.AGENT_HARNESSES:
+        assert harness in out
+
+
+def test_main_check(capsys):
+    assert ra.main(["--check"]) == 0

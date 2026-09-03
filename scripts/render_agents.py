@@ -403,3 +403,185 @@ RENDERERS = {
     "commandcode": render_commandcode,
 }
 EXTENSIONS = {"claude": ".md", "codex": ".toml", "opencode": ".md", "commandcode": ".md"}
+
+
+TARGET_DIRS = {
+    "claude": ("{home}/.claude/agents", "CLAUDE_AGENTS_DIR"),
+    "codex": ("{home}/.codex/agents", "CODEX_AGENTS_DIR"),
+    "opencode": ("{home}/.config/opencode/agents", "OPENCODE_AGENTS_DIR"),
+    "commandcode": ("{home}/.commandcode/agents", "COMMANDCODE_AGENTS_DIR"),
+}
+HARNESS_DISPLAY = {
+    "claude": "Claude Code",
+    "codex": "OpenAI Codex",
+    "opencode": "OpenCode",
+    "commandcode": "Command Code",
+}
+
+
+def selected_agent_harnesses(selected: list[str] | None) -> list[str]:
+    if not selected:
+        return list(AGENT_HARNESSES)
+    names: list[str] = []
+    for item in selected:
+        names.extend(part.strip() for part in item.split(",") if part.strip())
+    if not names:
+        raise SystemExit("No harness names parsed from --target; nothing to do")
+    for name in names:
+        if name not in AGENT_HARNESSES:
+            raise SystemExit(f"Unknown agent harness: {name}. Supported: {', '.join(AGENT_HARNESSES)}")
+    return names
+
+
+def agent_target_dir(harness: str, home: Path | None = None, env: dict[str, str] | None = None) -> Path:
+    template, env_var = TARGET_DIRS[harness]
+    values = os.environ if env is None else env
+    if values.get(env_var):
+        return Path(values[env_var]).expanduser()
+    home_path = Path.home() if home is None else Path(home)
+    return Path(template.format(home=home_path)).expanduser()
+
+
+def render_harness(
+    specs: list[AgentSpec], harness: str, overrides: dict, invariants: str
+) -> tuple[dict[str, str], list[str]]:
+    rendered: dict[str, str] = {}
+    notices: list[str] = []
+    for spec in specs:
+        resolved = resolve(spec, harness, overrides)
+        notices.extend(resolved.notices)
+        rendered[spec.name + EXTENSIONS[harness]] = RENDERERS[harness](spec, resolved, invariants)
+    if all(resolve(spec, harness, overrides).model is None for spec in specs):
+        notices.append(f"{harness}: every tier renders as inherit; set prompts/models.local.json to enable tiering")
+    return rendered, notices
+
+
+def print_notices(notices: list[str]) -> None:
+    for notice in dict.fromkeys(notices):
+        print(f"notice: {notice}")
+
+
+def render_all(
+    repo_root: Path, out_dir: Path, selected: list[str] | None, overrides: dict
+) -> dict[str, list[Path]]:
+    specs = load_agents(repo_root)
+    invariants = read_invariants(repo_root)
+    written: dict[str, list[Path]] = {}
+    notices: list[str] = []
+    for harness in selected_agent_harnesses(selected):
+        files, harness_notices = render_harness(specs, harness, overrides, invariants)
+        notices.extend(harness_notices)
+        dest_dir = out_dir / harness
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        paths: list[Path] = []
+        for filename, text in files.items():
+            dest = dest_dir / filename
+            dest.write_text(text, encoding="utf-8")
+            paths.append(dest)
+        written[harness] = paths
+    print_notices(notices)
+    return written
+
+
+def check(repo_root: Path, selected: list[str] | None) -> int:
+    overrides = load_overrides(repo_root)
+    with TemporaryDirectory() as temp_dir:
+        written = render_all(repo_root, Path(temp_dir), selected, overrides)
+        for harness, paths in written.items():
+            for path in paths:
+                text = path.read_text(encoding="utf-8")
+                if GENERATED_MARKER not in text:
+                    print(f"ERROR: {harness}/{path.name} lacks the generated marker")
+                    return 1
+                if harness == "codex":
+                    tomllib.loads(text)
+                else:
+                    parse_frontmatter(text, path)
+    print("Agent render check passed")
+    return 0
+
+
+def is_generated(path: Path) -> bool:
+    try:
+        return GENERATED_MARKER in path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+
+
+def deploy(
+    repo_root: Path, selected: list[str] | None, overrides: dict, dry_run: bool, backup_dir: Path
+) -> None:
+    specs = load_agents(repo_root)
+    invariants = read_invariants(repo_root)
+    notices: list[str] = []
+    for harness in selected_agent_harnesses(selected):
+        files, harness_notices = render_harness(specs, harness, overrides, invariants)
+        notices.extend(harness_notices)
+        target = agent_target_dir(harness)
+        extension = EXTENSIONS[harness]
+
+        stale = []
+        if target.is_dir():
+            stale = [
+                path
+                for path in sorted(target.glob(f"*{extension}"))
+                if path.name not in files and is_generated(path)
+            ]
+
+        if dry_run:
+            for filename in files:
+                print(f"would write {harness}: {target / filename}")
+            for path in stale:
+                print(f"would remove stale {harness}: {path}")
+            continue
+
+        target.mkdir(parents=True, exist_ok=True)
+        for filename, text in files.items():
+            dest = target / filename
+            if dest.exists() and dest.read_text(encoding="utf-8", errors="replace") == text:
+                print(f"unchanged {harness}: {dest}")
+                continue
+            backup_existing(dest, backup_dir)
+            dest.write_text(text, encoding="utf-8")
+            print(f"updated {harness}: {dest}")
+        for path in stale:
+            backup_existing(path, backup_dir)
+            path.unlink()
+            print(f"removed stale {harness}: {path}")
+    print_notices(notices)
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    repo_root = Path(__file__).resolve().parents[1]
+    parser = argparse.ArgumentParser(description="Render and deploy subagent definitions.")
+    parser.add_argument("--repo-root", type=Path, default=repo_root)
+    parser.add_argument("--out-dir", type=Path, default=repo_root / "build" / "agents")
+    parser.add_argument("--target", action="append", help="Harness target, repeatable or comma-separated.")
+    parser.add_argument("--deploy", action="store_true", help="Write rendered agents to global harness directories.")
+    parser.add_argument("--dry-run", action="store_true", help="Print deploy actions without writing.")
+    parser.add_argument("--check", action="store_true", help="Validate rendered output without persistent writes.")
+    parser.add_argument("--list-targets", action="store_true", help="List supported harnesses and target directories.")
+    parser.add_argument("--backup-dir", type=Path, default=repo_root / ".backups", help="Directory for deploy backups.")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    if args.list_targets:
+        for harness in selected_agent_harnesses(args.target):
+            print(f"{harness}\t{HARNESS_DISPLAY[harness]}\t{agent_target_dir(harness)}\t{TARGET_DIRS[harness][1]}")
+        return 0
+    if args.check:
+        return check(args.repo_root, args.target)
+    overrides = load_overrides(args.repo_root)
+    if args.deploy or args.dry_run:
+        deploy(args.repo_root, args.target, overrides, args.dry_run, args.backup_dir)
+        return 0
+    written = render_all(args.repo_root, args.out_dir, args.target, overrides)
+    for harness, paths in written.items():
+        print(f"rendered {harness}: {paths[0].parent} ({len(paths)} agents)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
