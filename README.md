@@ -1,8 +1,8 @@
 # agents.
 
-Opinionated global `AGENTS.md` / `CLAUDE.md` configuration for coding agents.
+Portable instructions, subagent roles, and context-consolidation workflows for coding agents, with shared and private project context.
 
-This is not a neutral baseline. It is a working config shaped by 20+ years in IT and DevOps, production incidents, code reviews, research, and ideas from people worth listening to - including Andrej Karpathy's autoresearch/autoimprove loop and writing from Boris and others. It is meant to be useful, sharp, and portable, not universal. Pick the parts that fit your workflow and ignore the rest.
+This is an opinionated toolkit shaped by 20+ years in IT and DevOps, production incidents, code reviews, research, and ideas from people worth listening to - including Andrej Karpathy's autoresearch/autoimprove loop and writing from Boris and others. Pick the parts that fit your workflow: global prompts, specialized subagents, project instruction templates, or context consolidation. Each is maintained here and installed separately.
 
 ## What This Repo Does
 
@@ -12,10 +12,15 @@ This is not a neutral baseline. It is a working config shaped by 20+ years in IT
 - Separates deployable global targets from manual project-local targets when no verified global operational rules path is known.
 - Does not generate persona, identity, memory, provider credential, model settings, MCP, plugin, or assistant-profile files.
 - Deploys rendered files to resolved global paths with backups.
+- Renders six reusable subagent roles from `agents/` into four harness formats.
+- Provides opt-in shared/local project instruction templates and a portable context-consolidation skill.
 - Lints public prompt sources, including `prompts/private.example.md`, for private paths, token-like secrets, missing harness fragments, and non-ASCII drift.
 - Provides a Karpathy-style score -> improve -> verify loop in `scripts/autoimprove-prompts`.
 
 ## Quick Start
+
+Use Python 3.11+ and Bash. For dependency setup and the separate prompt, subagent,
+hook, and skill installers, see [Install and Deploy](INSTALL.md).
 
 Render all supported harness files into `build/generated/`:
 
@@ -25,9 +30,10 @@ scripts/sync-ai-prompts
 
 Harnesses that share an output filename, such as `AGENTS.md`, render into per-harness subdirectories so targets do not overwrite each other.
 
-Deploy selected harnesses to global paths:
+Preview and deploy only the harnesses you use:
 
 ```bash
+scripts/sync-ai-prompts --target claude,codex --dry-run
 scripts/sync-ai-prompts --target claude,codex --deploy
 ```
 
@@ -68,18 +74,15 @@ scripts/
   render-invariants       # wrapper for the invariants renderer
   render-agents           # wrapper for the subagent renderer
   render_agents.py        # subagent renderer
+  install_workflow.py     # explicit-destination consolidation skill installer
   lint_prompts.py         # prompt-source linter
   scan_prompt_sources.py  # prompt-injection scanner
   check_harness_docs.py   # README/INSTALL harness-table drift check
   autoimprove-prompts     # score -> improve -> verify loop
-tests/
-  test_ci_config.py
-  test_harness_docs.py
-  test_lint_prompts.py
-  test_render_invariants.py
-  test_render_prompts.py
-  test_scan_prompt_sources.py
-docs/                     # design notes and specs
+skills/consolidate-agents-md/  # portable project context workflow
+templates/project/        # opt-in shared and private instruction examples
+tests/                    # render, deploy, installer, lint, and CI regression tests
+docs/                     # autoresearch guide and historical design specs
 ```
 
 ## Autoimprove
@@ -104,7 +107,9 @@ Public prompt fragments stay anonymized. Put personal paths, internal repo names
 cp prompts/private.example.md prompts/private.md
 ```
 
-`prompts/private.md` is gitignored and appended after the shared core during render/deploy, so it can override or extend the public config without leaking into the repo.
+`prompts/private.md` is gitignored and appended after the shared core during render/deploy.
+It can extend the public config locally, but rendered output can contain private content.
+Do not publish generated files or copy them into tracked project instructions.
 
 For local leak checks that should not be committed, copy `prompts/private-patterns.example.txt` to `prompts/private-patterns.txt` or set `AGENTS_PRIVATE_PATTERNS` to comma- or newline-separated markers.
 
@@ -119,6 +124,8 @@ keeps project instructions lean, aligns companion files, and consolidates then c
 project memory after verified backups and writes. It preserves shared/local separation.
 The global prompt suggests it once at task completion when durable discoveries or drift
 warrant it; only explicit invocation runs it. See [installation and invocation](INSTALL.md#context-consolidation-workflow).
+Prompt deployment does not install this skill. Run its installer separately; installing
+it does not consolidate or clear memory.
 
 ## Invariants Reinforcement
 
@@ -209,7 +216,7 @@ python scripts/scan_prompt_sources.py
 python scripts/check_harness_docs.py
 python -m pytest -q
 bash -n scripts/sync-ai-prompts scripts/autoimprove-prompts scripts/render-invariants scripts/render-agents
-python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/render_agents.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py
+python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/render_agents.py scripts/install_workflow.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py
 scripts/sync-ai-prompts --check
 scripts/sync-ai-prompts --dry-run
 scripts/render-agents --check

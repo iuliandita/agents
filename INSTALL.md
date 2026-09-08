@@ -1,5 +1,33 @@
 # Install And Deploy
 
+## Prerequisites
+
+Run commands from the repository root with Python 3.11+ available as `python`
+and Bash for the wrapper scripts. The full test suite uses the CI Python version
+recorded in [ci.yml](.github/workflows/ci.yml).
+
+For subagent validation, workflow installation, and tests, set up the dependencies:
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+```
+
+PyYAML is required by the workflow installer; pytest is used for verification.
+The prompt and invariants renderers use the Python standard library.
+Keep the virtual environment out of version control.
+
+Deployment is separate for each component; none of these commands installs the others:
+
+| Component | Command | Details |
+|---|---|---|
+| Global prompts | `scripts/sync-ai-prompts` | [Render and deploy](#render) |
+| Subagent definitions | `scripts/render-agents` | [Agent targets](#agent-targets) |
+| Invariants hook | `scripts/render-invariants` | [Hook setup](README.md#invariants-reinforcement) |
+| Consolidation skill | `python scripts/install_workflow.py` | [Workflow installation](#context-consolidation-workflow) |
+| Shared/local project files | Manual opt-in | [Project instructions](#project-instructions-shared-or-private) |
+
 ## Render
 
 ```bash
@@ -11,6 +39,7 @@ Rendered files go to `build/generated/`. Harnesses that share the same output fi
 ## Deploy
 
 ```bash
+scripts/sync-ai-prompts --target claude,codex --dry-run
 scripts/sync-ai-prompts --target claude,codex --deploy
 ```
 
@@ -96,7 +125,14 @@ ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/ANTIGRAVITY.md" scripts/sync-ai-prompts -
 
 ## Agent Targets
 
-`scripts/render-agents --deploy` writes one file per agent into these directories. Override with the environment variable when a harness home is customized.
+Select only the harnesses you use. Prompt deployment does not deploy these definitions:
+
+```bash
+scripts/render-agents --target claude,codex --dry-run
+scripts/render-agents --target claude,codex --deploy
+```
+
+Deployment writes one file per agent into these directories. Override with the environment variable when a harness home is customized.
 
 | Harness | Directory | Override |
 |---|---|---|
@@ -228,4 +264,7 @@ discovery; installation checks alone do not prove model execution behavior.
 
 ## Operational Rules Only
 
-This repo renders operational coding-agent rules. It does not generate persona, identity, memory, provider credential, model settings, MCP, plugin, or assistant-profile files.
+The prompt renderer writes operational coding-agent rules, not persona, identity,
+memory stores, provider credentials, model settings, MCP, plugins, or assistant profiles.
+The separately installed consolidation workflow can edit project instructions and
+clear verified project memory only when explicitly invoked.
