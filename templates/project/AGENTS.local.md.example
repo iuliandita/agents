@@ -1,0 +1,13 @@
+# Local Project Configuration
+
+This file is private to this checkout. Keep it and its companion ignored by Git.
+It supplements shared instructions without relaxing security or required verification.
+
+## Environment
+
+Add developer-specific paths, local service setup, and environment differences here.
+Use credential references, never secret values: this content enters the agent's context.
+
+## Preferences
+
+Add project-specific personal preferences here. Keep cross-project preferences global.

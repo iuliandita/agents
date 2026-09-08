@@ -1,0 +1,20 @@
+# Project Instructions
+
+## Local Configuration
+
+Before starting work, read `AGENTS.local.md` beside this file if it exists
+and has not already been loaded. Its absence is normal; do not create it
+unless requested. Resolve this path relative to this file, not the working directory.
+
+Use local notes for developer-specific paths, environment details, and preferences.
+They must not relax shared security requirements or required verification.
+Keep their private details out of tracked files and public git artifacts.
+
+## Project Context
+
+Replace this section with the project's architecture, conventions, and useful gotchas.
+Keep machine-specific paths and personal preferences in the optional local file.
+
+## Verification
+
+Replace this section with the project's actual check commands and completion criteria.

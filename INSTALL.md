@@ -111,6 +111,74 @@ Existing `shell_ro_wrappers` settings are accepted for compatibility but no long
 
 Model tiers for OpenCode and Command Code are inherit by default. Copy `prompts/models.local.example.json` to `prompts/models.local.json` and set provider model IDs to enable tiering.
 
+## Project Instructions: Shared Or Private
+
+Choose per project. The default private-only layout keeps `AGENTS.md` and its
+`CLAUDE.md` companion gitignored. Opt into the following layout when colleagues
+should share the project instructions:
+
+| File | Version control | Purpose |
+|---|---|---|
+| `AGENTS.md` | Tracked | Portable project context, conventions, and required checks |
+| `CLAUDE.md` | Tracked symlink to `AGENTS.md` | Shared Claude instructions |
+| `AGENTS.local.md` | Ignored | Optional developer and machine details |
+| `CLAUDE.local.md` | Ignored symlink to `AGENTS.local.md` | Local Claude instructions |
+
+Start with [the shared template](templates/project/AGENTS.md.example) and
+[the local template](templates/project/AGENTS.local.md.example). Fill in real
+project context and verification commands before using the shared template.
+Do not copy globally rendered output into the shared file: it can contain the
+private overlay from `prompts/private.md`.
+
+Claude loads `CLAUDE.local.md` alongside `CLAUDE.md`. Codex's documented discovery
+loads at most one instruction file per directory; `AGENTS.override.md` replaces
+that directory's `AGENTS.md`, and fallback filenames do not append another file.
+The shared template therefore explicitly asks Codex to read the optional local
+file. This is model-followed guidance, not a native import or enforced hook.
+See [Claude memory](https://code.claude.com/docs/en/memory) and
+[Codex instruction discovery](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
+
+For an existing project:
+
+1. Back up the current instruction files outside the tracked tree. Review their
+   content and move private paths, environment details, and preferences into
+   `AGENTS.local.md`; retain portable project rules in `AGENTS.md`.
+2. Add the optional-local-file paragraph from the shared template to `AGENTS.md`.
+3. Remove root ignore entries for the shared `AGENTS.md` and `CLAUDE.md`. Add:
+
+   ```gitignore
+   /AGENTS.local.md
+   /CLAUDE.local.md
+   ```
+
+4. Keep an existing correct `CLAUDE.md` symlink. Where companions do not yet exist,
+   create relative links from the project root:
+
+   ```sh
+   ln -s AGENTS.md CLAUDE.md
+   ln -s AGENTS.local.md CLAUDE.local.md
+   ```
+
+   Create the local companion only when the local target exists. Do not overwrite
+   existing companions blindly. Where symlinks are unsuitable, use regular
+   `CLAUDE.md` and `CLAUDE.local.md` files containing `@AGENTS.md` and
+   `@AGENTS.local.md`, respectively; keep the latter ignored.
+5. Verify with `git check-ignore -v AGENTS.local.md CLAUDE.local.md` and
+   `git status --short`. If the shared files still stay ignored, inspect global
+   excludes and `.git/info/exclude` with `git check-ignore -v AGENTS.md CLAUDE.md`.
+   Stage only the sanitized shared files and `.gitignore`, then inspect the staged
+   diff before committing. Ignore rules do not untrack previously committed files.
+6. Start fresh sessions. Ask Codex to identify the instruction files it actually
+   read, including the local file. In Claude, check `/memory`. Test with and
+   without local files; missing local configuration must not block ordinary work.
+
+Each developer or worktree supplies its own ignored files. Keep cross-project
+preferences global and secret values out of instruction files. Local notes may
+adjust paths and preferences, but must not weaken shared security or required checks.
+
+This repository keeps its own root instruction files private. These templates
+are opt-in examples, not an automatic migration or part of global deployment.
+
 ## Operational Rules Only
 
 This repo renders operational coding-agent rules. It does not generate persona, identity, memory, provider credential, model settings, MCP, plugin, or assistant-profile files.
