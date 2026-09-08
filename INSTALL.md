@@ -9,8 +9,8 @@ recorded in [ci.yml](.github/workflows/ci.yml).
 For subagent validation, workflow installation, and tests, set up the dependencies:
 
 ```sh
-python3 -m venv .venv
-. .venv/bin/activate
+python3 -m venv "$HOME/.venvs/agents"
+. "$HOME/.venvs/agents/bin/activate"
 python -m pip install -r requirements-dev.txt
 ```
 

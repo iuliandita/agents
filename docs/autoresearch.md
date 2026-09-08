@@ -50,6 +50,8 @@ The prompt asks for small improvements only. This repo is configuration, not app
 
 The current script does not silently revert failed attempts. It leaves the diff in place and stops. That is intentional: prompt changes are subjective enough that failed verification should be inspected, not erased without context.
 
-Neither mode commits, pushes, or deploys. `auto` runs bounded improvement attempts;
-it is not a scheduled monitor. Start from a reviewed worktree so candidate edits are
-easy to distinguish from existing work.
+The wrapper does not itself commit, push, or deploy, but it does not prohibit those
+actions in the invoked harness. Review that harness's permissions and approval policy
+before running the loop. `auto` runs bounded improvement attempts; it is not a scheduled
+monitor. Start from a reviewed worktree so candidate edits are easy to distinguish
+from existing work.
