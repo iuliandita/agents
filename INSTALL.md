@@ -179,6 +179,53 @@ adjust paths and preferences, but must not weaken shared security or required ch
 This repository keeps its own root instruction files private. These templates
 are opt-in examples, not an automatic migration or part of global deployment.
 
+## Context Consolidation Workflow
+
+`skills/consolidate-agents-md/SKILL.md` is the canonical workflow. It retains the
+original command's memory consolidation, transcript review, and clearing behavior,
+with recoverable file backups, secret redaction, and verification before clearing.
+It operates on the selected project only and preserves shared versus local instructions.
+The installer installs instructions; it does not run consolidation or touch project memory.
+
+Install into explicit skill directories (Python and the existing PyYAML dependency required):
+
+```sh
+python scripts/install_workflow.py --skills-dir "$HOME/.agents/skills" --skills-dir "$HOME/.claude/skills"
+python scripts/install_workflow.py --skills-dir "$HOME/.agents/skills" --skills-dir "$HOME/.claude/skills" --deploy
+```
+
+The default is a dry run. All destinations are checked before writes; symlinks and
+file/directory collisions are refused. Changed regular files are backed up under
+`.backups/workflow-*`; identical files are untouched. For a symlinked skill root,
+inspect it and pass its intended real directory explicitly. Do not overwrite a link blindly.
+
+To migrate an existing Claude command as well, add
+`--legacy-command "$HOME/.claude/commands/consolidate-agents-md.md"` to both commands.
+This backs up and replaces the old command with the same portable content; future
+updates use the same installer. No separate command implementation is maintained.
+
+Codex and OpenCode discover user skills in `~/.agents/skills`; Claude uses
+`~/.claude/skills`. See [Codex skills](https://learn.chatgpt.com/docs/build-skills),
+[OpenCode skills](https://opencode.ai/docs/skills), and
+[Claude skills](https://code.claude.com/docs/en/skills).
+For another harness, either install into its verified skill directory or give it the
+absolute path to the installed `SKILL.md` and ask it to read and follow the workflow.
+Native Command Code skill discovery is not assumed; the explicit-file route works
+with a file-capable agent and can be recorded in the private overlay.
+
+Invoke with `/consolidate-agents-md [repo-path]` in Claude or
+`$consolidate-agents-md` in Codex, naming the target in your request. In other
+harnesses, ask to run `consolidate-agents-md` through their skill mechanism or
+the explicit-file route. The singular spelling `consolidate-agent-md` is a
+natural-language alias in the description, not a second installed slash command.
+
+End-of-work prompting is advisory, not a lifecycle hook: the agent suggests the
+workflow only when useful and does not consolidate automatically. Explicitly invoke
+it for edits and memory clearing, or request review-only/no-memory behavior to narrow
+the scope. Existing local policies that prohibit memory access remain effective unless
+the user explicitly overrides them. Restart the harness after installing and verify
+discovery; installation checks alone do not prove model execution behavior.
+
 ## Operational Rules Only
 
 This repo renders operational coding-agent rules. It does not generate persona, identity, memory, provider credential, model settings, MCP, plugin, or assistant-profile files.
