@@ -19,8 +19,10 @@ This is an opinionated toolkit shaped by 20+ years in IT and DevOps, production 
 
 ## Quick Start
 
-Use Python 3.11+ and Bash. For dependency setup and the separate prompt, subagent,
-hook, and skill installers, see [Install and Deploy](INSTALL.md).
+Use Git, Python 3.11+, and Bash; GitHub CLI is optional. Start with the
+[environment setup](INSTALL.md#prerequisites), including the macOS interpreter
+selection notes. The launchers use the checkout's `.venv` when present and also
+work with `python3` alone on PATH. No global `python` alias is needed.
 
 Render all supported harness files into `build/generated/`:
 

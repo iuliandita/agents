@@ -2,21 +2,58 @@
 
 ## Prerequisites
 
-Run commands from the repository root with Python 3.11+ available as `python`
-and Bash for the wrapper scripts. The full test suite uses the CI Python version
-recorded in [ci.yml](.github/workflows/ci.yml).
-
-For subagent validation, workflow installation, and tests, set up the dependencies:
+Use Git, Python 3.11+, and Bash. GitHub CLI (`gh`) is not required to clone,
+render, or deploy. Clone this repository using its HTTPS URL from GitHub's Code
+menu, then run commands from the checkout root:
 
 ```sh
-python3 -m venv "$HOME/.venvs/agents"
-. "$HOME/.venvs/agents/bin/activate"
+python3 --version
+python3 -m venv .venv
+. .venv/bin/activate
+```
+
+Check the version before creating the environment. On macOS, `python3` may resolve
+to an older system interpreter even when a newer Homebrew Python is installed.
+If you use Homebrew, install Python if needed with `brew install python`, then
+select it explicitly when creating the environment:
+
+```sh
+"$(brew --prefix python)/bin/python3" --version
+"$(brew --prefix python)/bin/python3" -m venv .venv
+. .venv/bin/activate
+```
+
+This avoids hardcoding Apple Silicon or Intel installation paths. See
+[Homebrew's Python guidance](https://docs.brew.sh/Homebrew-and-Python) and
+[Python virtual environments](https://docs.python.org/3/library/venv.html).
+Do not install packages into the system Python or create a global `python` alias.
+
+Prompt, subagent, and invariants rendering use the Python standard library.
+For the consolidation workflow and development checks, install the dependencies
+inside the activated environment:
+
+```sh
 python -m pip install -r requirements-dev.txt
 ```
 
 PyYAML is required by the workflow installer; pytest is used for verification.
-The prompt and invariants renderers use the Python standard library.
-Keep the virtual environment out of version control.
+Missing PyYAML does not block global prompt deployment. The `.venv/` directory
+is gitignored. The full test suite uses the CI Python version recorded in
+[ci.yml](.github/workflows/ci.yml).
+
+The shell launchers select `AGENTS_PYTHON` when set, then the checkout's
+`.venv/bin/python`, then `python3`, then `python` on PATH. They reject Python
+versions below 3.11 with setup guidance. Activation is optional for these
+launchers; use it for the direct `python` commands in this guide. To use an
+environment elsewhere, supply its executable path, not a shell command:
+
+```sh
+AGENTS_PYTHON="$HOME/my environments/agents/bin/python" scripts/sync-ai-prompts --target claude --dry-run
+```
+
+If `python` is not found, activate the environment or use the shell launcher.
+If `import yaml` fails in the workflow installer, run the dependency command
+above using the same interpreter that will run the installer.
 
 Deployment is separate for each component; none of these commands installs the others:
 

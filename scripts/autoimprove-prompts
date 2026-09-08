@@ -83,10 +83,10 @@ done
 score() {
   # Chain with && so a failure fails the whole gate even when the caller
   # wraps this in `if score`, which disables errexit inside the function.
-  python "$repo_root/scripts/lint_prompts.py" &&
-    python "$repo_root/scripts/scan_prompt_sources.py" &&
-    python -m pytest -q "$repo_root/tests" &&
-    python "$repo_root/scripts/render_prompts.py" --repo-root "$repo_root" --out-dir "$repo_root/build/generated" >/dev/null
+  "$agents_python" "$repo_root/scripts/lint_prompts.py" &&
+    "$agents_python" "$repo_root/scripts/scan_prompt_sources.py" &&
+    "$agents_python" -m pytest -q "$repo_root/tests" &&
+    "$agents_python" "$repo_root/scripts/render_prompts.py" --repo-root "$repo_root" --out-dir "$repo_root/build/generated" >/dev/null
 }
 
 worktree_changes() {
@@ -193,6 +193,8 @@ EOF
 
 main() {
   validate_options
+  source "$repo_root/scripts/python-runtime.sh"
+  select_agents_python "$repo_root"
   cd "$repo_root"
   printf 'Baseline score...\n'
   score
