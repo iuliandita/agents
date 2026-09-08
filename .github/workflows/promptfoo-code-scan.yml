@@ -32,13 +32,13 @@ jobs:
 
       - name: Check out repository
         if: env.PROMPTFOO_API_KEY != ''
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Run Promptfoo code scan
         if: env.PROMPTFOO_API_KEY != ''
-        uses: promptfoo/code-scan-action@148e01f35bc65bd992b9f44679577aa9123be6ab # v0.1.8
+        uses: promptfoo/code-scan-action@104214d969d978d545e6ddf3c8a6fec911f16626 # v0.2.0
         env:
           PROMPTFOO_API_KEY: ${{ env.PROMPTFOO_API_KEY }}
         with:
