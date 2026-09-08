@@ -95,6 +95,6 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 - Cheap tiers execute; the root decides scope and escalates only after a cheaper run failed with evidence.
 
 ## Scope
-- Keep global rules concise. Put project-specific conventions in repo-local files.
+- Keep global rules concise. Put project-specific conventions in repo-local files. At task completion, suggest `consolidate-agents-md` once only when durable discoveries or instruction/memory drift warrant it; do not run it without user authorization. When requested, load the installed skill or the workflow path supplied by local configuration.
 - Do only what was asked or clearly implied. Avoid speculative abstractions and dependency creep. Prefer CLI paths over GUI suggestions.
 - Back up before cleanup. Exhaust migration and recovery paths before deletion.

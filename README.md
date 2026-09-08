@@ -112,6 +112,14 @@ For local leak checks that should not be committed, copy `prompts/private-patter
 
 For project instructions shared with colleagues, use the optional [shared and local layout](INSTALL.md#project-instructions-shared-or-private). It keeps `AGENTS.md` in version control and developer-specific details in ignored `AGENTS.local.md`, with companions for Claude. Existing private-only projects need no migration.
 
+## Context Consolidation
+
+The portable [consolidate-agents-md skill](skills/consolidate-agents-md/SKILL.md)
+keeps project instructions lean, aligns companion files, and consolidates then clears
+project memory after verified backups and writes. It preserves shared/local separation.
+The global prompt suggests it once at task completion when durable discoveries or drift
+warrant it; only explicit invocation runs it. See [installation and invocation](INSTALL.md#context-consolidation-workflow).
+
 ## Invariants Reinforcement
 
 Global memory files are advisory: harnesses drift on them deep in long sessions, and memory loading varies by agent (Claude Code's built-in Explore and Plan subagents skip `CLAUDE.md` entirely; custom and general-purpose subagents load it but still drift). `prompts/invariants.md` holds a short block of non-negotiable rules for the cases where that drift is expensive.
