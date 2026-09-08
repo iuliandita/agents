@@ -2,8 +2,13 @@
 
 ## Prerequisites
 
-Run commands from the repository root with Python 3.11+ available as `python`
-and Bash for the wrapper scripts. The full test suite uses the CI Python version
+Run commands from the repository root with Python 3.11+ and Bash for the wrapper
+scripts. `sync-ai-prompts`, `render-agents`, and `render-invariants` try `python`,
+then `python3` on PATH, accepting the first interpreter that meets the version
+requirement. An activated virtual environment takes precedence through PATH.
+Set `AGENTS_PYTHON` to an executable name or quoted path to choose explicitly;
+an invalid override fails without fallback. Do not include command-line flags in it.
+The full test suite uses the CI Python version
 recorded in [ci.yml](.github/workflows/ci.yml).
 
 For subagent validation, workflow installation, and tests, set up the dependencies:
@@ -17,6 +22,29 @@ python -m pip install -r requirements-dev.txt
 PyYAML is required by the workflow installer; pytest is used for verification.
 The prompt and invariants renderers use the Python standard library.
 Keep the virtual environment out of version control.
+
+### macOS Setup
+
+Git is sufficient to clone this public repository; the GitHub CLI (`gh`) is optional.
+Check `python3 --version` before creating the environment above. If it is older
+than 3.11, use the full path to a newer installed interpreter instead. The wrappers
+do not search Homebrew directories or install Python automatically.
+
+For example, if your supported interpreter is `/opt/homebrew/bin/python3`:
+
+```sh
+/opt/homebrew/bin/python3 --version
+AGENTS_PYTHON=/opt/homebrew/bin/python3 scripts/sync-ai-prompts --target claude --dry-run
+AGENTS_PYTHON=/opt/homebrew/bin/python3 scripts/sync-ai-prompts --target claude --deploy
+```
+
+Use the path from your own installation; do not assume that example exists on every
+Mac. For tests or workflow installation, use that same interpreter to create the
+virtual environment, activate it, and install `requirements-dev.txt`. Direct
+`python` commands and `autoimprove-prompts` still require the activated environment
+or a suitable `python` on PATH; `AGENTS_PYTHON` applies only to the three wrappers.
+Basic prompt rendering/deployment does not need PyYAML, pytest, or a virtual environment.
+Do not install packages into the system Python or create a system-wide `python` alias.
 
 Deployment is separate for each component; none of these commands installs the others:
 

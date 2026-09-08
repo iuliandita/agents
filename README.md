@@ -21,6 +21,9 @@ This is an opinionated toolkit shaped by 20+ years in IT and DevOps, production 
 
 Use Python 3.11+ and Bash. For dependency setup and the separate prompt, subagent,
 hook, and skill installers, see [Install and Deploy](INSTALL.md).
+The render wrappers accept `python` or `python3`; use `AGENTS_PYTHON` for an
+explicit interpreter. See [macOS setup](INSTALL.md#macos-setup) if your system
+Python is too old or a Homebrew installation is not first on PATH.
 
 Render all supported harness files into `build/generated/`:
 

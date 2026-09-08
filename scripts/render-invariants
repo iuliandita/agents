@@ -3,4 +3,5 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-python "$repo_root/scripts/render_invariants.py" --repo-root "$repo_root" "$@"
+source "$repo_root/scripts/python-runtime.sh"
+exec "$agents_python" "$repo_root/scripts/render_invariants.py" --repo-root "$repo_root" "$@"
