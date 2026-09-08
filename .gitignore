@@ -20,6 +20,7 @@ SECURITY-AUDIT.md
 .hypothesis/
 .tox/
 .nox/
+.venv/
 .coverage
 htmlcov/
 __pycache__/

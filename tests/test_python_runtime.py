@@ -119,3 +119,74 @@ def test_prompt_dry_run_needs_no_site_packages(runtime):
     assert result.returncode == 0, result.stderr
     assert "would update claude:" in result.stdout
     assert not (checkout / "build").exists()
+
+
+def test_repository_venv_takes_precedence_over_path(runtime):
+    checkout, bin_dir, _ = runtime
+    venv_python = checkout / ".venv" / "bin" / "python"
+    venv_python.parent.mkdir(parents=True)
+    venv_python.symlink_to(sys.executable)
+    path_python = bin_dir / "python"
+    path_python.write_text(
+        '#!/bin/sh\nif [ "$1" = "-c" ]; then\n'
+        f'  exec {shlex.quote(sys.executable)} "$@"\nfi\nexit 97\n'
+    )
+    path_python.chmod(0o755)
+    old_python(bin_dir / "python3")
+    result = run(runtime)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("invalid", ["old", "not-executable", "broken-symlink"])
+def test_invalid_repository_venv_never_falls_back(runtime, invalid):
+    checkout, bin_dir, env = runtime
+    venv_python = checkout / ".venv" / "bin" / "python"
+    venv_python.parent.mkdir(parents=True)
+    if invalid == "old":
+        old_python(venv_python)
+    elif invalid == "not-executable":
+        venv_python.write_text("#!/bin/sh\nexit 0\n")
+    else:
+        venv_python.symlink_to(checkout / "missing-python")
+    (bin_dir / "python").symlink_to(sys.executable)
+    result = run(runtime)
+    assert result.returncode != 0
+    assert ".venv/bin/python" in result.stderr
+    assert "INSTALL.md" in result.stderr
+    env["AGENTS_PYTHON"] = sys.executable
+    result = run(runtime)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("selection", ["relative-override", "venv"])
+def test_autoimprove_score_uses_selected_python_after_chdir(runtime, selection):
+    checkout, bin_dir, env = runtime
+    caller = bin_dir.parent
+    selected = (
+        bin_dir / "selected python"
+        if selection == "relative-override"
+        else checkout / ".venv" / "bin" / "python"
+    )
+    selected.parent.mkdir(parents=True, exist_ok=True)
+    log = caller / "score.log"
+    selected.write_text(
+        '#!/bin/sh\nif [ "$1" = "-c" ]; then\n'
+        f'  exec {shlex.quote(sys.executable)} "$@"\nfi\n'
+        f'printf "%s\\n" "$*" >> {shlex.quote(str(log))}\n'
+    )
+    selected.chmod(0o755)
+    old_python(bin_dir / "python")
+    if selection == "relative-override":
+        env["AGENTS_PYTHON"] = str(selected.relative_to(caller))
+    result = subprocess.run(
+        [BASH, str(checkout / "scripts" / "autoimprove-prompts"), "--iterations", "0"],
+        cwd=caller, env=env, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert log.read_text().splitlines() == [
+        str(checkout / "scripts" / "lint_prompts.py"),
+        str(checkout / "scripts" / "scan_prompt_sources.py"),
+        f"-m pytest -q {checkout / 'tests'}",
+        f"{checkout / 'scripts' / 'render_prompts.py'} --repo-root {checkout} "
+        f"--out-dir {checkout / 'build' / 'generated'}",
+    ]
