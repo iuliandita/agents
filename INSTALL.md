@@ -107,6 +107,8 @@ ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/ANTIGRAVITY.md" scripts/sync-ai-prompts -
 
 `shell-ro` becomes shell access only on Codex, where `sandbox_mode = "read-only"` enforces the boundary. Claude Code, OpenCode, and Command Code omit shell access for those agents and keep their native read and search tools.
 
+Existing `shell_ro_wrappers` settings are accepted for compatibility but no longer grant shell access. Redeploying the agents removes their references to the old `agents-shell-ro-guard.py` hook; the previously deployed hook file is left in place and is unused by the updated agents.
+
 Model tiers for OpenCode and Command Code are inherit by default. Copy `prompts/models.local.example.json` to `prompts/models.local.json` and set provider model IDs to enable tiering.
 
 ## Operational Rules Only

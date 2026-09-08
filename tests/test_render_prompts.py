@@ -315,7 +315,8 @@ def test_fragments_track_fable_5_1_and_current_cli_defaults():
 
     assert "the default `high` fits most work on Fable 5.1 and Opus 5" in claude
     assert "safeguard false positives" in claude
-    assert "GPT-5.6 is leaner by default" in codex
+    assert "When migrating to Astra, preserve effective effort initially" in codex
+    assert "do not assume API and app effort ranges match" in codex
     assert "/effort xhigh" not in claude
     assert "--restricted" in claude
     assert "CLAUDE_CODE_SUBAGENT_MODEL" in claude
@@ -346,7 +347,9 @@ def test_core_tracks_fable_5_1_and_gpt_5_6_prompting_guides():
         "Use lists when asked or when the content is multifaceted",
         "compare one level lower",
         "Recognizing a name is not knowing its current state",
-        "Do not delegate work you can finish in a handful of tool calls",
+        "Keep work you can finish in a handful of tool calls inline",
+        "Preserve authorization across turns",
+        "Once appropriate checks pass",
         "Keep working while subagents run",
         "when check output would flood the context",
     ):
@@ -400,7 +403,7 @@ def test_effort_guidance_is_general_with_vendor_caveats():
 
     assert "Effort names are vendor-specific" in core
     assert "Effort names vary by model" in claude
-    assert "verify current CLI/docs first" in codex
+    assert "Verify current CLI/docs before setting automation flags" in codex
     assert "Gemini exposes thinking controls differently" in gemini
 
 
