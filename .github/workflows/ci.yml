@@ -49,7 +49,7 @@ jobs:
         run: python -m pytest -q
 
       - name: Syntax-check shell scripts
-        run: bash -n scripts/sync-ai-prompts scripts/autoimprove-prompts scripts/render-invariants scripts/render-agents
+        run: bash -n scripts/sync-ai-prompts scripts/autoimprove-prompts scripts/render-invariants scripts/render-agents scripts/python-runtime.sh
 
       - name: Syntax-check Python scripts
         run: python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/render_agents.py
@@ -62,3 +62,29 @@ jobs:
 
       - name: Dry-run deploy rendering
         run: scripts/sync-ai-prompts --dry-run
+
+  macos-setup:
+    name: macOS setup smoke test
+    runs-on: macos-15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up minimum supported Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Test interpreter selection
+        run: python -m pytest -q tests/test_python_runtime.py
+
+      - name: Render with system Bash and an isolated environment
+        run: |
+          python3 -m venv --without-pip .venv
+          /bin/bash scripts/sync-ai-prompts --target claude --check
+          /bin/bash scripts/sync-ai-prompts --target claude --dry-run
+          /bin/bash scripts/render-agents --target claude --check
+          /bin/bash scripts/render-invariants --dry-run

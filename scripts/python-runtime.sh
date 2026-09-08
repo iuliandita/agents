@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sourced by render wrappers; keep compatible with Bash 3.2.
+# Sourced by launchers; keep compatible with Bash 3.2.
 set -euo pipefail
 
 select_agents_python() {
@@ -9,9 +9,25 @@ select_agents_python() {
   if [[ ${AGENTS_PYTHON+x} ]]; then
     if [[ -n "$AGENTS_PYTHON" ]] && "$AGENTS_PYTHON" -c "$version_check" >/dev/null 2>&1; then
       agents_python="$AGENTS_PYTHON"
+      case "$agents_python" in
+        /*) ;;
+        */*) agents_python="$PWD/$agents_python" ;;
+      esac
       return 0
     fi
     printf '%s\n' 'AGENTS_PYTHON must name a working Python 3.11+ executable (not a command with flags). See INSTALL.md.' >&2
+    return 1
+  fi
+
+  local runtime_root
+  runtime_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  candidate="$runtime_root/.venv/bin/python"
+  if [[ -e "$candidate" || -L "$candidate" ]]; then
+    if "$candidate" -c "$version_check" >/dev/null 2>&1; then
+      agents_python="$candidate"
+      return 0
+    fi
+    printf '%s\n' 'The repository .venv/bin/python must be a working Python 3.11+ executable. Repair the virtual environment or set AGENTS_PYTHON to a supported executable. See INSTALL.md.' >&2
     return 1
   fi
 
