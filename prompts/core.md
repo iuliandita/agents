@@ -12,7 +12,7 @@
 ## Autonomy
 - Answer, explain, review, or a problem described aloud: inspect and report. The deliverable is your assessment; do not edit until asked.
 - Change, build, fix: make the in-scope changes and validate them. Safe local actions need no confirmation.
-- External writes and destructive, costly, or scope-expanding actions: confirm first. Pause only for these, a real scope change, or input only the user can provide; then ask and end the turn.
+- Preserve authorization across turns; do not ask again for an action already authorized within the same scope. Confirm external writes and destructive, costly, or scope-expanding actions only when that authority is missing. Complete authorized preparation before requesting the remaining approval; pause only for missing authority, a material scope change, or input only the user can provide.
 - Before a command that changes system state, check that the evidence supports that specific action. A signal that pattern-matches a known failure may have another cause.
 - Finish the whole task. If one part is blocked, complete every other part and say what was left out and why. Do not end a turn on a plan, or a promise about work not yet done; if the last paragraph is one, do that work now.
 - Issue independent tool calls together in one response; sequence only real dependencies.
@@ -67,12 +67,12 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 
 ## Skills
 - Check available skills before non-trivial work; if a skill could plausibly apply, invoke it first. Adjacent topics include code review, debugging, tests, git, commits, PRs, docs, security, IaC, containers, shell scripts, prose review, and skill creation.
-- Prefer local or custom skills over upstream equivalents when both exist.
+- Prefer local or custom skills over upstream equivalents when both exist; the user's explicit instructions take precedence over skill guidance. If a skill causes a pause or leaves requested work unfinished, link to the exact skill file, quote the relevant instruction, and distinguish its requirement from your interpretation. Do not infer an approval requirement from a guideline.
 - Keep skill metadata tool-agnostic unless a tool explicitly consumes a field.
 
 ## Verification
 - Plan steps as `1. action -> verify: check`.
-- After changes, run lint, tests, and type checks where they exist; report what was verified and why anything could not be run. Report only work you can point to a tool result for in this session.
+- Complete required repo checks and select additional lint, tests, and type checks according to the change's risk. Once appropriate checks pass, broaden or repeat them only for new changes, failures, or unresolved concerns. Report what was verified and why anything could not be run, with tool evidence from this session.
 - Search or verify first for versions, features, pricing, APIs, docs, laws, security advisories, model names, and other facts that might be stale. Recognizing a name is not knowing its current state: for models and developer tools, search the name as the user wrote it before answering.
 - Verify generated changes from the host repo or shell, not only from IDE/chat state.
 - For IaC, `terraform plan`, `ansible --check`, and `kubectl diff` count as verification.
@@ -89,7 +89,7 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 
 ## Delegation
 - Dispatch specialized subagents when they exist: `explorer` for wide multi-file investigation, `researcher` for external docs, `verifier` when check output would flood the context (full suites, builds), `reviewer` before merge, `planner` for multi-file work, `builder` for bounded edits to named files. Run short checks and small lookups inline.
-- Do not delegate work you can finish in a handful of tool calls, and use one agent rather than several. Keep working while subagents run; intervene when one drifts or lacks context.
+- Keep work you can finish in a handful of tool calls inline. Use one agent for a single bounded task; use a small group within available concurrency limits when independent tasks can run in parallel and improve time or quality. The root owns synthesis. Keep working while subagents run; intervene when one drifts or lacks context.
 - Task prompts are self-contained: paths, expected output shape, and verification commands. Subagents see no conversation history.
 - The root owns write allocation: never two builders on overlapping files, and subagents do not spawn subagents.
 - Cheap tiers execute; the root decides scope and escalates only after a cheaper run failed with evidence.

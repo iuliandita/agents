@@ -148,7 +148,7 @@ Specialized subagents beat general-purpose ones for two reasons: a clean context
 
 The core prompt dispatches `verifier` only when check output would flood the main context (full suites, builds); short checks run inline, and work that fits in a handful of tool calls is never delegated.
 
-Tiers map to models per harness: Claude Code `haiku`, `sonnet`, `opus`, and `fable` for `apex`; Codex `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol`. OpenCode and Command Code have no generic aliases and are often self-hosted or routed, so they inherit the session model until `prompts/models.local.json` names provider IDs. Copy `prompts/models.local.example.json` to start; it can also promote one agent to a higher tier or effort locally without touching tracked files.
+Tiers map to models per harness: Claude Code `haiku`, `sonnet`, `opus`, and `fable` for `apex`; Codex `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol`, and `gpt-6-astra` for `apex`. OpenCode and Command Code have no generic aliases and are often self-hosted or routed, so they inherit the session model until `prompts/models.local.json` names provider IDs. Copy `prompts/models.local.example.json` to start; it can also promote one agent to a higher tier or effort locally without touching tracked files.
 
 ```bash
 scripts/render-agents                # build/agents/<harness>/
@@ -159,13 +159,7 @@ scripts/render-agents --target claude,codex --deploy
 
 Deploy backs up overwritten files into `.backups/` and removes only stale files that carry the generated marker; hand-written agents in the same directory are left alone. The hard invariants are rendered into every agent from `prompts/invariants.md`, so the manual subagent paste is only needed for agents defined outside this repo.
 
-Enforcement of `shell-ro` differs by harness. OpenCode splits a compound command into parts, asks permission per part, and denies the whole call if any part is denied; a redirect rides along inside the matched command text, so `ls > f` still passes a glob allowlist. Claude Code gets a rendered `PreToolUse` guard installed alongside the agents: it blocks any segment that is not one of the allowed read-only commands, and blocks redirects, process and command substitution, and `--output`. Codex relies on `sandbox_mode = "read-only"`, and Command Code has no per-command allowlist, so it relies on the prompt.
-
-The guard is deployed to `~/.claude/hooks/agents-shell-ro-guard.py` (override the directory with `CLAUDE_HOOKS_DIR`) and referenced by absolute path from the frontmatter of every `shell-ro` agent. If your shell rules prefix commands with a wrapper, list it under `shell_ro_wrappers` in `prompts/models.local.json` so both the guard and the OpenCode globs admit it:
-
-```json
-{"claude": {"shell_ro_wrappers": ["rtk"]}, "opencode": {"shell_ro_wrappers": ["rtk"]}}
-```
+`shell-ro` is rendered only when the harness can enforce it as a real sandbox boundary. Codex maps it to shell access under `sandbox_mode = "read-only"`. Claude Code, OpenCode, and Command Code omit shell access for `shell-ro` agents and retain their native read and search tools. This costs explorer and reviewer direct git-history access on those harnesses, but keeps the read-only contract honest. Full `shell` roles are unchanged.
 
 Codex only uses a custom role when the parent calls `spawn_agent` with `agent_type` set to the role name, and a full-history fork (`fork_turns = "all"`) inherits the parent's model and effort regardless of the role file. The rendered Codex prompt tells the root agent to pass `agent_type` and `fork_turns = "none"`; task prompts must therefore be self-contained.
 

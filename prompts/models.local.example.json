@@ -5,8 +5,7 @@
       "mid": "opencode-go/glm-5.3",
       "flagship": "opencode-go/kimi-k3"
     },
-    "effort_key": "reasoningEffort",
-    "shell_ro_wrappers": ["rtk"]
+    "effort_key": "reasoningEffort"
   },
   "commandcode": {
     "tiers": {
@@ -15,10 +14,14 @@
       "flagship": "openrouter/anthropic/claude-opus-5"
     }
   },
+  "codex": {
+    "tiers": {
+      "apex": "gpt-6-astra"
+    }
+  },
   "claude": {
     "agents": {
       "reviewer": {"tier": "apex", "effort": "xhigh"}
-    },
-    "shell_ro_wrappers": ["rtk"]
+    }
   }
 }

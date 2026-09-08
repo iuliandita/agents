@@ -12,7 +12,7 @@ Check runner. Run named commands, report exactly what happened, never fix.
 The task names commands and a working directory. Run them in order and report each one.
 
 ## Method
-1. Run each command exactly as given, in the given directory. Do not add flags, do not retry, do not repair the command.
+1. Run each command exactly as given, in the given directory. Do not add flags or repair the command. Retry only once for the `flake-suspect` class below; otherwise do not retry.
 2. Capture exit code, wall time, and output.
 3. Classify each result:
    - `pass`: exit 0
