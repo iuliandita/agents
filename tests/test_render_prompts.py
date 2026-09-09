@@ -284,6 +284,23 @@ def test_vendor_harnesses_define_model_ladders():
     assert "Pro = strongest reasoning" in gemini
 
 
+@pytest.mark.parametrize("harness", ["claude", "codex", "opencode", "commandcode"])
+def test_rendered_workflow_policy_covers_aliases_and_indirect_calls(harness):
+    repo = Path(__file__).resolve().parents[1]
+    rendered = renderer.render_document(
+        fragment=(repo / "prompts" / "harnesses" / f"{harness}.md").read_text(),
+        core=(repo / "prompts" / "core.md").read_text(),
+        stamp="2026-09-10",
+    )
+
+    assert "Superpowers workflows are opt-in" in rendered
+    assert "aliases and indirect calls from other skills" in rendered
+    assert "ordinary brainstorming or implementation requests do not opt in" in rendered
+    assert "if a skill could plausibly apply, invoke it first" not in rendered
+    assert "proactively when a task touches a skill-adjacent topic" not in rendered
+    assert "before starting skill-adjacent work" not in rendered
+
+
 def test_harness_fragments_track_current_agent_behavior():
     repo = Path(__file__).resolve().parents[1]
     harness_dir = repo / "prompts" / "harnesses"
