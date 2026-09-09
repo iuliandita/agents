@@ -117,7 +117,7 @@ For local leak checks that should not be committed, copy `prompts/private-patter
 
 ## Workflow Activation
 
-Load skills when requested or when they materially help the task. Superpowers workflows require an explicit request for that workflow or a repository instruction; this applies to aliases and calls from other skills too. Ordinary brainstorming and implementation requests do not activate the formal workflow. This policy changes the rendered instructions, not installed skill files or their discovery metadata.
+The shared prompt makes Superpowers workflows opt-in: use them only on an explicit request for that workflow or a repository instruction, including aliases and calls from other skills. Ordinary brainstorming and implementation requests do not opt in. Other skills are selected when requested or when they materially help the task. This changes the rendered guidance, not installed skill files or discovery metadata; higher-priority harness requirements can still trigger workflows. It is not a runtime disable switch.
 
 This first conservative pass preserves the operational safeguards and model settings. Source and render checks verify that the policy is present; they do not measure model behavior or token savings. Compare representative tasks at the same model and effort before further consolidation or effort changes.
 
