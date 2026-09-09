@@ -115,6 +115,12 @@ Do not publish generated files or copy them into tracked project instructions.
 
 For local leak checks that should not be committed, copy `prompts/private-patterns.example.txt` to `prompts/private-patterns.txt` or set `AGENTS_PRIVATE_PATTERNS` to comma- or newline-separated markers.
 
+## Workflow Activation
+
+The shared prompt makes Superpowers workflows opt-in: use them only on an explicit request for that workflow or a repository instruction, including aliases and calls from other skills. Ordinary brainstorming and implementation requests do not opt in. Other skills are selected when requested or when they materially help the task. This changes the rendered guidance, not installed skill files or discovery metadata; higher-priority harness requirements can still trigger workflows. It is not a runtime disable switch.
+
+This first conservative pass preserves the operational safeguards and model settings. Source and render checks verify that the policy is present; they do not measure model behavior or token savings. Compare representative tasks at the same model and effort before further consolidation or effort changes.
+
 ## Project Instructions
 
 For project instructions shared with colleagues, use the optional [shared and local layout](INSTALL.md#project-instructions-shared-or-private). It keeps `AGENTS.md` in version control and developer-specific details in ignored `AGENTS.local.md`, with companions for Claude. Existing private-only projects need no migration.

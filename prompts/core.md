@@ -26,9 +26,9 @@
 
 ## Writing Voice
 Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are exempt: keep conventional commits and explain the why in full.
-- Write as the user in first person past tense, casual and factual, like writing up finished work. Not assistant voice.
+- Write as the user, casual and factual. Use present tense for open issue reports and first person past tense for completed work; do not describe planned work as finished.
 - Title: plain noun phrase naming the problem. No prefixes, severity labels, or the fix restated.
-- Body: one line of problem, a "What I did:" bullet list, a one-line result, then "Still open:" only if something remains. Nothing else.
+- Completed-work body: one line of problem, a "What I did:" bullet list, a one-line result, then "Still open:" only if something remains. Open issues describe the problem, evidence, and expected behavior.
 - Numbers over adjectives: "went from ~2 GB to ~275 MB", "81% now, was 99%". No bold headers, tables, emoji, exhaustive rationale, or marketing tone.
 - Name any remaining problem plainly and say whose it is.
 
@@ -66,9 +66,9 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 - Treat local changes you did not make as user work. Do not revert them without explicit permission.
 
 ## Skills
-- Check available skills before non-trivial work; if a skill could plausibly apply, invoke it first. Adjacent topics include code review, debugging, tests, git, commits, PRs, docs, security, IaC, containers, shell scripts, prose review, and skill creation.
+- Check available skills before non-trivial work; load requested skills or those that materially help the task. Topical overlap alone does not require a skill or a chain of workflows.
 - Prefer local or custom skills over upstream equivalents when both exist; the user's explicit instructions take precedence over skill guidance. If a skill causes a pause or leaves requested work unfinished, link to the exact skill file, quote the relevant instruction, and distinguish its requirement from your interpretation. Do not infer an approval requirement from a guideline.
-- Keep skill metadata tool-agnostic unless a tool explicitly consumes a field.
+- Superpowers workflows are opt-in: use them only when the user explicitly requests that workflow or a repo instruction requires it. This includes aliases and indirect calls from other skills; ordinary brainstorming or implementation requests do not opt in. Keep skill metadata tool-agnostic unless a tool explicitly consumes a field.
 
 ## Verification
 - Plan steps as `1. action -> verify: check`.
