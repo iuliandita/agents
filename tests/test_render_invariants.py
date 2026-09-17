@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -17,9 +18,28 @@ def test_invariants_source_exists_and_is_nonempty():
 
 def test_render_all_writes_three_artifacts(tmp_path):
     written = ri.render_all(REPO, tmp_path, "$HOME/.claude/hooks/" + ri.HOOK_NAME)
-    assert set(written) == {"hook", "settings", "subagent"}
+    assert set(written) == {
+        "hook",
+        "settings",
+        "subagent",
+        "antigravity_hook",
+        "antigravity_settings",
+    }
     for path in written.values():
         assert path.exists()
+
+
+def test_antigravity_hook_emits_valid_preinvocation_json(tmp_path):
+    written = ri.render_all(REPO, tmp_path, "unused")
+    hook = written["antigravity_hook"]
+    assert hook.stat().st_mode & 0o111
+
+    out = subprocess.run(["bash", str(hook)], capture_output=True, text=True, check=True).stdout
+    data = json.loads(out)
+    assert "Never add AI attribution" in data["injectSteps"][0]["ephemeralMessage"]
+
+    settings = json.loads(written["antigravity_settings"].read_text(encoding="utf-8"))
+    assert settings["invariants"]["PreInvocation"][0]["type"] == "command"
 
 
 def test_hook_is_executable_and_emits_invariants(tmp_path):
