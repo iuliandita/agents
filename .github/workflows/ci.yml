@@ -56,10 +56,10 @@ jobs:
         run: python -m pytest -q
 
       - name: Syntax-check shell scripts
-        run: bash -n scripts/sync-ai-prompts scripts/render-invariants scripts/render-agents scripts/python-runtime.sh
+        run: bash -n scripts/sync-ai-prompts scripts/render-invariants scripts/render-agents scripts/render-hermes scripts/python-runtime.sh
 
       - name: Syntax-check Python scripts
-        run: python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py scripts/render_agents.py
+        run: python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py scripts/render_agents.py scripts/render_hermes.py
 
       - name: Check render output shape
         run: scripts/sync-ai-prompts --check

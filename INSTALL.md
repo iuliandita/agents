@@ -132,6 +132,20 @@ HERMES_AGENTS_PATH="$PWD/HERMES.md" scripts/sync-ai-prompts --target hermes --de
 GENERIC_AGENTS_PATH="$PWD/AGENTS.md" scripts/sync-ai-prompts --target generic --deploy
 ```
 
+### Hermes Global Rules
+
+Hermes has no global rules file. Merge the shared core into `agent.coding_instructions` in
+`$HERMES_HOME/config.yaml` (default `~/.hermes/config.yaml`):
+
+```bash
+scripts/render-hermes --dry-run
+scripts/render-hermes --deploy
+```
+
+The merge is a comment-preserving line edit and backs the config up first, so unrelated settings and
+comments are kept. Override the target with `--path` or `HERMES_CONFIG_PATH`, and the home with
+`HERMES_HOME`.
+
 ## List Targets
 
 ```bash

@@ -75,11 +75,14 @@ scripts/
   render-invariants       # wrapper for the invariants renderer
   render-agents           # wrapper for the subagent renderer
   render_agents.py        # subagent renderer
+  render_hermes.py        # Hermes global-rules merger (agent.coding_instructions)
+  render-hermes           # wrapper for the Hermes merger
   python-runtime.sh       # POSIX interpreter selection (sourced by bash wrappers)
   python-runtime.ps1      # PowerShell interpreter selection (sourced by .ps1 wrappers)
   sync-ai-prompts.ps1     # PowerShell counterparts of the bash launchers (native Windows)
   render-agents.ps1
   render-invariants.ps1
+  render-hermes.ps1
   install_workflow.py     # explicit-destination consolidation skill installer
   lint_prompts.py         # prompt-source linter
   scan_prompt_sources.py  # prompt-injection scanner
@@ -214,6 +217,11 @@ Each target can be overridden with its environment variable, such as `CLAUDE_AGE
 `CODEX_AGENTS_PATH`, `ANTIGRAVITY_AGENTS_PATH`, or `HERMES_AGENTS_PATH`. Manual targets
 (`hermes`, `generic`) require an explicit override before deploy writes anything. Harnesses removed
 from the catalog are listed in [docs/legacy-harnesses.md](docs/legacy-harnesses.md) with a re-add recipe.
+
+Hermes has no global Markdown rules file. Its global operational rules live in `agent.coding_instructions`
+in `$HERMES_HOME/config.yaml`; merge the shared core there with `scripts/render-hermes --dry-run` then
+`scripts/render-hermes --deploy`. The merge is a comment-preserving line edit with a backup, so unrelated
+settings and comments are kept.
 
 ## Verification
 
