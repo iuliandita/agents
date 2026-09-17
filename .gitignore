@@ -1,8 +1,7 @@
 .backups/
 build/
 docs/local/
-docs/superpowers/*
-!docs/superpowers/specs/
+docs/superpowers/
 plans/
 prompts/private.md
 prompts/private-patterns.txt
@@ -11,7 +10,6 @@ SECURITY-AUDIT.md
 /.claude/
 /.codex
 /CLAUDE.md
-/AGENT.md
 /AGENTS.md
 /GEMINI.md
 .pytest_cache/

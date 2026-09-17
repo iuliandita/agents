@@ -32,7 +32,7 @@ MODEL_RE = re.compile(r"^[A-Za-z0-9._:/+-]+$")
 KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 WRAPPER_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
 
-AGENT_HARNESSES = ("claude", "codex", "opencode", "commandcode")
+AGENT_HARNESSES = ("claude", "codex", "opencode", "commandcode", "antigravity")
 # Command Code silently ignores custom files that reuse a built-in name.
 RESERVED_NAMES = {"commandcode": frozenset({"explore", "plan", "review", "general"})}
 # These harnesses let a custom agent shadow a built-in; allowed, but noticed.
@@ -169,26 +169,9 @@ def load_agents(repo_root: Path) -> list[AgentSpec]:
     return specs
 
 
-DEFAULT_MODELS: dict[str, dict[str, str | None]] = {
-    "claude": {"cheap": "haiku", "mid": "sonnet", "flagship": "opus", "apex": "fable"},
-    "codex": {
-        "cheap": "gpt-5.6-luna",
-        "mid": "gpt-5.6-terra",
-        "flagship": "gpt-5.6-sol",
-        "apex": "gpt-6-astra",
-    },
-    # No generic aliases; commonly self-hosted or routed. Inherit the session model
-    # unless prompts/models.local.json names provider/model IDs.
-    "opencode": {tier: None for tier in TIERS},
-    "commandcode": {tier: None for tier in TIERS},
-}
-DEFAULT_EFFORT_KEYS = {
-    "claude": "effort",
-    "codex": "model_reasoning_effort",
-    "opencode": "reasoningEffort",
-    "commandcode": "reasoningEffort",
-}
-OVERRIDE_KEYS = frozenset({"tiers", "agents", "effort_key", "shell_ro_wrappers"})
+MODELS_PATH = ("prompts", "models.json")
+MODELS_LOCAL_PATH = ("prompts", "models.local.json")
+OVERRIDE_KEYS = frozenset({"tiers", "agents", "effort_key", "effort_map", "shell_ro_wrappers"})
 AGENT_OVERRIDE_KEYS = frozenset({"tier", "effort"})
 
 
@@ -251,11 +234,18 @@ def validate_overrides(data: object, source: Path) -> dict:
         effort_key = entry.get("effort_key")
         if effort_key is not None and (not isinstance(effort_key, str) or not KEY_RE.match(effort_key)):
             raise SystemExit(f"{label}: '{harness}.effort_key' must match {KEY_RE.pattern}")
+        effort_map = entry.get("effort_map", {})
+        if not isinstance(effort_map, dict):
+            raise SystemExit(f"{label}: '{harness}.effort_map' must be an object")
+        for level, mapped in effort_map.items():
+            if level not in EFFORTS:
+                raise SystemExit(f"{label}: '{harness}.effort_map.{level}' is not an effort level")
+            if not isinstance(mapped, str) or not mapped:
+                raise SystemExit(f"{label}: '{harness}.effort_map.{level}' must be a non-empty string")
     return data
 
 
-def load_overrides(repo_root: Path) -> dict:
-    path = repo_root / "prompts" / "models.local.json"
+def load_models_file(path: Path) -> dict:
     if not path.exists():
         return {}
     try:
@@ -263,6 +253,22 @@ def load_overrides(repo_root: Path) -> dict:
     except json.JSONDecodeError as exc:
         raise SystemExit(f"{path}: invalid JSON: {exc}")
     return validate_overrides(data, path)
+
+
+def load_model_defaults(repo_root: Path) -> dict:
+    path = repo_root.joinpath(*MODELS_PATH)
+    data = load_models_file(path)
+    if not data:
+        raise SystemExit(f"Missing or empty model defaults: {path}. Define tiers and effort maps per harness.")
+    missing = [harness for harness in AGENT_HARNESSES if harness not in data]
+    if missing:
+        raise SystemExit(f"{path}: missing harness entries: {', '.join(missing)}")
+    return data
+
+
+def load_overrides(repo_root: Path) -> dict:
+    path = repo_root.joinpath(*MODELS_LOCAL_PATH)
+    return load_models_file(path)
 
 
 def check_override_agents(overrides: dict, specs: list[AgentSpec]) -> None:
@@ -275,20 +281,33 @@ def check_override_agents(overrides: dict, specs: list[AgentSpec]) -> None:
                 )
 
 
-def resolve(spec: AgentSpec, harness: str, overrides: dict) -> Resolved:
+def resolve(spec: AgentSpec, harness: str, overrides: dict, defaults: dict) -> Resolved:
+    default_entry = defaults.get(harness, {})
     entry = overrides.get(harness, {})
     per_agent = entry.get("agents", {}).get(spec.name, {})
     tier = per_agent.get("tier", spec.tier)
-    effort = per_agent.get("effort", spec.effort)
-    models = dict(DEFAULT_MODELS[harness])
-    models.update(entry.get("tiers", {}))
-    effort_key = entry.get("effort_key", DEFAULT_EFFORT_KEYS[harness])
+    effort_level = per_agent.get("effort", spec.effort)
+    tiers = dict(default_entry.get("tiers", {}))
+    tiers.update(entry.get("tiers", {}))
+    effort_map = dict(default_entry.get("effort_map", {}))
+    effort_map.update(entry.get("effort_map", {}))
+    effort_key = entry.get("effort_key", default_entry.get("effort_key"))
+    # A harness whose per-role format has no effort field (Antigravity) simply
+    # leaves effort_key unset; the renderer omits effort for it.
 
     notices: list[str] = []
-    model = models[tier]
-    if tier == "apex" and model is None and models["flagship"] is not None:
-        model = models["flagship"]
-        notices.append(f"{harness}/{spec.name}: no apex model configured; using flagship '{model}'")
+    if tier in tiers:
+        # An explicit null means "inherit the session model"; it is not a missing
+        # entry, so no flagship fallback applies.
+        model = tiers[tier]
+    else:
+        model = None
+        if tier == "apex" and tiers.get("flagship") is not None:
+            model = tiers["flagship"]
+            notices.append(f"{harness}/{spec.name}: no apex model configured; using flagship '{model}'")
+        elif tiers:
+            notices.append(f"{harness}/{spec.name}: no {tier} model configured; inheriting the session model")
+    effort = effort_map.get(effort_level, effort_level)
     if spec.name in SHADOWED_NAMES.get(harness, frozenset()):
         notices.append(f"{harness}/{spec.name}: shadows the built-in agent of the same name")
     return Resolved(
@@ -316,6 +335,17 @@ COMMANDCODE_TOOLS = {
     "shell": ("shell_command", "run_command"),
     "shell-ro": (),
     "web": ("web_fetch", "web_search"),
+}
+# Antigravity warns that a misspelled tool name can hang the subagent, so these
+# must stay exact; see https://antigravity.google/docs/subagents/.
+ANTIGRAVITY_TOOLS = {
+    "read": ("view_file", "list_dir"),
+    "search": ("grep_search", "find_by_name"),
+    "edit": ("replace_file_content",),
+    "write": ("write_to_file",),
+    "shell": ("run_command",),
+    "shell-ro": (),
+    "web": ("search_web", "read_url_content"),
 }
 OPENCODE_TOOLS = {
     "read": ("read", "list"),
@@ -365,7 +395,8 @@ def render_claude(spec: AgentSpec, resolved: Resolved, invariants: str) -> str:
     ]
     if resolved.model is not None:
         lines.append(f"model: {yaml_string(resolved.model)}")
-    lines.append(f"{resolved.effort_key}: {resolved.effort}")
+    if resolved.effort_key:
+        lines.append(f"{resolved.effort_key}: {resolved.effort}")
     if spec.max_turns is not None:
         lines.append(f"maxTurns: {spec.max_turns}")
     lines.append("---")
@@ -391,7 +422,8 @@ def render_codex(spec: AgentSpec, resolved: Resolved, invariants: str) -> str:
     ]
     if resolved.model is not None:
         lines.append(f"model = {toml_string(resolved.model)}")
-    lines.append(f"{resolved.effort_key} = {toml_string(resolved.effort)}")
+    if resolved.effort_key:
+        lines.append(f"{resolved.effort_key} = {toml_string(resolved.effort)}")
     lines.append(f"sandbox_mode = {toml_string(sandbox)}")
     # fork_turns is a spawn_agent parameter, not a role-file key; Codex rejects
     # the whole file as malformed if it appears here. The harness fragment tells
@@ -416,7 +448,8 @@ def render_opencode(spec: AgentSpec, resolved: Resolved, invariants: str) -> str
     ]
     if resolved.model is not None:
         lines.append(f"model: {yaml_string(resolved.model)}")
-    lines.append(f"{resolved.effort_key}: {resolved.effort}")
+    if resolved.effort_key:
+        lines.append(f"{resolved.effort_key}: {resolved.effort}")
     if spec.max_turns is not None:
         lines.append(f"steps: {spec.max_turns}")
     lines.append("permission:")
@@ -439,11 +472,33 @@ def render_commandcode(spec: AgentSpec, resolved: Resolved, invariants: str) -> 
     ]
     if resolved.model is not None:
         lines.append(f"model: {yaml_string(resolved.model)}")
-    lines.append(f"{resolved.effort_key}: {resolved.effort}")
+    if resolved.effort_key:
+        lines.append(f"{resolved.effort_key}: {resolved.effort}")
     if spec.max_turns is not None:
         lines.append(f"maxTurns: {spec.max_turns}")
     lines.append("---")
     salt = f"commandcode:{resolved.model}:{resolved.effort}"
+    return "\n".join(lines) + "\n" + markdown_body(spec, invariants, salt=salt)
+
+
+def render_antigravity(spec: AgentSpec, resolved: Resolved, invariants: str) -> str:
+    tools = expand_tools(spec.tools, ANTIGRAVITY_TOOLS)
+    lines = [
+        "---",
+        f"name: {spec.name}",
+        f"description: {yaml_string(spec.description)}",
+        "subagent: true",
+        "mainAgent: false",
+    ]
+    if tools:
+        lines.append("tools:")
+        lines.extend(f"  - {name}" for name in tools)
+    if resolved.model is not None:
+        lines.append(f"model: {yaml_string(resolved.model)}")
+    if "shell" in spec.tools:
+        lines.append("commandExecutionPolicy: sandbox")
+    lines.append("---")
+    salt = f"antigravity:{resolved.model}:{resolved.effort}"
     return "\n".join(lines) + "\n" + markdown_body(spec, invariants, salt=salt)
 
 
@@ -452,8 +507,9 @@ RENDERERS = {
     "codex": render_codex,
     "opencode": render_opencode,
     "commandcode": render_commandcode,
+    "antigravity": render_antigravity,
 }
-EXTENSIONS = {"claude": ".md", "codex": ".toml", "opencode": ".md", "commandcode": ".md"}
+EXTENSIONS = {"claude": ".md", "codex": ".toml", "opencode": ".md", "commandcode": ".md", "antigravity": ".md"}
 
 
 TARGET_DIRS = {
@@ -461,13 +517,32 @@ TARGET_DIRS = {
     "codex": ("{home}/.codex/agents", "CODEX_AGENTS_DIR"),
     "opencode": ("{home}/.config/opencode/agents", "OPENCODE_AGENTS_DIR"),
     "commandcode": ("{home}/.commandcode/agents", "COMMANDCODE_AGENTS_DIR"),
+    "antigravity": ("{home}/.gemini/config/agents", "ANTIGRAVITY_AGENTS_DIR"),
 }
 HARNESS_DISPLAY = {
     "claude": "Claude Code",
     "codex": "OpenAI Codex",
     "opencode": "OpenCode",
     "commandcode": "Command Code",
+    "antigravity": "Antigravity",
 }
+
+def verify(repo_root: Path, selected: list[str] | None, env: dict[str, str] | None = None) -> int:
+    """Confirm the rendered roles exist where each harness reads them. Run after --deploy."""
+    specs = load_agents(repo_root)
+    names = [spec.name for spec in specs]
+    values = os.environ if env is None else env
+    failures = 0
+    for harness in selected_agent_harnesses(selected):
+        target = agent_target_dir(harness, env=values)
+        suffix = EXTENSIONS[harness]
+        missing = [name for name in names if not (target / f"{name}{suffix}").is_file()]
+        if missing:
+            print(f"{harness}: {len(missing)} of {len(names)} roles missing in {target}")
+            failures += 1
+        else:
+            print(f"{harness}: all {len(names)} roles present in {target}")
+    return 1 if failures else 0
 
 
 def selected_agent_harnesses(selected: list[str] | None) -> list[str]:
@@ -498,18 +573,27 @@ def render_harness(
     harness: str,
     overrides: dict,
     invariants: str,
+    defaults: dict,
+    allow_inherit: bool = False,
 ) -> tuple[dict[str, str], list[str]]:
     rendered: dict[str, str] = {}
     notices: list[str] = []
     models: list[str | None] = []
     for spec in specs:
-        resolved = resolve(spec, harness, overrides)
+        resolved = resolve(spec, harness, overrides, defaults)
         notices.extend(resolved.notices)
         models.append(resolved.model)
         text = RENDERERS[harness](spec, resolved, invariants)
         rendered[spec.name + EXTENSIONS[harness]] = text
     if all(model is None for model in models):
-        notices.append(f"{harness}: every tier renders as inherit; set prompts/models.local.json to enable tiering")
+        message = (
+            f"{harness}: every tier renders as inherit; define tiers in prompts/models.json "
+            "or prompts/models.local.json"
+        )
+        if allow_inherit:
+            notices.append(message)
+        else:
+            raise SystemExit(f"{message}. Pass --allow-inherit to render inherited models anyway.")
     return rendered, notices
 
 
@@ -519,22 +603,23 @@ def print_notices(notices: list[str]) -> None:
 
 
 def render_all(
-    repo_root: Path, out_dir: Path, selected: list[str] | None, overrides: dict
+    repo_root: Path, out_dir: Path, selected: list[str] | None, overrides: dict, allow_inherit: bool = False
 ) -> dict[str, list[Path]]:
     specs = load_agents(repo_root)
     check_override_agents(overrides, specs)
     invariants = read_invariants(repo_root)
+    defaults = load_model_defaults(repo_root)
     written: dict[str, list[Path]] = {}
     notices: list[str] = []
     for harness in selected_agent_harnesses(selected):
-        files, harness_notices = render_harness(specs, harness, overrides, invariants)
+        files, harness_notices = render_harness(specs, harness, overrides, invariants, defaults, allow_inherit)
         notices.extend(harness_notices)
         dest_dir = out_dir / harness
         dest_dir.mkdir(parents=True, exist_ok=True)
         paths: list[Path] = []
         for filename, text in files.items():
             dest = dest_dir / filename
-            dest.write_text(text, encoding="utf-8")
+            dest.write_text(text, encoding="utf-8", newline="\n")
             paths.append(dest)
         # Prune renders of agents that no longer exist; only our own files.
         for path in stale_outputs(dest_dir, EXTENSIONS[harness], files):
@@ -548,12 +633,12 @@ def render_all(
     return written
 
 
-def check(repo_root: Path, selected: list[str] | None) -> int:
+def check(repo_root: Path, selected: list[str] | None, allow_inherit: bool = False) -> int:
     # Honors the gitignored local override file, so local and CI renders can
     # differ by design.
     overrides = load_overrides(repo_root)
     with TemporaryDirectory() as temp_dir:
-        written = render_all(repo_root, Path(temp_dir), selected, overrides)
+        written = render_all(repo_root, Path(temp_dir), selected, overrides, allow_inherit)
         for harness, paths in written.items():
             for path in paths:
                 text = path.read_text(encoding="utf-8")
@@ -615,15 +700,21 @@ def preflight_target(target: Path, files: dict[str, str]) -> None:
 
 
 def deploy(
-    repo_root: Path, selected: list[str] | None, overrides: dict, dry_run: bool, backup_dir: Path
+    repo_root: Path,
+    selected: list[str] | None,
+    overrides: dict,
+    dry_run: bool,
+    backup_dir: Path,
+    allow_inherit: bool = False,
 ) -> None:
     specs = load_agents(repo_root)
     check_override_agents(overrides, specs)
     invariants = read_invariants(repo_root)
+    defaults = load_model_defaults(repo_root)
     notices: list[str] = []
     deployments: list[tuple[str, Path, dict[str, str], list[Path]]] = []
     for harness in selected_agent_harnesses(selected):
-        files, harness_notices = render_harness(specs, harness, overrides, invariants)
+        files, harness_notices = render_harness(specs, harness, overrides, invariants, defaults, allow_inherit)
         notices.extend(harness_notices)
         target = agent_target_dir(harness)
         extension = EXTENSIONS[harness]
@@ -649,8 +740,14 @@ def deploy(
                 print(f"unchanged {harness}: {dest}")
                 continue
             backup_existing(dest, backup_dir)
-            dest.write_text(text, encoding="utf-8")
+            dest.write_text(text, encoding="utf-8", newline="\n")
             print(f"updated {harness}: {dest}")
+        if harness == "claude":
+            legacy_guard = target / GUARD_NAME
+            if is_generated(legacy_guard):
+                backup_existing(legacy_guard, backup_dir)
+                legacy_guard.unlink()
+                print(f"removed stale {harness}: {legacy_guard} (backup in {backup_dir})")
         for path in stale:
             backup_existing(path, backup_dir)
             path.unlink()
@@ -668,6 +765,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true", help="Print deploy actions without writing.")
     parser.add_argument("--check", action="store_true", help="Validate rendered output without persistent writes.")
     parser.add_argument("--list-targets", action="store_true", help="List supported harnesses and target directories.")
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="Confirm the rendered roles exist in each harness's agent directory (run after --deploy).",
+    )
+    parser.add_argument(
+        "--allow-inherit",
+        action="store_true",
+        help="Render harnesses with no tier map as session-model inheritance instead of failing.",
+    )
     parser.add_argument("--backup-dir", type=Path, default=repo_root / ".backups", help="Directory for deploy backups.")
     return parser.parse_args(argv)
 
@@ -679,12 +786,19 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{harness}\t{HARNESS_DISPLAY[harness]}\t{agent_target_dir(harness)}\t{TARGET_DIRS[harness][1]}")
         return 0
     if args.check:
-        return check(args.repo_root, args.target)
+        return check(args.repo_root, args.target, args.allow_inherit)
+    if args.verify:
+        return verify(args.repo_root, args.target)
+    if args.deploy and not args.target:
+        raise SystemExit(
+            "--deploy requires --target (for example --target claude,opencode). "
+            "Use --dry-run without --target to preview every harness."
+        )
     overrides = load_overrides(args.repo_root)
     if args.deploy or args.dry_run:
-        deploy(args.repo_root, args.target, overrides, args.dry_run, args.backup_dir)
+        deploy(args.repo_root, args.target, overrides, args.dry_run, args.backup_dir, args.allow_inherit)
         return 0
-    written = render_all(args.repo_root, args.out_dir, args.target, overrides)
+    written = render_all(args.repo_root, args.out_dir, args.target, overrides, args.allow_inherit)
     for harness, paths in written.items():
         print(f"rendered {harness}: {paths[0].parent} ({len(paths)} agents)")
     return 0

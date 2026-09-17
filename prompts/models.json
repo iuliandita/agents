@@ -1,0 +1,68 @@
+{
+  "claude": {
+    "effort_key": "effort",
+    "effort_map": {
+      "low": "low",
+      "medium": "medium",
+      "high": "high",
+      "xhigh": "xhigh"
+    },
+    "tiers": {
+      "cheap": "haiku",
+      "mid": "sonnet",
+      "flagship": "opus",
+      "apex": "fable"
+    }
+  },
+  "codex": {
+    "effort_key": "model_reasoning_effort",
+    "effort_map": {
+      "low": "low",
+      "medium": "medium",
+      "high": "high",
+      "xhigh": "xhigh"
+    },
+    "tiers": {
+      "cheap": "gpt-5.6-luna",
+      "mid": "gpt-5.6-terra",
+      "flagship": "gpt-5.6-sol",
+      "apex": "gpt-6-astra"
+    }
+  },
+  "opencode": {
+    "effort_key": "reasoningEffort",
+    "effort_map": {
+      "low": "low",
+      "medium": "medium",
+      "high": "high",
+      "xhigh": "high"
+    },
+    "tiers": {
+      "cheap": "opencode-go/deepseek-v4.1-flash",
+      "mid": "opencode-go/glm-5.3",
+      "flagship": "opencode-go/kimi-k3"
+    }
+  },
+  "commandcode": {
+    "effort_key": "reasoningEffort",
+    "effort_map": {
+      "low": "low",
+      "medium": "medium",
+      "high": "high",
+      "xhigh": "high"
+    },
+    "tiers": {
+      "cheap": "openrouter/deepseek/deepseek-v4-flash",
+      "mid": "ollama/qwen3.6-plus",
+      "flagship": "openrouter/anthropic/claude-opus-5"
+    }
+  },
+  "antigravity": {
+    "tiers": {
+      "cheap": "flash",
+      "mid": "flash",
+      "flagship": "pro",
+      "apex": "pro"
+    }
+  }
+}

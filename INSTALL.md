@@ -56,6 +56,26 @@ If `python` is not found, activate the environment or use the shell launcher.
 If `import yaml` fails in the workflow installer, run the dependency command
 above using the same interpreter that will run the installer.
 
+## Windows (Native PowerShell)
+
+The bash wrappers are POSIX-only; on native Windows use the shipped PowerShell
+launchers. They resolve the same interpreter order as the bash launchers
+(`AGENTS_PYTHON`, then the checkout `.venv`, then `python`/`python3`, then the
+`py -3` launcher) and mirror their behavior:
+
+```powershell
+./scripts/sync-ai-prompts.ps1 --check
+./scripts/render-agents.ps1 --check
+./scripts/render-invariants.ps1 --dry-run
+```
+
+PowerShell 7+ (`pwsh`) is expected. Rendered writes are LF and backup names are
+Windows-safe. If you prefer to call the Python scripts directly, pass
+`--repo-root .`. Run inside WSL to use the bash wrappers unchanged; a WSL install
+reads the WSL home, separate from a native Windows install. Point both at one
+home with the native env var (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `HERMES_HOME`)
+if you want a shared config.
+
 Deployment is separate for each component; none of these commands installs the others:
 
 | Component | Command | Details |
@@ -83,7 +103,7 @@ scripts/sync-ai-prompts --target claude,codex --deploy
 
 Existing files are backed up under `.backups/` before replacement. Deploy writes only to harnesses with resolved target paths. Manual harnesses are skipped unless their environment variable points at a project or per-agent operational rules file.
 
-Full-catalog deploy can fail when deployable harnesses share a target, such as Gemini CLI and Antigravity CLI both using `~/.gemini/GEMINI.md`. Use `--target` for routine deploys, or override one shared path with its `*_AGENTS_PATH` env var.
+Real deploys refuse when two selected harnesses resolve to the same path, for example after overriding a path with its `*_AGENTS_PATH` env var. Use `--target` for routine deploys so only the harnesses you use are written.
 
 If `prompts/private.md` exists, it is merged into every rendered/deployed file after the shared core. Use `prompts/private.example.md` as the template.
 
@@ -109,7 +129,7 @@ Manual targets render by default, but deploy only with an explicit path:
 
 ```bash
 HERMES_AGENTS_PATH="$PWD/HERMES.md" scripts/sync-ai-prompts --target hermes --deploy
-NANOCLAW_AGENTS_PATH="$PWD/agents/nano/CLAUDE.md" scripts/sync-ai-prompts --target nanoclaw --deploy
+GENERIC_AGENTS_PATH="$PWD/AGENTS.md" scripts/sync-ai-prompts --target generic --deploy
 ```
 
 ## List Targets
@@ -126,8 +146,8 @@ Use env vars when a tool's real operational rules path differs from the default:
 
 ```bash
 CODEX_AGENTS_PATH="$CODEX_HOME/AGENTS.md" scripts/sync-ai-prompts --target codex --deploy
-WINDSURF_AGENTS_PATH="$HOME/.codeium/windsurf/AGENTS.md" scripts/sync-ai-prompts --target windsurf --deploy
-ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/ANTIGRAVITY.md" scripts/sync-ai-prompts --target antigravity --deploy
+OPENCODE_AGENTS_PATH="$HOME/.config/opencode/AGENTS.md" scripts/sync-ai-prompts --target opencode --deploy
+ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/GEMINI.md" scripts/sync-ai-prompts --target antigravity --deploy
 ```
 
 ## Default Targets
@@ -136,30 +156,11 @@ ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/ANTIGRAVITY.md" scripts/sync-ai-prompts -
 |---|---|---|---|
 | Claude Code | deployable | `~/.claude/CLAUDE.md` |  |
 | OpenAI Codex | deployable | `~/.codex/AGENTS.md` | Global path follows $CODEX_HOME (default ~/.codex); set CODEX_AGENTS_PATH when CODEX_HOME is customized. |
-| OpenCode | deployable | `~/.config/opencode/AGENTS.md` |  |
+| OpenCode | deployable | `~/.config/opencode/AGENTS.md` | Same home-relative path on macOS; on Windows run under WSL or use %USERPROFILE%\.config\opencode. |
 | Command Code | deployable | `~/.commandcode/AGENTS.md` |  |
-| Gemini CLI | deployable | `~/.gemini/GEMINI.md` | Legacy Google CLI target; consumer Gemini CLI transitioned to Antigravity CLI in June 2026. |
-| Antigravity CLI | deployable | `~/.gemini/GEMINI.md` | Forward Google CLI target; shares the default GEMINI.md path with Gemini CLI. |
-| Cursor | deployable | `~/.cursor/AGENTS.md` |  |
-| Windsurf | deployable | `~/.windsurf/AGENTS.md` |  |
-| GitHub Copilot CLI | deployable | `~/.copilot/AGENTS.md` |  |
-| Aider | deployable | `~/.aider/AGENTS.md` |  |
-| Goose | deployable | `~/.config/goose/AGENTS.md` |  |
-| Amp | deployable | `~/.amp/AGENTS.md` |  |
-| Continue | deployable | `~/.continue/AGENTS.md` |  |
-| Cline | deployable | `~/.cline/AGENTS.md` |  |
-| Roo Code | deployable | `~/.roo/AGENTS.md` |  |
-| Qwen Code | deployable | `~/.qwen/AGENTS.md` |  |
-| Warp | deployable | `~/.warp/AGENTS.md` |  |
-| Kiro | deployable | `~/.kiro/AGENTS.md` |  |
-| Augment | deployable | `~/.augment/AGENTS.md` |  |
-| OpenHands | deployable | `~/.openhands/AGENTS.md` |  |
-| Pi Coding Agent | deployable | `~/.pi/agent/AGENTS.md` |  |
-| OpenClaw | deployable | `~/.openclaw/workspace/AGENTS.md` |  |
-| Crush | deployable | `~/.config/crush/CRUSH.md` |  |
-| Kimi Code | deployable | `~/.kimi-code/AGENTS.md` | Global path follows $KIMI_CODE_HOME (default ~/.kimi-code); set KIMI_AGENTS_PATH when KIMI_CODE_HOME is customized. |
-| Hermes Agent | manual | `manual override via HERMES_AGENTS_PATH` | Render-only unless HERMES_AGENTS_PATH points at a project HERMES.md, .hermes.md, or AGENTS.md file. |
-| NanoClaw | manual | `manual override via NANOCLAW_AGENTS_PATH` | Render-only unless NANOCLAW_AGENTS_PATH points at a per-agent CLAUDE.md file. |
+| Antigravity | deployable | `~/.gemini/GEMINI.md` | Desktop, IDE, and CLI share ~/.gemini/GEMINI.md; workspace rules live in .agents/rules/ (12k char cap per file). |
+| Hermes Agent | manual | `manual override via HERMES_AGENTS_PATH` | Global rules merge into agent.coding_instructions in $HERMES_HOME/config.yaml; project rules deploy to HERMES.md or AGENTS.override.md via HERMES_AGENTS_PATH. |
+| Generic AGENTS.md | manual | `manual override via GENERIC_AGENTS_PATH` | Project-level AGENTS.md for tools with no verified global rules path; deploy with GENERIC_AGENTS_PATH pointing at a project file. |
 
 ## Agent Targets
 
@@ -178,12 +179,17 @@ Deployment writes one file per agent into these directories. Override with the e
 | OpenAI Codex | `~/.codex/agents/` | `CODEX_AGENTS_DIR` |
 | OpenCode | `~/.config/opencode/agents/` | `OPENCODE_AGENTS_DIR` |
 | Command Code | `~/.commandcode/agents/` | `COMMANDCODE_AGENTS_DIR` |
+| Antigravity | `~/.gemini/config/agents/` | `ANTIGRAVITY_AGENTS_DIR` |
 
-`shell-ro` becomes shell access only on Codex, where `sandbox_mode = "read-only"` enforces the boundary. Claude Code, OpenCode, and Command Code omit shell access for those agents and keep their native read and search tools.
+Hermes has no per-role prompt file, so its six roles are a manual paste; delegation is configured under `delegation:` in `~/.hermes/config.yaml`.
+
+After a real deploy, `scripts/render-agents --verify` confirms all six role files exist in each harness's agent directory.
+
+`shell-ro` becomes shell access only on Codex, where `sandbox_mode = "read-only"` enforces the boundary. Claude Code, OpenCode, Command Code, and Antigravity omit shell access for those agents and keep their native read and search tools.
 
 Existing `shell_ro_wrappers` settings are accepted for compatibility but no longer grant shell access. Redeploying the agents removes their references to the old `agents-shell-ro-guard.py` hook; the previously deployed hook file is left in place and is unused by the updated agents.
 
-Model tiers for OpenCode and Command Code are inherit by default. Copy `prompts/models.local.example.json` to `prompts/models.local.json` and set provider model IDs to enable tiering.
+Model tiers and effort maps come from the tracked `prompts/models.json`; `prompts/models.local.json` overrides them. Copy `prompts/models.local.example.json` to start. A harness with no tier map fails unless `--allow-inherit` is passed.
 
 ## Project Instructions: Shared Or Private
 

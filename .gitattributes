@@ -1,0 +1,9 @@
+# Keep rendered outputs LF on every OS so a Windows checkout does not trip the CRLF lint.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.gz binary
+*.zip binary
+*.pdf binary

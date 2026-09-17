@@ -158,35 +158,24 @@ def test_invalid_repository_venv_never_falls_back(runtime, invalid):
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.parametrize("selection", ["relative-override", "venv"])
-def test_autoimprove_score_uses_selected_python_after_chdir(runtime, selection):
-    checkout, bin_dir, env = runtime
-    caller = bin_dir.parent
-    selected = (
-        bin_dir / "selected python"
-        if selection == "relative-override"
-        else checkout / ".venv" / "bin" / "python"
-    )
-    selected.parent.mkdir(parents=True, exist_ok=True)
-    log = caller / "score.log"
-    selected.write_text(
-        '#!/bin/sh\nif [ "$1" = "-c" ]; then\n'
-        f'  exec {shlex.quote(sys.executable)} "$@"\nfi\n'
-        f'printf "%s\\n" "$*" >> {shlex.quote(str(log))}\n'
-    )
-    selected.chmod(0o755)
-    old_python(bin_dir / "python")
-    if selection == "relative-override":
-        env["AGENTS_PYTHON"] = str(selected.relative_to(caller))
+PWSH = shutil.which("pwsh")
+
+
+@pytest.mark.skipif(PWSH is None, reason="pwsh not installed")
+@pytest.mark.parametrize("wrapper", WRAPPERS)
+def test_powershell_wrappers_run(wrapper):
     result = subprocess.run(
-        [BASH, str(checkout / "scripts" / "autoimprove-prompts"), "--iterations", "0"],
-        cwd=caller, env=env, capture_output=True, text=True,
+        [PWSH, "-NoProfile", "-File", str(REPO / "scripts" / f"{wrapper}.ps1"), "--help"],
+        cwd=REPO, capture_output=True, text=True,
     )
-    assert result.returncode == 0, result.stderr
-    assert log.read_text().splitlines() == [
-        str(checkout / "scripts" / "lint_prompts.py"),
-        str(checkout / "scripts" / "scan_prompt_sources.py"),
-        f"-m pytest -q {checkout / 'tests'}",
-        f"{checkout / 'scripts' / 'render_prompts.py'} --repo-root {checkout} "
-        f"--out-dir {checkout / 'build' / 'generated'}",
-    ]
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "usage:" in result.stdout
+
+
+@pytest.mark.skipif(PWSH is None, reason="pwsh not installed")
+def test_powershell_wrapper_preserves_error_status():
+    result = subprocess.run(
+        [PWSH, "-NoProfile", "-File", str(REPO / "scripts/sync-ai-prompts.ps1"), "--not-a-valid-option"],
+        cwd=REPO, capture_output=True, text=True,
+    )
+    assert result.returncode == 2

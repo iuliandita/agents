@@ -2,8 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
+import re
 import shutil
+import subprocess
 from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -12,8 +16,7 @@ from typing import NamedTuple
 
 DEPLOYABLE = "deployable"
 MANUAL = "manual"
-DOCUMENTED_NO_TARGET = "documented-no-target"
-SUPPORT_LEVELS = {DEPLOYABLE, MANUAL, DOCUMENTED_NO_TARGET}
+SUPPORT_LEVELS = {DEPLOYABLE, MANUAL}
 
 
 class Harness(NamedTuple):
@@ -25,14 +28,32 @@ class Harness(NamedTuple):
     env_var: str
     support_level: str = DEPLOYABLE
     notes: str = ""
+    source_url: str = ""
+    verified_on: str = ""
+    confidence: str = "high"
+    optional_blocks: tuple[str, ...] = ("subagents",)
+    max_bytes: int | None = None
+    native_env_var: str = ""
+    native_filename: str = ""
 
-    @property
-    def renderable(self) -> bool:
-        return self.support_level != DOCUMENTED_NO_TARGET
 
-
+# Six supported harnesses plus one generic project-level target. Paths, overrides,
+# and verification receipts live in docs/harness-contract.md. Only add a harness
+# here once its rules path is confirmed against upstream docs.
 HARNESSES: tuple[Harness, ...] = (
-    Harness("claude", "Claude Code", "claude.md", "CLAUDE.md", "{home}/.claude/CLAUDE.md", "CLAUDE_AGENTS_PATH"),
+    Harness(
+        "claude",
+        "Claude Code",
+        "claude.md",
+        "CLAUDE.md",
+        "{home}/.claude/CLAUDE.md",
+        "CLAUDE_AGENTS_PATH",
+        notes="",
+        source_url="https://code.claude.com/docs/en/memory",
+        verified_on="2026-09-17",
+        native_env_var="CLAUDE_CONFIG_DIR",
+        native_filename="CLAUDE.md",
+    ),
     Harness(
         "codex",
         "OpenAI Codex",
@@ -41,52 +62,47 @@ HARNESSES: tuple[Harness, ...] = (
         "{home}/.codex/AGENTS.md",
         "CODEX_AGENTS_PATH",
         notes="Global path follows $CODEX_HOME (default ~/.codex); set CODEX_AGENTS_PATH when CODEX_HOME is customized.",
+        source_url="https://developers.openai.com/codex/agent-configuration/agents-md",
+        verified_on="2026-09-17",
+        max_bytes=32768,
+        native_env_var="CODEX_HOME",
+        native_filename="AGENTS.md",
     ),
-    Harness("opencode", "OpenCode", "opencode.md", "AGENTS.md", "{home}/.config/opencode/AGENTS.md", "OPENCODE_AGENTS_PATH"),
-    Harness("commandcode", "Command Code", "commandcode.md", "AGENTS.md", "{home}/.commandcode/AGENTS.md", "COMMANDCODE_AGENTS_PATH"),
     Harness(
-        "gemini",
-        "Gemini CLI",
-        "gemini.md",
-        "GEMINI.md",
-        "{home}/.gemini/GEMINI.md",
-        "GEMINI_AGENTS_PATH",
-        notes="Legacy Google CLI target; consumer Gemini CLI transitioned to Antigravity CLI in June 2026.",
+        "opencode",
+        "OpenCode",
+        "opencode.md",
+        "AGENTS.md",
+        "{home}/.config/opencode/AGENTS.md",
+        "OPENCODE_AGENTS_PATH",
+        notes="Same home-relative path on macOS; on Windows run under WSL or use %USERPROFILE%\\.config\\opencode.",
+        source_url="https://opencode.ai/docs/rules/",
+        verified_on="2026-09-17",
+        native_env_var="OPENCODE_CONFIG_DIR",
+        native_filename="AGENTS.md",
+    ),
+    Harness(
+        "commandcode",
+        "Command Code",
+        "commandcode.md",
+        "AGENTS.md",
+        "{home}/.commandcode/AGENTS.md",
+        "COMMANDCODE_AGENTS_PATH",
+        notes="",
+        source_url="https://commandcode.ai/docs/memory",
+        verified_on="2026-09-17",
+        confidence="medium",
     ),
     Harness(
         "antigravity",
-        "Antigravity CLI",
+        "Antigravity",
         "antigravity.md",
         "GEMINI.md",
         "{home}/.gemini/GEMINI.md",
         "ANTIGRAVITY_AGENTS_PATH",
-        notes="Forward Google CLI target; shares the default GEMINI.md path with Gemini CLI.",
-    ),
-    Harness("cursor", "Cursor", "cursor.md", "AGENTS.md", "{home}/.cursor/AGENTS.md", "CURSOR_AGENTS_PATH"),
-    Harness("windsurf", "Windsurf", "windsurf.md", "AGENTS.md", "{home}/.windsurf/AGENTS.md", "WINDSURF_AGENTS_PATH"),
-    Harness("copilot", "GitHub Copilot CLI", "copilot.md", "AGENTS.md", "{home}/.copilot/AGENTS.md", "COPILOT_AGENTS_PATH"),
-    Harness("aider", "Aider", "aider.md", "AGENTS.md", "{home}/.aider/AGENTS.md", "AIDER_AGENTS_PATH"),
-    Harness("goose", "Goose", "goose.md", "AGENTS.md", "{home}/.config/goose/AGENTS.md", "GOOSE_AGENTS_PATH"),
-    Harness("amp", "Amp", "amp.md", "AGENTS.md", "{home}/.amp/AGENTS.md", "AMP_AGENTS_PATH"),
-    Harness("continue", "Continue", "continue.md", "AGENTS.md", "{home}/.continue/AGENTS.md", "CONTINUE_AGENTS_PATH"),
-    Harness("cline", "Cline", "cline.md", "AGENTS.md", "{home}/.cline/AGENTS.md", "CLINE_AGENTS_PATH"),
-    Harness("roo", "Roo Code", "roo.md", "AGENTS.md", "{home}/.roo/AGENTS.md", "ROO_AGENTS_PATH"),
-    Harness("qwen", "Qwen Code", "qwen.md", "AGENTS.md", "{home}/.qwen/AGENTS.md", "QWEN_AGENTS_PATH"),
-    Harness("warp", "Warp", "AGENTS.md", "AGENTS.md", "{home}/.warp/AGENTS.md", "WARP_AGENTS_PATH"),
-    Harness("kiro", "Kiro", "kiro.md", "AGENTS.md", "{home}/.kiro/AGENTS.md", "KIRO_AGENTS_PATH"),
-    Harness("augment", "Augment", "augment.md", "AGENTS.md", "{home}/.augment/AGENTS.md", "AUGMENT_AGENTS_PATH"),
-    Harness("openhands", "OpenHands", "openhands.md", "AGENTS.md", "{home}/.openhands/AGENTS.md", "OPENHANDS_AGENTS_PATH"),
-    Harness("pi", "Pi Coding Agent", "pi.md", "AGENTS.md", "{home}/.pi/agent/AGENTS.md", "PI_AGENTS_PATH"),
-    Harness("openclaw", "OpenClaw", "openclaw.md", "AGENTS.md", "{home}/.openclaw/workspace/AGENTS.md", "OPENCLAW_AGENTS_PATH"),
-    Harness("crush", "Crush", "crush.md", "CRUSH.md", "{home}/.config/crush/CRUSH.md", "CRUSH_AGENTS_PATH"),
-    Harness(
-        "kimi",
-        "Kimi Code",
-        "kimi.md",
-        "AGENTS.md",
-        "{home}/.kimi-code/AGENTS.md",
-        "KIMI_AGENTS_PATH",
-        notes="Global path follows $KIMI_CODE_HOME (default ~/.kimi-code); set KIMI_AGENTS_PATH when KIMI_CODE_HOME is customized.",
+        notes="Desktop, IDE, and CLI share ~/.gemini/GEMINI.md; workspace rules live in .agents/rules/ (12k char cap per file).",
+        source_url="https://antigravity.google/docs/rules-workflows/",
+        verified_on="2026-09-17",
     ),
     Harness(
         "hermes",
@@ -96,17 +112,23 @@ HARNESSES: tuple[Harness, ...] = (
         None,
         "HERMES_AGENTS_PATH",
         MANUAL,
-        "Render-only unless HERMES_AGENTS_PATH points at a project HERMES.md, .hermes.md, or AGENTS.md file.",
+        "Global rules merge into agent.coding_instructions in $HERMES_HOME/config.yaml; project rules deploy to HERMES.md or AGENTS.override.md via HERMES_AGENTS_PATH.",
+        source_url="https://hermes-agent.nousresearch.com/docs/user-guide/features/context-files",
+        verified_on="2026-09-17",
     ),
     Harness(
-        "nanoclaw",
-        "NanoClaw",
-        "nanoclaw.md",
-        "CLAUDE.md",
+        "generic",
+        "Generic AGENTS.md",
+        "AGENTS.md",
+        "AGENTS.md",
         None,
-        "NANOCLAW_AGENTS_PATH",
+        "GENERIC_AGENTS_PATH",
         MANUAL,
-        "Render-only unless NANOCLAW_AGENTS_PATH points at a per-agent CLAUDE.md file.",
+        "Project-level AGENTS.md for tools with no verified global rules path; deploy with GENERIC_AGENTS_PATH pointing at a project file.",
+        source_url="",
+        verified_on="2026-09-17",
+        confidence="n/a",
+        optional_blocks=(),
     ),
 )
 
@@ -136,8 +158,6 @@ def default_target_label(harness: Harness, home: str = "~") -> str:
 def harness_target_rows(home: str = "~") -> list[tuple[str, str, str, str]]:
     rows: list[tuple[str, str, str, str]] = []
     for harness in HARNESSES:
-        if not harness.renderable:
-            continue
         rows.append((harness.display, harness.support_level, default_target_label(harness, home), harness.notes))
     return rows
 
@@ -160,6 +180,9 @@ def target_path(harness: str, home: str | Path | None = None, env: dict[str, str
     if item.env_var in values and values[item.env_var]:
         return Path(values[item.env_var]).expanduser()
 
+    if item.native_env_var and values.get(item.native_env_var):
+        return Path(values[item.native_env_var]).expanduser() / item.native_filename
+
     if item.target_template is None:
         return None
 
@@ -167,15 +190,54 @@ def target_path(harness: str, home: str | Path | None = None, env: dict[str, str
     return Path(item.target_template.format(home=home_path)).expanduser()
 
 
+OPTIONAL_BLOCK_RE = re.compile(
+    r"[ \t]*<!--\s*optional:([a-z0-9_-]+)\s*-->\n(.*?)\n[ \t]*<!--\s*/optional:\1\s*-->\n?",
+    re.DOTALL,
+)
+
+
+def apply_optional_blocks(text: str, enabled: frozenset[str]) -> str:
+    """Keep enabled optional blocks, drop the rest, and collapse left gaps."""
+
+    def replace(match: re.Match[str]) -> str:
+        return match.group(2) + "\n" if match.group(1) in enabled else ""
+
+    result = OPTIONAL_BLOCK_RE.sub(replace, text)
+    return re.sub(r"\n{3,}", "\n\n", result)
+
+
+def git_revision(repo_root: Path) -> str:
+    try:
+        result = subprocess.run(
+            ["git", "describe", "--always", "--dirty"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
 def render_document(
     fragment: str,
     core: str,
     private: str = "",
     stamp: str | None = None,
+    enabled_optional: frozenset[str] = frozenset({"subagents"}),
+    source_revision: str = "",
 ) -> str:
-    run_date = stamp or date.today().isoformat()
+    core = apply_optional_blocks(core, enabled_optional)
+    if stamp is not None:
+        provenance = f"on {stamp}"
+    else:
+        digest = hashlib.sha256((fragment + "\n" + core + "\n" + private).encode("utf-8")).hexdigest()[:12]
+        provenance = f"rev {digest}"
+        if source_revision:
+            provenance += f" ({source_revision})"
     rendered = (
-        f"<!-- Generated by sync-ai-prompts on {run_date}. "
+        f"<!-- Generated by sync-ai-prompts {provenance}. "
         "Edit prompts/core.md and prompts/harnesses/*.md, plus optional prompts/private.md "
         "(see prompts/private.example.md), not rendered files. -->\n\n"
         f"{fragment.rstrip()}\n\n"
@@ -206,13 +268,24 @@ def output_path(out_dir: Path, harness: Harness, collisions: set[str]) -> Path:
     return out_dir / harness.output_name
 
 
+def enforce_budget(harness: Harness, rendered: str) -> None:
+    if harness.max_bytes is None:
+        return
+    size = len(rendered.encode("utf-8"))
+    if size > harness.max_bytes:
+        raise SystemExit(
+            f"{harness.name}: rendered {size} bytes exceeds its {harness.max_bytes}-byte budget; "
+            "trim the fragment or the private overlay"
+        )
+
+
 def render_all(
     repo_root: Path,
     out_dir: Path,
     selected: list[str] | None = None,
     stamp: str | None = None,
 ) -> dict[str, Path]:
-    harnesses = [harness for harness in selected_harnesses(selected) if harness.renderable]
+    harnesses = selected_harnesses(selected)
     output_counts: dict[str, int] = {}
     for harness in harnesses:
         output_counts[harness.output_name] = output_counts.get(harness.output_name, 0) + 1
@@ -220,6 +293,7 @@ def render_all(
 
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
     private = read_private(repo_root)
+    source_revision = git_revision(repo_root)
     written: dict[str, Path] = {}
     for harness in harnesses:
         dest = output_path(out_dir, harness, collisions)
@@ -229,8 +303,11 @@ def render_all(
             core,
             private=private,
             stamp=stamp,
+            enabled_optional=frozenset(harness.optional_blocks),
+            source_revision=source_revision,
         )
-        dest.write_text(rendered, encoding="utf-8")
+        enforce_budget(harness, rendered)
+        dest.write_text(rendered, encoding="utf-8", newline="\n")
         written[harness.name] = dest
     return written
 
@@ -264,11 +341,16 @@ def resolve_deploy_targets(harnesses: list[Harness]) -> tuple[dict[Harness, Path
 
 
 def target_collisions(resolved: dict[Harness, Path]) -> dict[Path, list[Harness]]:
-    by_path: dict[Path, list[Harness]] = {}
+    by_key: dict[str, list[tuple[Path, Harness]]] = {}
     for harness, dest in resolved.items():
-        key = dest.expanduser().resolve(strict=False)
-        by_path.setdefault(key, []).append(harness)
-    return {dest: harnesses for dest, harnesses in by_path.items() if len(harnesses) > 1}
+        resolved_path = dest.expanduser().resolve(strict=False)
+        # normcase folds case so Windows/macOS default filesystems cannot collide unseen.
+        by_key.setdefault(os.path.normcase(str(resolved_path)), []).append((resolved_path, harness))
+    return {
+        pairs[0][0]: [harness for _, harness in pairs]
+        for pairs in by_key.values()
+        if len(pairs) > 1
+    }
 
 
 def format_target_collision(collisions: dict[Path, list[Harness]]) -> str:
@@ -284,7 +366,9 @@ def backup_existing(path: Path, backup_dir: Path) -> None:
     if not path.exists() and not path.is_symlink():
         return
     backup_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = str(path).lstrip("/").replace("/", "-")
+    # Collapse separators, drive letters, and other unsafe characters so Windows
+    # paths (C:\...) produce a valid flat backup name.
+    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "-", str(path)).strip("-")
     backup_stem = f"{path.stem}-{date.today().isoformat()}-{safe_name}"
     backup = backup_dir / f"{backup_stem}.bak"
     counter = 2
@@ -298,6 +382,31 @@ def backup_existing(path: Path, backup_dir: Path) -> None:
     shutil.copy2(path, backup)
 
 
+def content_hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def manifest_path(repo_root: Path) -> Path:
+    return repo_root / "build" / "deploy-manifest.json"
+
+
+def load_manifest(repo_root: Path) -> dict:
+    path = manifest_path(repo_root)
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def write_manifest(repo_root: Path, manifest: dict) -> None:
+    path = manifest_path(repo_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def deploy(
     repo_root: Path,
     selected: list[str] | None,
@@ -308,17 +417,24 @@ def deploy(
     harnesses = selected_harnesses(selected)
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
     private = read_private(repo_root)
+    source_revision = git_revision(repo_root)
     resolved, skipped = resolve_deploy_targets(harnesses)
 
     for harness in skipped:
         print(f"skipping {harness.name}: manual target requires {harness.env_var}")
 
     collisions = target_collisions(resolved)
-    if collisions and not dry_run:
+    if collisions:
         raise SystemExit(format_target_collision(collisions))
-    if collisions and dry_run:
-        print(format_target_collision(collisions))
 
+    for harness, dest in resolved.items():
+        if dest.is_symlink():
+            raise SystemExit(
+                f"{dest} is a symlink; refusing to write through it. "
+                f"Move it aside or point {harness.env_var} at a regular file."
+            )
+
+    manifest = load_manifest(repo_root)
     deployed: dict[str, Path] = {}
     for harness, dest in resolved.items():
         rendered = render_document(
@@ -326,7 +442,10 @@ def deploy(
             core,
             private=private,
             stamp=stamp,
+            enabled_optional=frozenset(harness.optional_blocks),
+            source_revision=source_revision,
         )
+        enforce_budget(harness, rendered)
         deployed[harness.name] = dest
         if dry_run:
             print(f"would update {harness.name}: {dest}")
@@ -334,12 +453,77 @@ def deploy(
         dest.parent.mkdir(parents=True, exist_ok=True)
         if dest.exists() and dest.read_text(encoding="utf-8", errors="replace") == rendered:
             print(f"unchanged {harness.name}: {dest}")
-            continue
-        backup_existing(dest, backup_dir)
-        dest.write_text(rendered, encoding="utf-8")
-        print(f"updated {harness.name}: {dest}")
+        else:
+            backup_existing(dest, backup_dir)
+            dest.write_text(rendered, encoding="utf-8", newline="\n")
+            print(f"updated {harness.name}: {dest}")
+        manifest[harness.name] = {"path": str(dest), "hash": content_hash(rendered)}
 
+    if not dry_run:
+        write_manifest(repo_root, manifest)
     return deployed
+
+
+def prune_backups(backup_dir: Path, keep: int, dry_run: bool) -> int:
+    """Keep the newest `keep` backups, remove the rest. Dry-run reports only."""
+    if keep < 0:
+        raise SystemExit("--prune-backups requires a non-negative count")
+    if not backup_dir.is_dir():
+        print(f"no backups at {backup_dir}")
+        return 0
+    files = [
+        path
+        for path in backup_dir.iterdir()
+        if (path.is_file() or path.is_symlink()) and path.name.endswith(".bak")
+    ]
+    files.sort(key=lambda path: path.lstat().st_mtime, reverse=True)
+    stale = files[keep:]
+    for path in stale:
+        if dry_run:
+            print(f"would remove {path}")
+            continue
+        path.unlink()
+        print(f"removed {path}")
+    verb = "would prune" if dry_run else "pruned"
+    print(f"{verb} {len(stale)} of {len(files)} backups in {backup_dir}")
+    return 0
+
+
+def status(repo_root: Path, selected: list[str] | None, stamp: str | None) -> int:
+    """Report whether each deployed file matches a fresh render, or was edited locally."""
+    core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
+    private = read_private(repo_root)
+    source_revision = git_revision(repo_root)
+    manifest = load_manifest(repo_root)
+    drift = 0
+    for harness in selected_harnesses(selected):
+        dest = target_path(harness.name)
+        if dest is None:
+            print(f"{harness.name}: manual target ({harness.env_var})")
+            continue
+        rendered = render_document(
+            read_fragment(repo_root, harness),
+            core,
+            private=private,
+            stamp=stamp,
+            enabled_optional=frozenset(harness.optional_blocks),
+            source_revision=source_revision,
+        )
+        if not dest.exists():
+            print(f"{harness.name}: not deployed ({dest})")
+            drift += 1
+            continue
+        current = dest.read_text(encoding="utf-8", errors="replace")
+        if current == rendered:
+            print(f"{harness.name}: in sync ({dest})")
+            continue
+        recorded = manifest.get(harness.name, {}).get("hash")
+        if recorded and content_hash(current) != recorded:
+            print(f"{harness.name}: local edits since deploy ({dest})")
+        else:
+            print(f"{harness.name}: drift from current render ({dest})")
+        drift += 1
+    return 1 if drift else 0
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -357,6 +541,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Validate render output shape without writing persistent output.",
     )
     parser.add_argument("--list-targets", action="store_true", help="List supported harnesses and output paths.")
+    parser.add_argument("--status", action="store_true", help="Report deployed files that differ from a fresh render.")
+    parser.add_argument(
+        "--prune-backups",
+        type=int,
+        metavar="KEEP",
+        help="Keep the newest KEEP backups under --backup-dir and remove the rest (combine with --dry-run to preview).",
+    )
     parser.add_argument(
         "--backup-dir",
         type=Path,
@@ -377,6 +568,18 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.check:
         return check_render_shape(args.repo_root, args.target)
+
+    if args.status:
+        return status(args.repo_root, args.target, args.stamp)
+
+    if args.prune_backups is not None:
+        return prune_backups(args.backup_dir, args.prune_backups, dry_run=args.dry_run)
+
+    if args.deploy and not args.target:
+        raise SystemExit(
+            "--deploy requires --target (for example --target claude,opencode). "
+            "Use --dry-run without --target to preview every harness."
+        )
 
     if args.deploy or args.dry_run:
         deploy(args.repo_root, args.target, args.stamp, args.dry_run, args.backup_dir)
