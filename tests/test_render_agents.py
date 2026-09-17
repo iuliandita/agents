@@ -8,6 +8,7 @@ import render_agents as ra
 
 
 REPO = Path(__file__).resolve().parents[1]
+DEFAULTS = ra.load_model_defaults(REPO)
 
 
 def write_agent(path: Path, name: str = "sample", **overrides: str) -> Path:
@@ -155,21 +156,27 @@ def spec(**overrides):
 
 
 def test_resolve_claude_defaults():
-    resolved = ra.resolve(spec(tier="flagship", effort="high"), "claude", {})
+    resolved = ra.resolve(spec(tier="flagship", effort="high"), "claude", {}, DEFAULTS)
     assert resolved.model == "opus"
     assert resolved.effort == "high"
     assert resolved.notices == []
 
 
 def test_resolve_codex_apex_uses_astra():
-    resolved = ra.resolve(spec(tier="apex"), "codex", {})
+    resolved = ra.resolve(spec(tier="apex"), "codex", {}, DEFAULTS)
     assert resolved.model == "gpt-6-astra"
     assert resolved.notices == []
 
 
-def test_resolve_opencode_inherits_without_override():
-    resolved = ra.resolve(spec(tier="mid"), "opencode", {})
-    assert resolved.model is None
+def test_resolve_opencode_uses_tracked_defaults():
+    resolved = ra.resolve(spec(tier="mid"), "opencode", {}, DEFAULTS)
+    assert resolved.model == "opencode-go/glm-5.3"
+    assert resolved.effort == "low"
+
+
+def test_resolve_short_effort_map_clamps_xhigh():
+    resolved = ra.resolve(spec(tier="mid", effort="xhigh"), "opencode", {}, DEFAULTS)
+    assert resolved.effort == "high"
 
 
 def test_resolve_applies_tier_and_agent_overrides():
@@ -179,7 +186,7 @@ def test_resolve_applies_tier_and_agent_overrides():
             "agents": {"sample": {"tier": "cheap", "effort": "medium"}},
         }
     }
-    resolved = ra.resolve(spec(tier="flagship", effort="high"), "opencode", overrides)
+    resolved = ra.resolve(spec(tier="flagship", effort="high"), "opencode", overrides, DEFAULTS)
     assert resolved.model == "opencode-go/glm-5.3-flash"
     assert resolved.effort == "medium"
 
@@ -222,7 +229,7 @@ INVARIANTS = "# Hard Invariants (non-negotiable)\n- Never add AI attribution to 
 
 
 def test_render_claude_frontmatter_and_body():
-    text = ra.render_claude(spec(tools=("read", "search", "shell-ro"), max_turns=30), ra.resolve(spec(), "claude", {}), INVARIANTS)
+    text = ra.render_claude(spec(tools=("read", "search", "shell-ro"), max_turns=30), ra.resolve(spec(), "claude", {}, DEFAULTS), INVARIANTS)
     fields, body = ra.parse_frontmatter(text, Path("claude/sample.md"))
     assert fields == {
         "name": "sample",
@@ -244,7 +251,7 @@ def test_render_claude_omits_model_when_inherit():
 
 
 def test_render_codex_is_valid_toml_with_sandbox():
-    read_only = ra.render_codex(spec(tools=("read", "search", "shell-ro")), ra.resolve(spec(), "codex", {}), INVARIANTS)
+    read_only = ra.render_codex(spec(tools=("read", "search", "shell-ro")), ra.resolve(spec(), "codex", {}, DEFAULTS), INVARIANTS)
     data = tomllib.loads(read_only)
     assert data["name"] == "sample"
     assert data["model"] == "gpt-5.6-luna"
@@ -254,26 +261,26 @@ def test_render_codex_is_valid_toml_with_sandbox():
     assert "Never add AI attribution" in data["developer_instructions"]
     assert data["developer_instructions"].rstrip().endswith("Body.")
 
-    writer = ra.render_codex(spec(tools=("read", "edit")), ra.resolve(spec(), "codex", {}), INVARIANTS)
+    writer = ra.render_codex(spec(tools=("read", "edit")), ra.resolve(spec(), "codex", {}, DEFAULTS), INVARIANTS)
     assert tomllib.loads(writer)["sandbox_mode"] == "workspace-write"
 
 
-def test_default_codex_apex_model_is_astra():
-    assert ra.DEFAULT_MODELS["codex"]["apex"] == "gpt-6-astra"
+def test_tracked_codex_apex_model_is_astra():
+    assert DEFAULTS["codex"]["tiers"]["apex"] == "gpt-6-astra"
 
 
 def test_render_codex_escapes_description_quotes():
-    text = ra.render_codex(spec(description='Say "hi" \\ now'), ra.resolve(spec(), "codex", {}), INVARIANTS)
+    text = ra.render_codex(spec(description='Say "hi" \\ now'), ra.resolve(spec(), "codex", {}, DEFAULTS), INVARIANTS)
     assert tomllib.loads(text)["description"] == 'Say "hi" \\ now'
 
 
 def test_render_codex_rejects_triple_quote_in_body():
     with pytest.raises(SystemExit, match='"""'):
-        ra.render_codex(spec(body='x = """y"""\n'), ra.resolve(spec(), "codex", {}), INVARIANTS)
+        ra.render_codex(spec(body='x = """y"""\n'), ra.resolve(spec(), "codex", {}, DEFAULTS), INVARIANTS)
 
 
 def test_render_opencode_permission_map_for_shell_ro():
-    resolved = ra.resolve(spec(), "opencode", {"opencode": {"tiers": {"cheap": "opencode-go/glm-5.3-flash"}}})
+    resolved = ra.resolve(spec(), "opencode", {"opencode": {"tiers": {"cheap": "opencode-go/glm-5.3-flash"}}}, DEFAULTS)
     text = ra.render_opencode(spec(tools=("read", "search", "shell-ro"), max_turns=30), resolved, INVARIANTS)
     head = text.split("---")[1]
     assert "mode: subagent" in head
@@ -290,17 +297,17 @@ def test_render_opencode_permission_map_for_shell_ro():
     assert "  bash: deny" in head
 
 
-def test_render_opencode_full_shell_and_inherit():
-    text = ra.render_opencode(spec(tools=("read", "shell")), ra.resolve(spec(), "opencode", {}), INVARIANTS)
+def test_render_opencode_full_shell():
+    text = ra.render_opencode(spec(tools=("read", "shell")), ra.resolve(spec(), "opencode", {}, DEFAULTS), INVARIANTS)
     head = text.split("---")[1]
-    assert "model:" not in head
+    assert 'model: "opencode-go/deepseek-v4.1-flash"' in head
     assert "  bash: allow" in head
 
 
 def test_shell_ro_omits_shell_without_a_hard_read_only_sandbox():
     claude = ra.render_claude(
         spec(tools=("read", "search", "shell-ro")),
-        ra.resolve(spec(), "claude", {}),
+        ra.resolve(spec(), "claude", {}, DEFAULTS),
         INVARIANTS,
     )
     assert "Bash" not in yaml.safe_load(claude.split("---")[1])["tools"]
@@ -311,6 +318,7 @@ def test_shell_ro_omits_shell_without_a_hard_read_only_sandbox():
             spec(),
             "opencode",
             {"opencode": {"shell_ro_wrappers": ["rtk"]}},
+            DEFAULTS,
         ),
         INVARIANTS,
     )
@@ -318,7 +326,7 @@ def test_shell_ro_omits_shell_without_a_hard_read_only_sandbox():
 
     commandcode = ra.render_commandcode(
         spec(tools=("read", "search", "shell-ro")),
-        ra.resolve(spec(), "commandcode", {}),
+        ra.resolve(spec(), "commandcode", {}, DEFAULTS),
         INVARIANTS,
     )
     tools = yaml.safe_load(commandcode.split("---")[1])["tools"]
@@ -326,19 +334,27 @@ def test_shell_ro_omits_shell_without_a_hard_read_only_sandbox():
     assert "run_command" not in tools
 
 
-def test_render_harness_notices_when_every_model_inherits():
+def test_render_harness_fails_loud_when_every_model_inherits():
     specs = [spec(name="a", source=Path("agents/a.md")), spec(name="b", source=Path("agents/b.md"))]
-    _, notices = ra.render_harness(specs, "opencode", {}, INVARIANTS)
+    inherit_defaults = {
+        "opencode": {
+            "effort_key": "reasoningEffort",
+            "tiers": {"cheap": None, "mid": None, "flagship": None},
+        }
+    }
+    with pytest.raises(SystemExit, match="every tier renders as inherit"):
+        ra.render_harness(specs, "opencode", {}, INVARIANTS, inherit_defaults)
+    _, notices = ra.render_harness(specs, "opencode", {}, INVARIANTS, inherit_defaults, allow_inherit=True)
     assert any("every tier renders as inherit" in notice for notice in notices)
 
 
 def test_render_commandcode_tools_list():
-    text = ra.render_commandcode(spec(tools=("read", "search", "web"), max_turns=30), ra.resolve(spec(), "commandcode", {}), INVARIANTS)
+    text = ra.render_commandcode(spec(tools=("read", "search", "web"), max_turns=30), ra.resolve(spec(), "commandcode", {}, DEFAULTS), INVARIANTS)
     fields, body = ra.parse_frontmatter(text, Path("x.md"))
     assert fields["tools"] == "read_file, read_directory, grep, glob, web_fetch, web_search"
     assert fields["reasoningEffort"] == "low"
     assert fields["maxTurns"] == "30"
-    assert "model" not in fields
+    assert fields["model"] == "openrouter/deepseek/deepseek-v4-flash"
     assert ra.GENERATED_MARKER in body
 
 
@@ -415,13 +431,36 @@ def test_render_all_rejects_unknown_override_agent_name(tmp_path):
 
 def test_validate_overrides_allows_null_tier_for_inherit():
     overrides = ra.validate_overrides({"claude": {"tiers": {"cheap": None}}}, Path("models.local.json"))
-    resolved = ra.resolve(spec(tier="cheap"), "claude", overrides)
+    resolved = ra.resolve(spec(tier="cheap"), "claude", overrides, DEFAULTS)
     assert resolved.model is None
 
 
 def test_check_passes_on_repo(capsys):
     assert ra.check(REPO, selected=None) == 0
     assert "check passed" in capsys.readouterr().out
+
+
+def test_render_antigravity_frontmatter_and_tools():
+    resolved = ra.resolve(spec(tier="cheap", tools=("read", "search", "shell-ro")), "antigravity", {}, DEFAULTS)
+    text = ra.render_antigravity(spec(tools=("read", "search", "shell-ro")), resolved, INVARIANTS)
+    fields, body = ra.parse_frontmatter(text, Path("x.md"))
+
+    assert fields["name"] == "sample"
+    assert fields["subagent"] == "true"
+    assert fields["mainAgent"] == "false"
+    assert fields["model"] == "flash"
+    assert "  - view_file" in text
+    assert "  - grep_search" in text
+    assert "run_command" not in text
+    assert ra.GENERATED_MARKER in body
+
+
+def test_render_antigravity_shell_role_gets_sandbox_policy():
+    resolved = ra.resolve(spec(tools=("read", "shell")), "antigravity", {}, DEFAULTS)
+    text = ra.render_antigravity(spec(tools=("read", "shell")), resolved, INVARIANTS)
+
+    assert "commandExecutionPolicy: sandbox" in text
+    assert "  - run_command" in text
 
 
 def test_agent_target_dir_uses_env_override(tmp_path):
@@ -589,7 +628,7 @@ def test_validate_overrides_accepts_legacy_wrappers():
 
 
 def test_render_claude_omits_guard_hook():
-    text = ra.render_claude(spec(tools=("read", "shell-ro")), ra.resolve(spec(), "claude", {}), INVARIANTS)
+    text = ra.render_claude(spec(tools=("read", "shell-ro")), ra.resolve(spec(), "claude", {}, DEFAULTS), INVARIANTS)
     assert "hooks:" not in text.split("---")[1]
 
 
@@ -645,3 +684,82 @@ def test_readme_roster_table_matches_agent_sources():
         assert rows[name][1] == spec.tier, name
         assert rows[name][2] == spec.effort, name
         assert rows[name][3] == ", ".join(spec.tools), name
+
+
+DOCUMENTED_KEYS = {
+    "claude": {"name", "description", "tools", "model", "effort", "maxTurns"},
+    "codex": {
+        "name",
+        "description",
+        "model",
+        "model_reasoning_effort",
+        "sandbox_mode",
+        "developer_instructions",
+    },
+    "opencode": {"description", "mode", "model", "reasoningEffort", "steps", "permission"},
+    "commandcode": {"name", "description", "tools", "model", "reasoningEffort", "maxTurns"},
+    "antigravity": {
+        "name",
+        "description",
+        "tools",
+        "subagent",
+        "mainAgent",
+        "model",
+        "commandExecutionPolicy",
+    },
+}
+
+OPENCODE_PERMISSION_KEYS = {
+    "read",
+    "edit",
+    "glob",
+    "grep",
+    "list",
+    "bash",
+    "task",
+    "external_directory",
+    "todowrite",
+    "webfetch",
+    "websearch",
+    "lsp",
+    "skill",
+    "question",
+    "doom_loop",
+}
+
+
+def test_rendered_agent_keys_match_documented_schemas(tmp_path):
+    written = ra.render_all(REPO, tmp_path, selected=None, overrides={})
+    for harness, paths in written.items():
+        for path in paths:
+            text = path.read_text(encoding="utf-8")
+            if harness == "codex":
+                keys = set(tomllib.loads(text))
+            else:
+                keys = set(yaml.safe_load(text.split("---")[1]))
+            assert keys <= DOCUMENTED_KEYS[harness], (harness, path.name, keys - DOCUMENTED_KEYS[harness])
+
+
+def test_opencode_permission_keys_are_documented(tmp_path):
+    written = ra.render_all(REPO, tmp_path, selected=["opencode"], overrides={})
+    for path in written["opencode"]:
+        data = yaml.safe_load(path.read_text(encoding="utf-8").split("---")[1])
+        assert set(data["permission"]) <= OPENCODE_PERMISSION_KEYS
+
+
+def test_verify_reports_missing_then_present_roles(tmp_path, capsys):
+    env = {"CLAUDE_AGENTS_DIR": str(tmp_path)}
+
+    assert ra.verify(REPO, ["claude"], env=env) == 1
+    assert "roles missing" in capsys.readouterr().out
+
+    for spec in ra.load_agents(REPO):
+        (tmp_path / f"{spec.name}.md").write_text("x", encoding="utf-8")
+
+    assert ra.verify(REPO, ["claude"], env=env) == 0
+    assert "all 6 roles present" in capsys.readouterr().out
+
+
+def test_verify_flags_an_undeployed_harness(tmp_path):
+    env = {"CODEX_AGENTS_DIR": str(tmp_path / "missing")}
+    assert ra.verify(REPO, ["codex"], env=env) == 1
