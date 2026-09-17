@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [2.1.1] - 2026-09-17
+
+### Fixed
+
+- Rendered headers no longer embed `git describe`. The revision is purely content-derived, so a commit
+  or tag no longer makes every deployed file report drift in `--status` or trigger redeploys.
+
 ## [2.1.0] - 2026-09-17
 
 ### Added

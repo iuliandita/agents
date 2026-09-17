@@ -44,8 +44,7 @@ def render_rules(repo_root: Path) -> str:
         render_prompts.read_fragment(repo_root, harness),
         (repo_root / "prompts" / "core.md").read_text(encoding="utf-8"),
         private=render_prompts.read_private(repo_root),
-        enabled_optional=frozenset(harness.optional_blocks),
-        source_revision=render_prompts.git_revision(repo_root),
+        enabled_optional=frozenset(harness.optional_blocks)
     )
 
 
