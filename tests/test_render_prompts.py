@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -816,3 +817,12 @@ def test_prune_backups_ignores_non_bak_files(tmp_path):
     assert renderer.prune_backups(backup_dir, 1, dry_run=False) == 0
     assert archive.exists()
     assert sorted(path.name for path in backup_dir.iterdir()) == ["old-backups-archive.tar.gz", "x-2.bak"]
+
+
+def test_render_document_header_has_no_git_revision_churn():
+    rendered = renderer.render_document("## H\nfrag\n", "# C\ncore\n")
+    header = rendered.split("-->")[0]
+
+    # The revision must be the content hash directly followed by the sentence,
+    # not a hash plus a git-describe suffix that changes on every commit/tag.
+    assert re.search(r"rev [0-9a-f]{12}\. ", header)
