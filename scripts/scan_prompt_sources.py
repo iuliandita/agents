@@ -26,9 +26,10 @@ EXCLUDED_DIRS = {
 }
 
 # Gitignored local artifacts that quote attack patterns by design (audit
-# reports); they are never rendered or deployed, so they do not gate the scan.
+# reports, workflow design docs); they are never rendered or deployed, so they
+# do not gate the scan.
 EXCLUDED_FILES = {"SECURITY-AUDIT.md"}
-EXCLUDED_SUBTREES = (("docs", "local"),)
+EXCLUDED_SUBTREES = (("docs", "local"), ("docs", "superpowers"))
 
 PROMPT_FILE_NAMES = {
     "AGENTS.md",
