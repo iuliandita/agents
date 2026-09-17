@@ -18,13 +18,29 @@ def test_harness_docs_are_in_sync_with_renderer_registry():
     assert "Harness docs check passed" in result.stdout
 
 
+def test_harness_contract_receipts_are_complete():
+    repo = Path(__file__).resolve().parents[1]
+
+    result = subprocess.run(
+        ["python", "scripts/check_harness_contract.py"],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Harness contract check passed" in result.stdout
+
+
 def test_install_docs_describe_support_levels():
     repo = Path(__file__).resolve().parents[1]
     install = (repo / "INSTALL.md").read_text(encoding="utf-8")
 
     assert "| Harness | Support | Target | Notes |" in install
-    assert "| Antigravity CLI | deployable | `~/.gemini/GEMINI.md` |" in install
-    assert "| Kimi Code | deployable | `~/.kimi-code/AGENTS.md` |" in install
+    assert "| Antigravity | deployable | `~/.gemini/GEMINI.md` |" in install
+    assert "| Hermes Agent | manual | `manual override via HERMES_AGENTS_PATH` |" in install
+    assert "| Generic AGENTS.md | manual | `manual override via GENERIC_AGENTS_PATH` |" in install
 
 
 def test_deploy_docs_warn_about_full_catalog_collision():
@@ -34,9 +50,9 @@ def test_deploy_docs_warn_about_full_catalog_collision():
 
     assert "scripts/sync-ai-prompts --target claude,codex --deploy" in readme
     assert "scripts/sync-ai-prompts --target claude,codex --deploy" in install
-    assert "Full-catalog deploy can fail when deployable harnesses share a target" in readme
+    assert "Real deploys refuse when two selected harnesses resolve to the same path" in readme
     assert "Use `--target` for routine deploys" in readme
-    assert "Full-catalog deploy can fail when deployable harnesses share a target" in install
+    assert "Real deploys refuse when two selected harnesses resolve to the same path" in install
     assert "Use `--target` for routine deploys" in install
 
 
@@ -94,10 +110,11 @@ def test_harness_docs_check_binds_notes_to_matching_install_row(tmp_path):
     )
 
 
-def test_readme_docs_include_watchlist_and_provider_boundary():
+def test_readme_documents_supported_harness_contract():
     repo = Path(__file__).resolve().parents[1]
     readme = (repo / "README.md").read_text(encoding="utf-8")
 
-    for name in ("Devin for Terminal", "Junie", "Kilo Code", "Qoder CLI", "Rovo Dev", "Trae"):
-        assert name in readme
-    assert "Z.ai and MiniMax are treated as providers/tool integrations" in readme
+    assert "docs/harness-contract.md" in readme
+    assert "docs/surfaces.md" in readme
+    assert "docs/legacy-harnesses.md" in readme
+    assert "Watchlist" not in readme

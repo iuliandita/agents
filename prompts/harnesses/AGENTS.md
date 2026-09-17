@@ -1,5 +1,5 @@
 ## Generic AGENTS.md Notes
-- Generated from this repo's `prompts/core.md` plus a generic `AGENTS.md` harness fragment. Edit the source fragments, then run `scripts/sync-ai-prompts`.
-- Use this target for tools that read an `AGENTS.md` file but do not need many tool-specific rules.
-- Keep the file portable and avoid assuming Claude, Codex, or any one harness.
-- Verify the current tool's global rule path before deploying publicly.
+- This is a project-level `AGENTS.md` for tools with no verified global rules path. Deploy it with `GENERIC_AGENTS_PATH` pointing at a project file; there is no universal global location.
+- Keep the file portable: do not assume Claude, Codex, OpenCode, Command Code, Antigravity, or Hermes-specific features or flags.
+- Prefer project facts and conventions here, and keep cross-project preferences in the user's global rules.
+- Add a dedicated harness target only once its global rules path is confirmed against upstream docs; see `docs/harness-contract.md`.

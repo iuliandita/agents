@@ -2,20 +2,19 @@
 
 Portable instructions, subagent roles, and context-consolidation workflows for coding agents, with shared and private project context.
 
-This is an opinionated toolkit shaped by 20+ years in IT and DevOps, production incidents, code reviews, research, and ideas from people worth listening to - including Andrej Karpathy's autoresearch/autoimprove loop and writing from Boris and others. Pick the parts that fit your workflow: global prompts, specialized subagents, project instruction templates, or context consolidation. Each is maintained here and installed separately.
+This is an opinionated toolkit shaped by 20+ years in IT and DevOps, production incidents, code reviews, and research. Pick the parts that fit your workflow: global prompts, specialized subagents, project instruction templates, or context consolidation. Each is maintained here and installed separately.
 
 ## What This Repo Does
 
 - Stores canonical prompt fragments in `prompts/`.
 - Merges an optional gitignored private overlay from `prompts/private.md`.
-- Renders public operational-rule variants for Claude Code, OpenAI Codex, OpenCode, Command Code, Gemini CLI, Antigravity CLI, Cursor, Windsurf, GitHub Copilot CLI, Aider, Goose, Amp, Continue, Cline, Roo Code, Qwen Code, Warp, Kiro, Augment, OpenHands, Pi Coding Agent, OpenClaw, Crush, Kimi Code, Hermes Agent, and NanoClaw.
+- Renders public operational-rule variants for Claude Code, OpenAI Codex, OpenCode, Command Code, Antigravity, and Hermes Agent, plus a generic project-level `AGENTS.md` target for other tools.
 - Separates deployable global targets from manual project-local targets when no verified global operational rules path is known.
 - Does not generate persona, identity, memory, provider credential, model settings, MCP, plugin, or assistant-profile files.
 - Deploys rendered files to resolved global paths with backups.
-- Renders six reusable subagent roles from `agents/` into four harness formats.
+- Renders six reusable subagent roles from `agents/` into five harness formats.
 - Provides opt-in shared/local project instruction templates and a portable context-consolidation skill.
 - Lints public prompt sources, including `prompts/private.example.md`, for private paths, token-like secrets, missing harness fragments, and non-ASCII drift.
-- Provides a Karpathy-style score -> improve -> verify loop in `scripts/autoimprove-prompts`.
 
 ## Quick Start
 
@@ -39,7 +38,7 @@ scripts/sync-ai-prompts --target claude,codex --dry-run
 scripts/sync-ai-prompts --target claude,codex --deploy
 ```
 
-Full-catalog deploy can fail when deployable harnesses share a target, such as Gemini CLI and Antigravity CLI both using `~/.gemini/GEMINI.md`. Use `--target` for routine deploys, or override one shared path with its `*_AGENTS_PATH` env var.
+Real deploys refuse when two selected harnesses resolve to the same path, for example after overriding a path with its `*_AGENTS_PATH` env var. Use `--target` for routine deploys so only the harnesses you use are written.
 
 Preview deploy paths without writing:
 
@@ -67,7 +66,7 @@ prompts/
     claude.md             # prepended to Claude output
     codex.md              # prepended to Codex output
     opencode.md           # prepended to OpenCode output
-    AGENTS.md             # generic fragment for tools without a bespoke one (Warp)
+    AGENTS.md             # generic fragment for project-level AGENTS.md targets
     ...
 scripts/
   render_prompts.py       # renderer and deploy logic
@@ -76,30 +75,21 @@ scripts/
   render-invariants       # wrapper for the invariants renderer
   render-agents           # wrapper for the subagent renderer
   render_agents.py        # subagent renderer
+  python-runtime.sh       # POSIX interpreter selection (sourced by bash wrappers)
+  python-runtime.ps1      # PowerShell interpreter selection (sourced by .ps1 wrappers)
+  sync-ai-prompts.ps1     # PowerShell counterparts of the bash launchers (native Windows)
+  render-agents.ps1
+  render-invariants.ps1
   install_workflow.py     # explicit-destination consolidation skill installer
   lint_prompts.py         # prompt-source linter
   scan_prompt_sources.py  # prompt-injection scanner
   check_harness_docs.py   # README/INSTALL harness-table drift check
-  autoimprove-prompts     # score -> improve -> verify loop
+  check_harness_contract.py  # harness receipt completeness check
 skills/consolidate-agents-md/  # portable project context workflow
 templates/project/        # opt-in shared and private instruction examples
 tests/                    # render, deploy, installer, lint, and CI regression tests
-docs/                     # autoresearch guide and historical design specs
+docs/                     # harness contract, surfaces, legacy harnesses, design specs
 ```
-
-## Autoimprove
-
-The loop is deliberately conservative:
-
-> Score -> Improve -> Verify -> Keep or stop.
-
-Run it in step mode:
-
-```bash
-scripts/autoimprove-prompts --iterations 3 --mode step
-```
-
-It runs lint, prompt-source scanning, tests, and rendering before and after each improvement attempt. If a configured harness is available, it asks that harness for one small improvement. If verification fails, the diff is left in place for review instead of being silently accepted.
 
 ## Private Overlay
 
@@ -143,26 +133,28 @@ Global memory files are advisory: harnesses drift on them deep in long sessions,
 scripts/render-invariants
 ```
 
-This renders three artifacts into `build/generated/invariants/` from the single source:
+This renders five artifacts into `build/generated/invariants/` from the single source:
 
 - `invariants-userpromptsubmit.sh` - a Claude Code `UserPromptSubmit` hook. Its stdout is injected into the main loop every turn, so the invariants survive context compaction.
 - `claude-settings-snippet.json` - the hook wiring, for reference or manual merge.
 - `subagent-block.md` - paste into custom subagent definitions; reinforcement that holds regardless of which memory files a given agent type loads.
+- `invariants-preinvocation.sh` - an Antigravity `PreInvocation` hook that emits `injectSteps.ephemeralMessage` JSON; Antigravity's documented per-turn channel.
+- `antigravity-hooks-snippet.json` - the `hooks.json` entry for the Antigravity hook, for manual merge into `~/.gemini/config/hooks.json`.
 
-Install the hook the same way prompts deploy - dry-run first, then deploy:
+Install the Claude hook the same way prompts deploy - dry-run first, then deploy:
 
 ```bash
 scripts/render-invariants --dry-run
 scripts/render-invariants --deploy
 ```
 
-`--deploy` copies the hook to `~/.claude/hooks/` and **idempotently appends** its entry to `hooks.UserPromptSubmit` in `~/.claude/settings.json`, backing up anything it overwrites into `.backups/`. It never removes or rewrites existing hooks, so an already-configured `UserPromptSubmit` (or any other setting) is preserved; re-running is a no-op. Override targets for testing with `CLAUDE_HOOKS_DIR`, `CLAUDE_SETTINGS_PATH`, `--hooks-dir`, or `--settings-path`.
+`--deploy` copies the hook to `~/.claude/hooks/` and **idempotently appends** its entry to `hooks.UserPromptSubmit` in `~/.claude/settings.json`, backing up anything it overwrites into `.backups/`. It refuses symlinked destinations and shell-quotes the hook path. It never removes or rewrites existing hooks, so an already-configured `UserPromptSubmit` (or any other setting) is preserved; re-running is a no-op. Override targets for testing with `CLAUDE_HOOKS_DIR`, `CLAUDE_SETTINGS_PATH`, `--hooks-dir`, or `--settings-path`. The Antigravity artifacts are render-only today; merge the snippet into `hooks.json` by hand.
 
-Per-turn injection is intentional: `SessionStart` runs once and gets buried, whereas `UserPromptSubmit` re-asserts the rules each turn for roughly 60 tokens. `UserPromptSubmit` fires on user prompts in the main loop, not on subagent dispatches; that is why the subagent block is a separate delivery path and stays a manual paste. Per-prompt injection support varies by harness (Claude Code, OpenCode, and current Codex expose lifecycle hooks; Gemini/Antigravity, Cursor, Windsurf, and Aider expose context/rules files but no programmatic per-turn hook) - verify current support before relying on it.
+Per-turn injection is intentional: `SessionStart` runs once and gets buried, whereas `UserPromptSubmit` re-asserts the rules each turn for roughly 60 tokens. `UserPromptSubmit` fires on user prompts in the main loop, not on subagent dispatches; that is why the subagent block is a separate delivery path and stays a manual paste. Per-turn injection support varies by harness: Claude Code (`UserPromptSubmit`) and Antigravity (`PreInvocation`) have a documented per-turn channel; OpenCode, Codex, Hermes, and Command Code expose hooks or context files whose injection semantics are not yet confirmed here, so treat their rules-reinforcement as advisory. Verify current support before relying on it.
 
 ## Subagent Roster
 
-Specialized subagents beat general-purpose ones for two reasons: a clean context window per dispatch, and a fixed compact output the main thread can consume cheaply. `agents/*.md` defines six roles once, tool-agnostic; `scripts/render-agents` emits native definitions for Claude Code, Codex, OpenCode, and Command Code.
+Specialized subagents beat general-purpose ones for two reasons: a clean context window per dispatch, and a fixed compact output the main thread can consume cheaply. `agents/*.md` defines six roles once, tool-agnostic; `scripts/render-agents` emits native definitions for Claude Code, Codex, OpenCode, Command Code, and Antigravity. Hermes has no per-role prompt file (delegation is configured under `delegation:` in `config.yaml`), so its six roles are a documented manual paste rather than a rendered file.
 
 | agent | tier | effort | tools | returns |
 |---|---|---|---|---|
@@ -175,26 +167,42 @@ Specialized subagents beat general-purpose ones for two reasons: a clean context
 
 The core prompt dispatches `verifier` only when check output would flood the main context (full suites, builds); short checks run inline, and work that fits in a handful of tool calls is never delegated.
 
-Tiers map to models per harness: Claude Code `haiku`, `sonnet`, `opus`, and `fable` for `apex`; Codex `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol`, and `gpt-6-astra` for `apex`. OpenCode and Command Code have no generic aliases and are often self-hosted or routed, so they inherit the session model until `prompts/models.local.json` names provider IDs. Copy `prompts/models.local.example.json` to start; it can also promote one agent to a higher tier or effort locally without touching tracked files.
+Tiers map to models per harness: Claude Code `haiku`, `sonnet`, `opus`, and `fable` for `apex`; Codex `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol`, and `gpt-6-astra` for `apex`; Antigravity `flash` and `pro`. OpenCode and Command Code get working defaults from the tracked `prompts/models.json` (`opencode-go/...`, OpenRouter/Ollama), so tiering is on out of the box. `prompts/models.local.json` overrides any tier, effort map, or single agent without touching tracked files; copy `prompts/models.local.example.json` to start. A harness with no tier map fails loudly unless you pass `--allow-inherit`.
 
 ```bash
 scripts/render-agents                # build/agents/<harness>/
 scripts/render-agents --check
 scripts/render-agents --dry-run
 scripts/render-agents --target claude,codex --deploy
+scripts/render-agents --verify        # after --deploy: confirm the roles landed in each agent dir
 ```
 
-Deploy backs up overwritten files into `.backups/` and removes only stale files that carry the generated marker; hand-written agents in the same directory are left alone. The hard invariants are rendered into every agent from `prompts/invariants.md`, so the manual subagent paste is only needed for agents defined outside this repo.
+Deploy backs up overwritten files into `.backups/` and removes only stale files that carry the generated marker; hand-written agents in the same directory are left alone. After a deploy, `--verify` checks that all six role files exist in each harness's agent directory. Prune old backups with `scripts/sync-ai-prompts --prune-backups 50 --dry-run` (drop `--dry-run` to delete). The hard invariants are rendered into every agent from `prompts/invariants.md`, so the manual subagent paste is only needed for agents defined outside this repo.
 
-`shell-ro` is rendered only when the harness can enforce it as a real sandbox boundary. Codex maps it to shell access under `sandbox_mode = "read-only"`. Claude Code, OpenCode, and Command Code omit shell access for `shell-ro` agents and retain their native read and search tools. This costs explorer and reviewer direct git-history access on those harnesses, but keeps the read-only contract honest. Full `shell` roles are unchanged.
+`shell-ro` is rendered only when the harness can enforce it as a real sandbox boundary. Codex maps it to shell access under `sandbox_mode = "read-only"`. Claude Code, OpenCode, Command Code, and Antigravity omit shell access for `shell-ro` agents and retain their native read and search tools. This costs explorer and reviewer direct git-history access on those harnesses, but keeps the read-only contract honest. Full `shell` roles are unchanged.
 
 Codex only uses a custom role when the parent calls `spawn_agent` with `agent_type` set to the role name, and a full-history fork (`fork_turns = "all"`) inherits the parent's model and effort regardless of the role file. The rendered Codex prompt tells the root agent to pass `agent_type` and `fork_turns = "none"`; task prompts must therefore be self-contained.
 
 ## Supported Harnesses
 
-This is a public catalog, not a reflection of what is installed on one machine. Deployable targets have verified default operational-rule paths. Manual targets render into `build/generated/`, but deploy only when their `*_AGENTS_PATH` environment variable points at a project or per-agent rules file.
+Six harnesses are supported, each with a rules path verified against upstream docs, plus one generic
+project-level target. Receipts, overrides, and per-surface behavior live in
+[docs/harness-contract.md](docs/harness-contract.md) and [docs/surfaces.md](docs/surfaces.md).
 
-Gemini CLI remains in the catalog as a legacy Google target. Since June 2026 the forward Google CLI target is Antigravity CLI; both use `GEMINI.md` by default, so real deploys refuse that same-path collision unless you select one target or override one path.
+| Harness | Support | Global rules file |
+|---|---|---|
+| Claude Code | deployable | `~/.claude/CLAUDE.md` |
+| OpenAI Codex | deployable | `~/.codex/AGENTS.md` |
+| OpenCode | deployable | `~/.config/opencode/AGENTS.md` |
+| Command Code | deployable | `~/.commandcode/AGENTS.md` |
+| Antigravity | deployable | `~/.gemini/GEMINI.md` |
+| Hermes Agent | manual | project `HERMES.md` / `$HERMES_HOME/config.yaml` |
+| Generic AGENTS.md | manual | project `AGENTS.md` only |
+
+`docs/surfaces.md` explains which CLI, IDE, and desktop surfaces read these files. The supported
+tools' coding surfaces, including Claude Desktop's Code tab, the Codex integration in the ChatGPT
+desktop app, OpenCode desktop, Antigravity's desktop/IDE/CLI, and the Hermes desktop app, share the
+deployed file; the account-synced chat surfaces do not.
 
 List targets, support levels, and resolved paths:
 
@@ -202,13 +210,10 @@ List targets, support levels, and resolved paths:
 scripts/sync-ai-prompts --list-targets
 ```
 
-Each deployable target path can be overridden with an environment variable such as `CLAUDE_AGENTS_PATH`, `CODEX_AGENTS_PATH`, `ANTIGRAVITY_AGENTS_PATH`, or `PI_AGENTS_PATH`. Manual targets require an explicit override such as `HERMES_AGENTS_PATH` or `NANOCLAW_AGENTS_PATH` before deploy writes anything.
-
-## Watchlist
-
-These tools are tracked for future operational-rule support, but are not first-wave deploy targets: Devin for Terminal, Junie, Kilo Code, iFlow CLI, Lingma, Mistral Vibe, Qoder CLI, Rovo Dev, SHAI, Tabnine CLI, Trae, CodeBuddy, and Forge.
-
-Z.ai and MiniMax are treated as providers/tool integrations until their docs identify standalone operational rules harnesses. They should not become deployable prompt targets just because their models or CLIs can be used from other agents.
+Each target can be overridden with its environment variable, such as `CLAUDE_AGENTS_PATH`,
+`CODEX_AGENTS_PATH`, `ANTIGRAVITY_AGENTS_PATH`, or `HERMES_AGENTS_PATH`. Manual targets
+(`hermes`, `generic`) require an explicit override before deploy writes anything. Harnesses removed
+from the catalog are listed in [docs/legacy-harnesses.md](docs/legacy-harnesses.md) with a re-add recipe.
 
 ## Verification
 
@@ -222,18 +227,21 @@ python -m pip install -r requirements-dev.txt
 python scripts/lint_prompts.py
 python scripts/scan_prompt_sources.py
 python scripts/check_harness_docs.py
+python scripts/check_harness_contract.py
 python -m pytest -q
-bash -n scripts/sync-ai-prompts scripts/autoimprove-prompts scripts/render-invariants scripts/render-agents
-python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/render_agents.py scripts/install_workflow.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py
+bash -n scripts/sync-ai-prompts scripts/render-invariants scripts/render-agents
+python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/render_agents.py scripts/install_workflow.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py
 scripts/sync-ai-prompts --check
 scripts/sync-ai-prompts --dry-run
+scripts/sync-ai-prompts --status
 scripts/render-agents --check
 ```
 
 ## GitHub Actions
 
-- `.github/workflows/ci.yml` runs the repo's prompt lint, prompt-injection scan, workflow lint, tests, shell syntax checks, Python compile checks, and dry-run render.
+- `.github/workflows/ci.yml` runs the repo's prompt lint, prompt-injection scan, contract check, workflow lint, tests, shell syntax checks, Python compile checks, and dry-run render on a Python 3.11/3.13 matrix.
 - `.github/workflows/security.yml` runs CodeQL and Gitleaks.
+- `.github/workflows/release.yml` creates or updates a GitHub release from generated notes when a `v*` tag is pushed.
 - `.github/workflows/promptfoo-code-scan.yml` wires in Promptfoo's LLM security scanner for prompt-sensitive PRs when `PROMPTFOO_API_KEY` is configured. The Promptfoo GitHub App is the cleaner no-key setup if you want hosted PR comments without storing a token.
 
 ## License

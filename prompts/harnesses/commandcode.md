@@ -1,8 +1,10 @@
-## Command Code-Specific Notes
-- Generated from this repo's `prompts/core.md` plus `prompts/harnesses/commandcode.md`. Edit the source fragments, then run `scripts/sync-ai-prompts`.
-- Global rules file: `~/.commandcode/AGENTS.md`; project rules live in `./AGENTS.md` (scaffold with `/init`).
+## Command Code Notes
+- Global rules: `~/.commandcode/AGENTS.md`; project rules `./AGENTS.md` (scaffold with `/init`); settings and hooks in `~/.commandcode/settings.json`; skills in `~/.commandcode/skills/`, agents in `~/.commandcode/agents/`. Override with `COMMANDCODE_AGENTS_PATH`.
+- Home resolves from `HOME`/`USERPROFILE`, so native Windows uses `%USERPROFILE%\.commandcode`; the binary is `cmd`/`command-code`/`commandcode` on POSIX and `cmdc` on native Windows.
+- Non-interactive: `cmd -p`; verify the current flag against `--help`. Hooks are gated by `~/.commandcode/trusted-hooks.json`.
+- Model and effort IDs live in `prompts/models.json` (`reasoningEffort`; per-task models via `/configure-models`). Verify supported levels before scripting.
 - Command Code learns a per-user "taste" from past sessions. Manage durable context with `/memory` and refresh style with `/learn-taste`; keep operational rules here, not in taste.
-- Models are per-task: set the main model and feature models (compaction, title generation, tool descriptions) via `/configure-models`. Use family names in guidance and verify current model IDs before scripting.
-- Hooks are configured in `~/.commandcode/settings.json` (for example `PreToolUse`, `PostToolUse`, `Stop`) and gated by `~/.commandcode/trusted-hooks.json`; confirm the supported event names before wiring automation.
-- Skills and agents load from `~/.commandcode/skills/` and `~/.commandcode/agents/`; prefer shared local skills unless a task needs a tool-specific one.
-- Binaries: `cmd`, `command-code`, `commandcode`. Verify non-interactive/exec flags against current CLI help before relying on them in scripts.
+- Agents render as markdown in `~/.commandcode/agents/`. Command Code ignores custom files that reuse a built-in name, so the six role names must stay distinct.
+- Skills and agents load from `~/.commandcode/skills/` and `~/.commandcode/agents/`; prefer shared local skills unless a task needs a tool-specific one, and deliver hard rules through the configured hooks rather than repeating them per prompt.
+- Treat configured hooks and trusted-hook entries as trusted input; confirm the supported event names before adding automation.
+- Verify discovery after deploy: the agent list shows the six roles and `/configure-models` shows the expected per-task models.
