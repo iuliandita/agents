@@ -789,3 +789,30 @@ def test_prune_backups_keeps_newest(tmp_path):
 
     assert renderer.prune_backups(backup_dir, 2, dry_run=False) == 0
     assert sorted(path.name for path in backup_dir.iterdir()) == ["x-3.bak", "x-4.bak"]
+
+
+def test_deploy_refuses_colliding_targets_even_in_dry_run(tmp_path, monkeypatch):
+    repo = Path(__file__).resolve().parents[1]
+    target = tmp_path / "AGENTS.md"
+    monkeypatch.setenv("CODEX_AGENTS_PATH", str(target))
+    monkeypatch.setenv("OPENCODE_AGENTS_PATH", str(target))
+
+    with pytest.raises(SystemExit, match="collision"):
+        renderer.deploy(
+            repo, selected=["codex,opencode"], stamp="2026-06-15", dry_run=True, backup_dir=tmp_path / "b"
+        )
+
+
+def test_prune_backups_ignores_non_bak_files(tmp_path):
+    backup_dir = tmp_path / "b"
+    backup_dir.mkdir()
+    archive = backup_dir / "old-backups-archive.tar.gz"
+    archive.write_text("x", encoding="utf-8")
+    for index in range(3):
+        path = backup_dir / f"x-{index}.bak"
+        path.write_text(str(index), encoding="utf-8")
+        os.utime(path, (1000 + index, 1000 + index))
+
+    assert renderer.prune_backups(backup_dir, 1, dry_run=False) == 0
+    assert archive.exists()
+    assert sorted(path.name for path in backup_dir.iterdir()) == ["old-backups-archive.tar.gz", "x-2.bak"]

@@ -116,7 +116,12 @@ def render_antigravity_settings(hook_path: str) -> str:
     ) + "\n"
 
 
-def render_all(repo_root: Path, out_dir: Path, hook_install_path: str) -> dict[str, Path]:
+def render_all(
+    repo_root: Path,
+    out_dir: Path,
+    hook_install_path: str,
+    antigravity_hook_path: str | None = None,
+) -> dict[str, Path]:
     invariants = read_invariants(repo_root)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -141,7 +146,7 @@ def render_all(repo_root: Path, out_dir: Path, hook_install_path: str) -> dict[s
     written["antigravity_hook"] = ag_hook
 
     ag_settings = out_dir / ANTIGRAVITY_SETTINGS_NAME
-    ag_path = ANTIGRAVITY_HOOK_PATH.format(home=Path.home())
+    ag_path = antigravity_hook_path or ANTIGRAVITY_HOOK_PATH.format(home=Path.home())
     ag_settings.write_text(render_antigravity_settings(ag_path), encoding="utf-8", newline="\n")
     written["antigravity_settings"] = ag_settings
 

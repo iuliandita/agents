@@ -424,10 +424,8 @@ def deploy(
         print(f"skipping {harness.name}: manual target requires {harness.env_var}")
 
     collisions = target_collisions(resolved)
-    if collisions and not dry_run:
+    if collisions:
         raise SystemExit(format_target_collision(collisions))
-    if collisions and dry_run:
-        print(format_target_collision(collisions))
 
     for harness, dest in resolved.items():
         if dest.is_symlink():
@@ -473,7 +471,11 @@ def prune_backups(backup_dir: Path, keep: int, dry_run: bool) -> int:
     if not backup_dir.is_dir():
         print(f"no backups at {backup_dir}")
         return 0
-    files = [path for path in backup_dir.iterdir() if path.is_file() or path.is_symlink()]
+    files = [
+        path
+        for path in backup_dir.iterdir()
+        if (path.is_file() or path.is_symlink()) and path.name.endswith(".bak")
+    ]
     files.sort(key=lambda path: path.lstat().st_mtime, reverse=True)
     stale = files[keep:]
     for path in stale:

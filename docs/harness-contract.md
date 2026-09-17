@@ -14,7 +14,7 @@ directly (`high`), it is inferred from a consistent pattern (`medium`), or it is
 | OpenCode | `~/.config/opencode/AGENTS.md` (+ `opencode.json`) | `OPENCODE_AGENTS_PATH`, `OPENCODE_CONFIG_DIR` | high | opencode.ai/docs/rules/ |
 | Command Code | `~/.commandcode/AGENTS.md` (+ `settings.json`) | `COMMANDCODE_AGENTS_PATH` | medium | commandcode.ai/docs/memory |
 | Antigravity | `~/.gemini/GEMINI.md`; workspace `.agents/rules/` | `ANTIGRAVITY_AGENTS_PATH`, none native | high | antigravity.google/docs/rules-workflows/ |
-| Hermes Agent | `agent.coding_instructions` in `$HERMES_HOME/config.yaml`; project `.hermes.md`/`HERMES.md` > `AGENTS.override.md` > `AGENTS.md` | `HERMES_AGENTS_PATH`, `HERMES_HOME` | high | hermes-agent.nousresearch.com/docs/user-guide/features/context-files |
+| Hermes Agent | `agent.coding_instructions` in `$HERMES_HOME/config.yaml`; project `.hermes.md`/`HERMES.md` > `AGENTS.override.md` > `AGENTS.md` | `HERMES_AGENTS_PATH` (project file) | high | hermes-agent.nousresearch.com/docs/user-guide/features/context-files |
 | Generic | none (project-level `AGENTS.md` only) | `GENERIC_AGENTS_PATH` | n/a | - |
 
 ## Per-harness notes

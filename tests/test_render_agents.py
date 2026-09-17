@@ -1,3 +1,4 @@
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -763,3 +764,20 @@ def test_verify_reports_missing_then_present_roles(tmp_path, capsys):
 def test_verify_flags_an_undeployed_harness(tmp_path):
     env = {"CODEX_AGENTS_DIR": str(tmp_path / "missing")}
     assert ra.verify(REPO, ["codex"], env=env) == 1
+
+
+def test_validate_overrides_rejects_null_effort_map_value(tmp_path):
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "models.local.json").write_text(
+        __import__("json").dumps({"claude": {"effort_map": {"high": None}}}), encoding="utf-8"
+    )
+    with pytest.raises(SystemExit, match="effort_map"):
+        ra.load_overrides(tmp_path)
+
+
+def test_cli_agent_deploy_requires_target():
+    result = subprocess.run(
+        ["scripts/render-agents", "--deploy"], cwd=REPO, capture_output=True, text=True, check=False
+    )
+    assert result.returncode != 0
+    assert "--deploy requires --target" in result.stdout + result.stderr

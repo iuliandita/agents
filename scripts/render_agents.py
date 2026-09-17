@@ -240,7 +240,7 @@ def validate_overrides(data: object, source: Path) -> dict:
         for level, mapped in effort_map.items():
             if level not in EFFORTS:
                 raise SystemExit(f"{label}: '{harness}.effort_map.{level}' is not an effort level")
-            if mapped is not None and (not isinstance(mapped, str) or not mapped):
+            if not isinstance(mapped, str) or not mapped:
                 raise SystemExit(f"{label}: '{harness}.effort_map.{level}' must be a non-empty string")
     return data
 
@@ -422,7 +422,8 @@ def render_codex(spec: AgentSpec, resolved: Resolved, invariants: str) -> str:
     ]
     if resolved.model is not None:
         lines.append(f"model = {toml_string(resolved.model)}")
-    lines.append(f"{resolved.effort_key} = {toml_string(resolved.effort)}")
+    if resolved.effort_key:
+        lines.append(f"{resolved.effort_key} = {toml_string(resolved.effort)}")
     lines.append(f"sandbox_mode = {toml_string(sandbox)}")
     # fork_turns is a spawn_agent parameter, not a role-file key; Codex rejects
     # the whole file as malformed if it appears here. The harness fragment tells
@@ -526,8 +527,6 @@ HARNESS_DISPLAY = {
     "antigravity": "Antigravity",
 }
 
-# Harnesses with a documented non-interactive command that lists custom agents.
-# None means no such command is known, so verification is skipped rather than guessed.
 def verify(repo_root: Path, selected: list[str] | None, env: dict[str, str] | None = None) -> int:
     """Confirm the rendered roles exist where each harness reads them. Run after --deploy."""
     specs = load_agents(repo_root)
@@ -743,6 +742,12 @@ def deploy(
             backup_existing(dest, backup_dir)
             dest.write_text(text, encoding="utf-8", newline="\n")
             print(f"updated {harness}: {dest}")
+        if harness == "claude":
+            legacy_guard = target / GUARD_NAME
+            if is_generated(legacy_guard):
+                backup_existing(legacy_guard, backup_dir)
+                legacy_guard.unlink()
+                print(f"removed stale {harness}: {legacy_guard} (backup in {backup_dir})")
         for path in stale:
             backup_existing(path, backup_dir)
             path.unlink()
@@ -784,6 +789,11 @@ def main(argv: list[str] | None = None) -> int:
         return check(args.repo_root, args.target, args.allow_inherit)
     if args.verify:
         return verify(args.repo_root, args.target)
+    if args.deploy and not args.target:
+        raise SystemExit(
+            "--deploy requires --target (for example --target claude,opencode). "
+            "Use --dry-run without --target to preview every harness."
+        )
     overrides = load_overrides(args.repo_root)
     if args.deploy or args.dry_run:
         deploy(args.repo_root, args.target, overrides, args.dry_run, args.backup_dir, args.allow_inherit)
