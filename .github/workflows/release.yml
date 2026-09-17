@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Publish GitHub release
@@ -23,5 +27,6 @@ jobs:
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release edit "$GITHUB_REF_NAME" --generate-notes
           else
-            gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag
+            gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag \
+              || gh release edit "$GITHUB_REF_NAME" --generate-notes
           fi
