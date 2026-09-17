@@ -3,7 +3,15 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
-## [Unreleased]
+## [2.0.0] - 2026-09-17
+
+### Breaking
+
+- The supported harness set is reduced to Claude Code, Codex, OpenCode, Command Code, Antigravity,
+  Hermes Agent, plus the generic project-level `AGENTS.md` target. 19 unverified harness targets were
+  removed; see `docs/legacy-harnesses.md` for the re-add recipe.
+- `--deploy` now requires `--target`, and a harness with no model tier map fails unless
+  `--allow-inherit` is passed.
 
 ### Changed
 
