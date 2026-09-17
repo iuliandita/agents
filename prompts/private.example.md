@@ -2,7 +2,9 @@
 
 Copy this file to `prompts/private.md` for machine-specific or private rules.
 
-This file is appended after the shared core during render and deploy. Keep it out of git.
+This file is appended after the shared core during render and deploy. Keep it out of git. It is applied
+to Claude Code and Codex only by default; add other harnesses with `AGENTS_PRIVATE_HARNESSES` or a
+`prompts/private-harnesses.txt` file, so home-lab hosts and identities do not reach third-party models.
 
 Examples:
 

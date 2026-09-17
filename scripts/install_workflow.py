@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import tempfile
 
-import yaml
+from render_agents import parse_frontmatter
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKILL_NAME = "consolidate-agents-md"
@@ -40,17 +40,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         source = REPO_ROOT / "skills" / SKILL_NAME / "SKILL.md"
         content = source.read_bytes()
-        lines = content.decode("utf-8").splitlines()
-        if not lines or lines[0] != "---" or "---" not in lines[1:]:
-            raise ValueError("Canonical skill must have YAML frontmatter")
-        end = lines.index("---", 1)
         try:
-            metadata = yaml.safe_load("\n".join(lines[1:end]))
-        except yaml.YAMLError:
-            raise ValueError("Canonical skill has invalid YAML frontmatter") from None
-        if (not isinstance(metadata, dict) or metadata.get("name") != source.parent.name
-                or not isinstance(metadata.get("description"), str)
-                or not metadata["description"].strip()):
+            metadata, _ = parse_frontmatter(content.decode("utf-8"), source)
+        except SystemExit as exc:
+            raise ValueError(str(exc)) from None
+        if metadata.get("name") != source.parent.name or not metadata.get("description", "").strip():
             raise ValueError("Canonical skill needs a matching name and nonempty description")
 
         targets = [directory / SKILL_NAME / "SKILL.md" for directory in args.skills_dir]

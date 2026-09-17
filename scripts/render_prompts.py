@@ -244,6 +244,31 @@ def read_private(repo_root: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+PRIVATE_HARNESSES_ENV = "AGENTS_PRIVATE_HARNESSES"
+# Private overlays can hold home-lab hosts, identities, and local paths. Only
+# first-party harnesses receive them by default; opt other harnesses in with
+# AGENTS_PRIVATE_HARNESSES or prompts/private-harnesses.txt.
+DEFAULT_PRIVATE_HARNESSES = ("claude", "codex")
+
+
+def private_harnesses(repo_root: Path, env: dict[str, str] | None = None) -> frozenset[str]:
+    values = os.environ if env is None else env
+    override = values.get(PRIVATE_HARNESSES_ENV, "")
+    if override.strip():
+        return frozenset(part.strip() for part in override.replace(",", "\n").split() if part.strip())
+
+    path = repo_root / "prompts" / "private-harnesses.txt"
+    if path.exists():
+        names = [
+            line.strip()
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        ]
+        return frozenset(names)
+
+    return frozenset(DEFAULT_PRIVATE_HARNESSES)
+
+
 def output_path(out_dir: Path, harness: Harness, collisions: set[str]) -> Path:
     if harness.output_name in collisions:
         return out_dir / harness.name / harness.output_name
@@ -275,6 +300,7 @@ def render_all(
 
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
     private = read_private(repo_root)
+    allowed_private = private_harnesses(repo_root)
     written: dict[str, Path] = {}
     for harness in harnesses:
         dest = output_path(out_dir, harness, collisions)
@@ -282,7 +308,7 @@ def render_all(
         rendered = render_document(
             read_fragment(repo_root, harness),
             core,
-            private=private,
+            private=private if harness.name in allowed_private else "",
             stamp=stamp,
             enabled_optional=frozenset(harness.optional_blocks),
         )
@@ -397,6 +423,7 @@ def deploy(
     harnesses = selected_harnesses(selected)
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
     private = read_private(repo_root)
+    allowed_private = private_harnesses(repo_root)
     resolved, skipped = resolve_deploy_targets(harnesses)
 
     for harness in skipped:
@@ -419,7 +446,7 @@ def deploy(
         rendered = render_document(
             read_fragment(repo_root, harness),
             core,
-            private=private,
+            private=private if harness.name in allowed_private else "",
             stamp=stamp,
             enabled_optional=frozenset(harness.optional_blocks),
         )
@@ -471,6 +498,7 @@ def status(repo_root: Path, selected: list[str] | None, stamp: str | None) -> in
     """Report whether each deployed file matches a fresh render, or was edited locally."""
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
     private = read_private(repo_root)
+    allowed_private = private_harnesses(repo_root)
     manifest = load_manifest(repo_root)
     drift = 0
     for harness in selected_harnesses(selected):
@@ -481,7 +509,7 @@ def status(repo_root: Path, selected: list[str] | None, stamp: str | None) -> in
         rendered = render_document(
             read_fragment(repo_root, harness),
             core,
-            private=private,
+            private=private if harness.name in allowed_private else "",
             stamp=stamp,
             enabled_optional=frozenset(harness.optional_blocks),
         )

@@ -3,6 +3,22 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [2.2.0] - 2026-09-17
+
+### Changed
+
+- The private overlay (`prompts/private.md`) is applied to Claude Code and Codex only by default. Add
+  harnesses with `AGENTS_PRIVATE_HARNESSES` (comma-separated) or `prompts/private-harnesses.txt` (one
+  name per line). This keeps home-lab hosts, identities, and local paths out of third-party models.
+- The workflow installer uses only the standard library; installing the consolidation skill no longer
+  needs PyYAML (PyYAML remains a test-only dependency).
+- `scripts/check_harness_docs.py --write` regenerates the INSTALL harness table from the registry; CI
+  still verifies it.
+
+### Fixed
+
+- The public README no longer names a specific workflow plugin in its shared guidance.
+
 ## [2.1.1] - 2026-09-17
 
 ### Fixed
