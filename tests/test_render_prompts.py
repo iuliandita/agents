@@ -826,3 +826,38 @@ def test_render_document_header_has_no_git_revision_churn():
     # The revision must be the content hash directly followed by the sentence,
     # not a hash plus a git-describe suffix that changes on every commit/tag.
     assert re.search(r"rev [0-9a-f]{12}\. ", header)
+
+
+def test_private_harnesses_default_and_env_override():
+    repo = Path(__file__).resolve().parents[1]
+    assert renderer.private_harnesses(repo, env={}) == frozenset({"claude", "codex"})
+    assert renderer.private_harnesses(
+        repo, env={"AGENTS_PRIVATE_HARNESSES": "opencode, claude"}
+    ) == frozenset({"opencode", "claude"})
+
+
+def test_private_harnesses_file_overrides_default(tmp_path):
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "private-harnesses.txt").write_text(
+        "# opt in\nopencode\n", encoding="utf-8"
+    )
+    assert renderer.private_harnesses(tmp_path, env={}) == frozenset({"opencode"})
+
+
+def test_private_overlay_withheld_except_allowed_harnesses(tmp_path, monkeypatch):
+    monkeypatch.delenv("AGENTS_PRIVATE_HARNESSES", raising=False)
+    repo = tmp_path / "repo"
+    (repo / "prompts" / "harnesses").mkdir(parents=True)
+    (repo / "prompts" / "core.md").write_text("# Core\nshared\n", encoding="utf-8")
+    (repo / "prompts" / "private.md").write_text("## Private\nlocal only\n", encoding="utf-8")
+    fragments = ("claude", "codex", "opencode", "commandcode", "antigravity", "hermes")
+    for name in fragments:
+        (repo / "prompts" / "harnesses" / f"{name}.md").write_text(f"## {name}\nx\n", encoding="utf-8")
+    (repo / "prompts" / "harnesses" / "AGENTS.md").write_text("## Generic\nx\n", encoding="utf-8")
+
+    written = renderer.render_all(repo_root=repo, out_dir=tmp_path / "out", stamp="2026-04-25")
+
+    assert "local only" in written["claude"].read_text(encoding="utf-8")
+    assert "local only" in written["codex"].read_text(encoding="utf-8")
+    for harness in ("opencode", "commandcode", "antigravity", "hermes"):
+        assert "local only" not in written[harness].read_text(encoding="utf-8")

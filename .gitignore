@@ -5,6 +5,7 @@ docs/superpowers/
 plans/
 prompts/private.md
 prompts/private-patterns.txt
+prompts/private-harnesses.txt
 prompts/models.local.json
 SECURITY-AUDIT.md
 /.claude/

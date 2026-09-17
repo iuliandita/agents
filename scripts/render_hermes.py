@@ -40,11 +40,13 @@ def hermes_config_path(env: dict[str, str] | None = None) -> Path:
 
 def render_rules(repo_root: Path) -> str:
     harness = render_prompts.harness_by_name("hermes")
+    allowed = render_prompts.private_harnesses(repo_root)
+    private = render_prompts.read_private(repo_root) if "hermes" in allowed else ""
     return render_prompts.render_document(
         render_prompts.read_fragment(repo_root, harness),
         (repo_root / "prompts" / "core.md").read_text(encoding="utf-8"),
-        private=render_prompts.read_private(repo_root),
-        enabled_optional=frozenset(harness.optional_blocks)
+        private=private,
+        enabled_optional=frozenset(harness.optional_blocks),
     )
 
 

@@ -106,11 +106,16 @@ cp prompts/private.example.md prompts/private.md
 It can extend the public config locally, but rendered output can contain private content.
 Do not publish generated files or copy them into tracked project instructions.
 
+The overlay is applied to **Claude Code and Codex only** by default, because it can hold home-lab
+hosts, identities, and local paths that should not reach third-party models. Add other harnesses with
+`AGENTS_PRIVATE_HARNESSES` (comma-separated) or a `prompts/private-harnesses.txt` file with one harness
+name per line. Opt in only for providers you trust with the overlay contents.
+
 For local leak checks that should not be committed, copy `prompts/private-patterns.example.txt` to `prompts/private-patterns.txt` or set `AGENTS_PRIVATE_PATTERNS` to comma- or newline-separated markers.
 
 ## Workflow Activation
 
-The shared prompt makes Superpowers workflows opt-in: use them only on an explicit request for that workflow or a repository instruction, including aliases and calls from other skills. Ordinary brainstorming and implementation requests do not opt in. Other skills are selected when requested or when they materially help the task. This changes the rendered guidance, not installed skill files or discovery metadata; higher-priority harness requirements can still trigger workflows. It is not a runtime disable switch.
+The shared prompt makes workflow-style skills opt-in: use them only on an explicit request for that workflow or a repository instruction, including aliases and calls from other skills. Ordinary brainstorming and implementation requests do not opt in. Other skills are selected when requested or when they materially help the task. This changes the rendered guidance, not installed skill files or discovery metadata; higher-priority harness requirements can still trigger workflows. It is not a runtime disable switch.
 
 This first conservative pass preserves the operational safeguards and model settings. Source and render checks verify that the policy is present; they do not measure model behavior or token savings. Compare representative tasks at the same model and effort before further consolidation or effort changes.
 

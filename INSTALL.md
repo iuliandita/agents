@@ -28,18 +28,16 @@ This avoids hardcoding Apple Silicon or Intel installation paths. See
 [Python virtual environments](https://docs.python.org/3/library/venv.html).
 Do not install packages into the system Python or create a global `python` alias.
 
-Prompt, subagent, and invariants rendering use the Python standard library.
-For the consolidation workflow and development checks, install the dependencies
-inside the activated environment:
+All rendering and deploy tooling, including the workflow installer, uses only
+the Python standard library. Install the development dependencies to run the
+checks (pytest, plus PyYAML for tests that parse rendered YAML):
 
 ```sh
 python -m pip install -r requirements-dev.txt
 ```
 
-PyYAML is required by the workflow installer; pytest is used for verification.
-Missing PyYAML does not block global prompt deployment. The `.venv/` directory
-is gitignored. The full test suite uses the CI Python version recorded in
-[ci.yml](.github/workflows/ci.yml).
+The `.venv/` directory is gitignored. The full test suite uses the CI Python
+version recorded in [ci.yml](.github/workflows/ci.yml).
 
 The shell launchers select `AGENTS_PYTHON` when set, then the checkout's
 `.venv/bin/python`, then `python`, then `python3` on PATH. They reject Python
@@ -53,8 +51,8 @@ AGENTS_PYTHON="$HOME/my environments/agents/bin/python" scripts/sync-ai-prompts 
 ```
 
 If `python` is not found, activate the environment or use the shell launcher.
-If `import yaml` fails in the workflow installer, run the dependency command
-above using the same interpreter that will run the installer.
+The workflow installer needs no third-party packages; a missing `import yaml`
+now affects only the test suite, not installation.
 
 ## Windows (Native PowerShell)
 
@@ -105,7 +103,7 @@ Existing files are backed up under `.backups/` before replacement. Deploy writes
 
 Real deploys refuse when two selected harnesses resolve to the same path, for example after overriding a path with its `*_AGENTS_PATH` env var. Use `--target` for routine deploys so only the harnesses you use are written.
 
-If `prompts/private.md` exists, it is merged into every rendered/deployed file after the shared core. Use `prompts/private.example.md` as the template.
+If `prompts/private.md` exists, it is merged into the rendered/deployed file after the shared core. It is applied to Claude Code and Codex only by default; add harnesses with `AGENTS_PRIVATE_HARNESSES` (comma-separated) or `prompts/private-harnesses.txt` (one name per line). Use `prompts/private.example.md` as the template.
 
 ## Dry Run
 
@@ -166,6 +164,7 @@ ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/GEMINI.md" scripts/sync-ai-prompts --targ
 
 ## Default Targets
 
+<!-- harness-targets:start -->
 | Harness | Support | Target | Notes |
 |---|---|---|---|
 | Claude Code | deployable | `~/.claude/CLAUDE.md` |  |
@@ -175,6 +174,7 @@ ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/GEMINI.md" scripts/sync-ai-prompts --targ
 | Antigravity | deployable | `~/.gemini/GEMINI.md` | Desktop, IDE, and CLI share ~/.gemini/GEMINI.md; workspace rules live in .agents/rules/ (12k char cap per file). |
 | Hermes Agent | manual | `manual override via HERMES_AGENTS_PATH` | Global rules merge into agent.coding_instructions in $HERMES_HOME/config.yaml; project rules deploy to HERMES.md or AGENTS.override.md via HERMES_AGENTS_PATH. |
 | Generic AGENTS.md | manual | `manual override via GENERIC_AGENTS_PATH` | Project-level AGENTS.md for tools with no verified global rules path; deploy with GENERIC_AGENTS_PATH pointing at a project file. |
+<!-- harness-targets:end -->
 
 ## Agent Targets
 
@@ -281,7 +281,7 @@ with recoverable file backups, secret redaction, and verification before clearin
 It operates on the selected project only and preserves shared versus local instructions.
 The installer installs instructions; it does not run consolidation or touch project memory.
 
-Install into explicit skill directories (Python and the existing PyYAML dependency required):
+Install into explicit skill directories (Python 3.11+ required):
 
 ```sh
 python scripts/install_workflow.py --skills-dir "$HOME/.agents/skills" --skills-dir "$HOME/.claude/skills"
