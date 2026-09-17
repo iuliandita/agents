@@ -78,6 +78,8 @@ directly (`high`), it is inferred from a consistent pattern (`medium`), or it is
 - Skills `$HERMES_HOME/skills/`; delegation via `delegate_task`; hooks via plugins/config.
 - No per-role prompt file: delegation is configured under `delegation:` in `config.yaml`, so the six
   roles are a manual paste rather than a rendered file.
+- Global rules are merged with `scripts/render-hermes --deploy`, a comment-preserving line edit that
+  sets `agent.coding_instructions` and backs up `config.yaml` first.
 
 ## Unverified
 

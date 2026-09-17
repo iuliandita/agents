@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [Unreleased]
+
+### Added
+
+- `scripts/render-hermes` merges the shared core into Hermes `agent.coding_instructions` with a
+  comment-preserving line edit and a backup, giving Hermes the same global-rules channel as the rest.
+
 ## [2.0.0] - 2026-09-17
 
 ### Breaking
