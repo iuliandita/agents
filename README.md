@@ -173,7 +173,11 @@ Specialized subagents beat general-purpose ones for two reasons: a clean context
 | reviewer | flagship | high | read, search, shell-ro | one severity-tagged line per finding |
 | planner | flagship | high | read, search, web | numbered `action -> verify: command` steps |
 
-The core prompt dispatches `verifier` only when check output would flood the main context (full suites, builds); short checks run inline, and work that fits in a handful of tool calls is never delegated.
+The core prompt delegates bounded work by default. The main model coordinates scope, priorities, decisions, integration, and the final answer; workers handle research, investigation, implementation, checks, and review. Related small tasks are batched, independent work runs in parallel, and trivial actions stay inline when dispatch would cost more than doing them. Each worker gets explicit ownership and concise context, and the main model checks its evidence.
+
+Model and reasoning effort are chosen separately for each task, using the cheapest capable model and escalating when difficulty or observed failures warrant it. Total cost includes context, retries, delegation overhead, and verification. Role defaults remain starting points, subject to the harness's supported controls and explicit user overrides.
+
+When a configured Jev/TypeSafe API key and a relevant installed skill such as `typesafe-ai` or `jevify` are available, the prompt calls for proactive Jev use for suitable bounded decisions, including routing, triage, ranking, and context selection, when it improves cost or speed at the required quality. Credentials stay private, exact rules remain deterministic, and uncertain results or service failures fall back to the main model or a worker. Missing access does not block the task.
 
 Tiers map to models per harness: Claude Code `haiku`, `sonnet`, `opus`, and `fable` for `apex`; Codex `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol`, and `gpt-6-astra` for `apex`; Antigravity `flash` and `pro`. OpenCode and Command Code get working defaults from the tracked `prompts/models.json` (`opencode-go/...`, OpenRouter/Ollama), so tiering is on out of the box. `prompts/models.local.json` overrides any tier, effort map, or single agent without touching tracked files; copy `prompts/models.local.example.json` to start. A harness with no tier map fails loudly unless you pass `--allow-inherit`.
 

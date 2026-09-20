@@ -354,13 +354,16 @@ def test_core_tracks_fable_5_1_and_gpt_5_6_prompting_guides():
         "Finish the whole task",
         "Issue independent tool calls together in one response",
         "Use lists when asked or when the content is multifaceted",
-        "compare one level lower",
+        "Choose model and reasoning effort per subtask",
         "Recognizing a name is not knowing its current state",
-        "Keep work you can finish in a handful of tool calls inline",
+        "Delegate by default whenever a bounded task",
         "Preserve authorization across turns",
         "Once appropriate checks pass",
-        "Keep working while subagents run",
-        "when check output would flood the context",
+        "while workers run",
+        "Maximize useful delegation, not agent count",
+        "configured Jev/TypeSafe API key",
+        "relevant installed skill",
+        "Jev output is evidence, not authorization or proof",
     ):
         assert phrase in core
 
