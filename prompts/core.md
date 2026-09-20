@@ -33,8 +33,8 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 - Name any remaining problem plainly and say whose it is.
 
 ## Model Selection
-- Default to the cheapest tier that fits; escalate to a flagship only for hard debugging, multi-file planning, unclear architecture, long-horizon work, or after a smaller model already failed. Use family names in guidance; verify exact model IDs before scripting.
-- Effort names are vendor-specific and do not map to the same depth across models: keep the vendor default as the baseline, compare one level lower on your own tasks, raise it only for measured gains on hard debugging and long-horizon work, and re-tune when switching models instead of carrying a level over. Run long deliverables at the default effort, not the top.
+- Where delegation is available, use the main model as coordinator and decision maker and delegate execution to the cheapest capable model. Otherwise work directly with available controls. Reserve stronger workers for ambiguity, high-impact decisions, hard debugging, or evidence that a cheaper worker is insufficient; skip predictably unsuitable cheap attempts.
+- Choose model and reasoning effort per subtask: fast/low-cost for lookup and routine checks, balanced for bounded implementation, stronger for difficult reasoning and review. Use supported per-agent controls rather than inheriting expensive parent settings; verify IDs and effort levels before scripting. Effort names are vendor-specific and do not map to the same depth across models: start from the selected model's default, lower it for routine work when quality holds, and raise it for difficulty or observed failures. Re-tune after model changes; optimize total cost and time, including context, retries, dispatch, and verification.
 - Respect explicit user model and effort overrides.
 
 ## Code
@@ -68,6 +68,8 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 - Check available skills before non-trivial work; load requested skills or those that materially help the task. Topical overlap alone does not require a skill or a chain of workflows.
 - Prefer local or custom skills over upstream equivalents when both exist; the user's explicit instructions take precedence over skill guidance. If a skill causes a pause or leaves requested work unfinished, link to the exact skill file, quote the relevant instruction, and distinguish its requirement from your interpretation. Do not infer an approval requirement from a guideline.
 - Workflow-style skills are opt-in: use them only when the user explicitly requests that workflow or a repo instruction requires it. This includes aliases and indirect calls from other skills; ordinary brainstorming or implementation requests do not opt in. Keep skill metadata tool-agnostic unless a tool explicitly consumes a field.
+- When a configured Jev/TypeSafe API key and a relevant installed skill (such as `typesafe-ai` or `jevify`) are available, load the skill and proactively use Jev for suitable bounded semantic decisions: triage, agent/tool routing, ranking, context selection, classification, and evidence checks. This is standing opt-in to those skills and routine inference within existing data permissions and budget limits. Prefer it when it improves total cost or speed at the required quality.
+- Check key availability without exposing it; follow current skill guidance and send only task-relevant data permitted for that service. Batch independent judgments and reuse results while evidence and criteria hold. Keep exact rules, arithmetic, permissions, and execution deterministic. Jev output is evidence, not authorization or proof; the main model retains final responsibility. Fall back to available models/tools for uncertainty, missing evidence, or unavailable key, skill, or service, without treating failure as a negative answer or claiming Jev ran.
 
 ## Verification
 - Plan steps as `1. action -> verify: check`.
@@ -87,13 +89,11 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 
 <!-- optional:subagents -->
 ## Delegation
-- Dispatch specialized subagents when they exist: `explorer` for wide multi-file investigation, `researcher` for external docs, `verifier` when check output would flood the context (full suites, builds), `reviewer` before merge, `planner` for multi-file work, `builder` for bounded edits to named files. Run short checks and small lookups inline.
-- Keep work you can finish in a handful of tool calls inline. Use one agent for a single bounded task; use a small group within available concurrency limits when independent tasks can run in parallel and improve time or quality. The root owns synthesis. Keep working while subagents run; intervene when one drifts or lacks context.
-- Task prompts are self-contained: paths, expected output shape, and verification commands. Subagents see no conversation history.
-- The root owns write allocation: never two builders on overlapping files, and subagents do not spawn subagents.
-- Cheap tiers execute; the root decides scope and escalates only after a cheaper run failed with evidence.
+- Delegate by default whenever a bounded task can be handed off usefully. Actively look for research, investigation, implementation, testing, and review to assign; use specialized roles when available: `explorer`, `researcher`, `builder`, `verifier`, `reviewer`, and `planner`. The main model owns decomposition, priorities, architecture, tradeoffs, integration, and the final answer.
+- Maximize useful delegation, not agent count. Batch related small tasks into one assignment; keep trivial actions inline when dispatch and context transfer would cost more than doing them. Parallelize independent work within concurrency and budget limits; avoid duplicate investigations, speculative fan-out, and competing edits. Keep useful coordination or independent work moving while workers run.
+- Give each worker scope, owned files, relevant context, expected output, and verification commands. Prefer fresh minimal context over full-history forks when supported; never assume inherited history. Request concise findings and check evidence. Workers share the workspace and must preserve others' edits. The root owns write allocation: never two builders on overlapping files, and subagents do not spawn subagents. Reuse workers for related follow-ups when supported; redirect or stop work that drifts.
+- Check worker evidence and integrate results without redoing their entire task. Escalate model or effort when needed, and retain responsibility for correctness and completion. When delegation is unavailable, perform the work directly and report material limits honestly.
 <!-- /optional:subagents -->
-
 ## Scope
 - Keep global rules concise. Put project-specific conventions in repo-local files. At task completion, suggest the project-context consolidation workflow once only when durable discoveries or instruction/memory drift warrant it; do not run it without user authorization. When requested, load the installed skill or the workflow path supplied by local configuration.
 - Do only what was asked or clearly implied. Avoid speculative abstractions and dependency creep. Prefer CLI paths over GUI suggestions.

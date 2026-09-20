@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [2.3.0] - 2026-09-20
+
+### Changed
+
+- Delegate bounded work by default, with the main model coordinating decisions, integration, and
+  verification. Batch small tasks and keep trivial actions inline when delegation adds cost.
+- Choose model and reasoning effort per task, accounting for context, retries, and verification costs.
+- Use Jev/TypeSafe for suitable bounded decisions when a configured API key and relevant installed
+  skill are available, with fallback when access, evidence, or service reliability is insufficient.
+
 ## [2.2.0] - 2026-09-17
 
 ### Changed
