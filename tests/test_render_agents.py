@@ -936,3 +936,8 @@ def test_omp_agent_dir_follows_profile(tmp_path):
     assert ra.agent_target_dir("omp", home=tmp_path, env=env) == tmp_path / ".omp" / "profiles" / "work" / "agent" / "agents"
     explicit = dict(env, OMP_AGENTS_DIR=str(tmp_path / "explicit"))
     assert ra.agent_target_dir("omp", home=tmp_path, env=explicit) == tmp_path / "explicit"
+
+
+def test_omp_agent_dir_follows_pi_config_dir(tmp_path):
+    env = {"PI_CONFIG_DIR": ".omp-alt", "PI_CODING_AGENT_DIR": str(tmp_path / "custom")}
+    assert ra.agent_target_dir("omp", home=tmp_path, env=env) == tmp_path / ".omp-alt" / "agent" / "agents"

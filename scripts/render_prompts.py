@@ -201,25 +201,34 @@ def omp_profile(env: dict[str, str] | os._Environ[str]) -> str | None:
     return name
 
 
+def omp_config_root(home: str | Path | None, env: dict[str, str] | os._Environ[str]) -> Path:
+    """omp builds every path from $HOME/$PI_CONFIG_DIR, defaulting to ~/.omp."""
+    home_path = Path.home() if home is None else Path(home)
+    return home_path / (env.get("PI_CONFIG_DIR") or ".omp")
+
+
 def omp_profile_agent_dir(home: str | Path | None, env: dict[str, str] | os._Environ[str]) -> Path | None:
     """A named profile moves omp's agent dir, taking precedence over PI_CODING_AGENT_DIR."""
     profile = omp_profile(env)
     if profile is None:
         return None
-    home_path = Path.home() if home is None else Path(home)
-    return home_path / ".omp" / "profiles" / profile / "agent"
+    return omp_config_root(home, env) / "profiles" / profile / "agent"
+
+
+def omp_agent_dir(home: str | Path | None, env: dict[str, str] | os._Environ[str]) -> Path:
+    """Agent dir from HOME and profile only; omp task agents ignore PI_CODING_AGENT_DIR."""
+    return omp_profile_agent_dir(home, env) or omp_config_root(home, env) / "agent"
 
 
 def omp_is_profile_derived(home: str | Path | None, env: dict[str, str] | os._Environ[str], agent_dir: str) -> bool:
-    """omp ignores a PI_CODING_AGENT_DIR that a parent's profile switch propagated (PI_PROFILE's agent dir)."""
+    """omp ignores a PI_CODING_AGENT_DIR equal to PI_PROFILE's agent dir (raw string match, as omp does)."""
     try:
         legacy = omp_profile({"PI_PROFILE": env.get("PI_PROFILE", "")})
     except SystemExit:
         return False
     if legacy is None:
         return False
-    home_path = Path.home() if home is None else Path(home)
-    return Path(agent_dir).expanduser() == home_path / ".omp" / "profiles" / legacy / "agent"
+    return agent_dir == str(omp_config_root(home, env) / "profiles" / legacy / "agent")
 
 
 def target_path(harness: str, home: str | Path | None = None, env: dict[str, str] | None = None) -> Path | None:
@@ -238,6 +247,9 @@ def target_path(harness: str, home: str | Path | None = None, env: dict[str, str
 
     if native_dir:
         return Path(native_dir).expanduser() / item.native_filename
+
+    if harness == "omp":
+        return omp_agent_dir(home, values) / item.native_filename
 
     if item.target_template is None:
         return None

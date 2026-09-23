@@ -18,7 +18,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from render_invariants import read_invariants
-from render_prompts import backup_existing, omp_profile_agent_dir
+from render_prompts import backup_existing, omp_agent_dir
 
 
 TIERS = ("cheap", "mid", "flagship", "apex")
@@ -631,9 +631,7 @@ def agent_target_dir(harness: str, home: Path | None = None, env: dict[str, str]
     if values.get(env_var):
         return Path(values[env_var]).expanduser()
     if harness == "omp":
-        profile_dir = omp_profile_agent_dir(home, values)
-        if profile_dir is not None:
-            return profile_dir / "agents"
+        return omp_agent_dir(home, values) / "agents"
     home_path = Path.home() if home is None else Path(home)
     return Path(template.format(home=home_path)).expanduser()
 

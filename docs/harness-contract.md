@@ -87,7 +87,8 @@ pattern (`medium`), or it is not vendored (`n/a`).
 - Global rules `~/.omp/agent/AGENTS.md` (`<agentDir>/AGENTS.md`); `agentDir` defaults to
   `~/.omp/agent` and follows `PI_CODING_AGENT_DIR`. Named profiles (`--profile`, `OMP_PROFILE`) move it
   to `~/.omp/profiles/<name>/agent` and win over `PI_CODING_AGENT_DIR`; the renderers follow the same order
-  (`OMP_AGENTS_PATH`/`OMP_AGENTS_DIR`, then the profile, then `PI_CODING_AGENT_DIR` for the rules file).
+  (`OMP_AGENTS_PATH`/`OMP_AGENTS_DIR`, then the profile, then `PI_CODING_AGENT_DIR` for the rules file,
+  ignoring a value that a parent's profile switch left behind). `PI_CONFIG_DIR` renames `~/.omp` for every path.
 - Also reads cross-harness user files `~/.agent/AGENTS.md` and `~/.agents/AGENTS.md`; `~/.claude` user
   sources only when opted in (`skills.enableClaudeUser`).
 - Project context priority: `.omp/AGENTS.md` (from the nearest non-empty `.omp` dir; a nearer settings-only `.omp` hides a parent's) > `.claude/CLAUDE.md` >

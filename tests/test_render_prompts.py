@@ -924,3 +924,18 @@ def test_omp_ignores_profile_derived_agent_dir_in_default_mode(tmp_path):
 def test_omp_keeps_unrelated_agent_dir_in_default_mode(tmp_path):
     env = {"OMP_PROFILE": "", "PI_PROFILE": "work", "PI_CODING_AGENT_DIR": str(tmp_path / "custom")}
     assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / "custom" / "AGENTS.md"
+
+
+def test_omp_paths_follow_pi_config_dir(tmp_path):
+    env = {"PI_CONFIG_DIR": ".omp-alt"}
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / ".omp-alt" / "agent" / "AGENTS.md"
+    env["OMP_PROFILE"] = "work"
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / ".omp-alt" / "profiles" / "work" / "agent" / "AGENTS.md"
+
+
+def test_omp_profile_derived_match_is_exact(tmp_path):
+    derived = str(tmp_path / ".omp-alt" / "profiles" / "work" / "agent")
+    env = {"PI_CONFIG_DIR": ".omp-alt", "PI_PROFILE": "work", "OMP_PROFILE": "", "PI_CODING_AGENT_DIR": derived}
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / ".omp-alt" / "agent" / "AGENTS.md"
+    env["PI_CODING_AGENT_DIR"] = derived + "/"
+    assert renderer.target_path("omp", home=tmp_path, env=env) == Path(derived) / "AGENTS.md"
