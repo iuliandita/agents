@@ -242,6 +242,13 @@ def test_resolve_apex_fallback_carries_flagship_effort():
     assert any("using flagship" in notice for notice in resolved.notices)
 
 
+def test_resolve_apex_fallback_keeps_effort_of_inheriting_flagship():
+    overrides = {"opencode": {"tiers": {"flagship": {"model": None, "effort": "max"}}, "effort_map": {"max": "max"}}}
+    resolved = ra.resolve(spec(tier="apex", effort="medium"), "opencode", overrides, DEFAULTS)
+    assert resolved.model is None
+    assert resolved.effort == "max"
+
+
 def test_resolve_explicit_null_apex_inherits_without_fallback():
     overrides = {"opencode": {"tiers": dict(SINGLE_MODEL["opencode"]["tiers"], apex=None)}}
     resolved = ra.resolve(spec(tier="apex", effort="medium"), "opencode", overrides, DEFAULTS)

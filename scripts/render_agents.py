@@ -319,7 +319,8 @@ def resolve(spec: AgentSpec, harness: str, overrides: dict, defaults: dict) -> R
         # An explicit null means "inherit the session model"; it is not a missing
         # entry, so no flagship fallback applies.
         entry_value = tiers[tier]
-    elif tier == "apex" and tier_model(tiers.get("flagship")) is not None:
+    elif tier == "apex" and tiers.get("flagship") is not None:
+        # A flagship object with a null model still carries its effort.
         entry_value = tiers["flagship"]
         notices.append(
             f"{harness}/{spec.name}: no apex model configured; using flagship '{tier_model(entry_value)}'"
