@@ -205,6 +205,8 @@ Existing `shell_ro_wrappers` settings are accepted for compatibility but no long
 
 Model tiers and effort maps come from the tracked `prompts/models.json`; `prompts/models.local.json` overrides them. Copy `prompts/models.local.example.json` to start. A harness with no tier map fails unless `--allow-inherit` is passed.
 
+A tier value is a model string, `null` (inherit the session model), or an object `{"model": "<id or null>", "effort": "<level>"}`. The object form is for single-model setups: point every tier at the same model and let the tier set the depth. Effort resolves in this order: `agents.<name>.effort` in the override file, then the tier's `effort`, then the role's own `effort`; `effort_map` then translates the level into the harness's vocabulary. A tier in `models.local.json` replaces the whole default entry, so a plain string there drops a default tier effort. A missing `apex` falls back to `flagship`, effort included; an explicit `"apex": null` inherits instead. Tier objects and the `max` level need this version or later; older checkouts reject them.
+
 ## Project Instructions: Shared Or Private
 
 Choose per project. The default private-only layout keeps `AGENTS.md` and its

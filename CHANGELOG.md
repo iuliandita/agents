@@ -3,6 +3,24 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [Unreleased]
+
+### Added
+
+- `max` effort level for roles, overrides, and effort maps.
+- Tier entries can carry an effort: `{"model": "...", "effort": "..."}`. A harness that runs one model on
+  every tier (for example DeepSeek V4.1 Flash) now varies depth by tier. Precedence is per-agent override,
+  then tier, then role. `models.local.json` files that use tier objects or `max` fail on older checkouts.
+
+### Changed
+
+- Claude Code cheap tier is Sonnet 5 at `low` effort; Haiku 4.5 has no effort control and is near retirement.
+  Claude notes describe Opus 5.5 with its `medium` default and Fable 5.1 as apex only.
+- Codex tiers move to GPT-6: Luna (cheap), Sol (mid and flagship, split by effort), Astra (apex).
+- OpenCode cheap tier is DeepSeek V4.1 Flash; Command Code defaults use its own model IDs
+  (`deepseek/deepseek-v4.1-flash`, `claude-sonnet-5`, `claude-opus-5-5`) instead of stale OpenRouter IDs.
+- Claude notes cover the `AGENTS.md` fallback and the `"attribution": false` setting.
+
 ## [2.3.0] - 2026-09-20
 
 ### Changed
