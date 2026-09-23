@@ -22,7 +22,7 @@ from render_prompts import backup_existing
 
 
 TIERS = ("cheap", "mid", "flagship", "apex")
-EFFORTS = ("low", "medium", "high", "xhigh")
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
 TOOLS = ("read", "search", "edit", "write", "shell", "shell-ro", "web")
 WRITE_TOOLS = frozenset({"edit", "write", "shell"})
 REQUIRED_KEYS = ("name", "description", "tier", "effort", "tools")
@@ -173,6 +173,9 @@ MODELS_PATH = ("prompts", "models.json")
 MODELS_LOCAL_PATH = ("prompts", "models.local.json")
 OVERRIDE_KEYS = frozenset({"tiers", "agents", "effort_key", "effort_map", "shell_ro_wrappers"})
 AGENT_OVERRIDE_KEYS = frozenset({"tier", "effort"})
+# A tier maps to a model string, null (inherit), or {"model": ..., "effort": ...}. The object
+# form lets a single-model harness vary effort by tier instead of by model.
+TIER_OBJECT_KEYS = frozenset({"model", "effort"})
 
 
 @dataclass(frozen=True)
@@ -198,17 +201,26 @@ def validate_overrides(data: object, source: Path) -> dict:
         tiers = entry.get("tiers", {})
         if not isinstance(tiers, dict):
             raise SystemExit(f"{label}: '{harness}.tiers' must be an object")
-        for tier, model in tiers.items():
+        for tier, value in tiers.items():
             if tier not in TIERS:
                 raise SystemExit(f"{label}: '{harness}.tiers.{tier}' is not a tier")
+            where = f"{label}: '{harness}.tiers.{tier}'"
+            model = value
+            if isinstance(value, dict):
+                unknown = set(value) - TIER_OBJECT_KEYS
+                if unknown:
+                    raise SystemExit(f"{where} has unknown keys {sorted(unknown)}; allowed: {sorted(TIER_OBJECT_KEYS)}")
+                if "model" not in value:
+                    raise SystemExit(f"{where} object needs a 'model' key (null inherits the session model)")
+                if "effort" in value and value["effort"] not in EFFORTS:
+                    raise SystemExit(f"{where}.effort = {value['effort']!r} is not one of {', '.join(EFFORTS)}")
+                model = value["model"]
             if model is None:
                 continue
             if not isinstance(model, str) or not model:
-                raise SystemExit(f"{label}: '{harness}.tiers.{tier}' must be a non-empty string")
+                raise SystemExit(f"{where} must be a non-empty string, null, or an object with 'model'")
             if not MODEL_RE.match(model):
-                raise SystemExit(
-                    f"{label}: '{harness}.tiers.{tier}' has characters outside {MODEL_RE.pattern}"
-                )
+                raise SystemExit(f"{where} has characters outside {MODEL_RE.pattern}")
         agents = entry.get("agents", {})
         if not isinstance(agents, dict):
             raise SystemExit(f"{label}: '{harness}.agents' must be an object")
@@ -281,6 +293,12 @@ def check_override_agents(overrides: dict, specs: list[AgentSpec]) -> None:
                 )
 
 
+def tier_model(value: object) -> str | None:
+    if isinstance(value, dict):
+        return value.get("model")
+    return value  # type: ignore[return-value]
+
+
 def resolve(spec: AgentSpec, harness: str, overrides: dict, defaults: dict) -> Resolved:
     default_entry = defaults.get(harness, {})
     entry = overrides.get(harness, {})
@@ -296,17 +314,22 @@ def resolve(spec: AgentSpec, harness: str, overrides: dict, defaults: dict) -> R
     # leaves effort_key unset; the renderer omits effort for it.
 
     notices: list[str] = []
+    entry_value: object = None
     if tier in tiers:
         # An explicit null means "inherit the session model"; it is not a missing
         # entry, so no flagship fallback applies.
-        model = tiers[tier]
-    else:
-        model = None
-        if tier == "apex" and tiers.get("flagship") is not None:
-            model = tiers["flagship"]
-            notices.append(f"{harness}/{spec.name}: no apex model configured; using flagship '{model}'")
-        elif tiers:
-            notices.append(f"{harness}/{spec.name}: no {tier} model configured; inheriting the session model")
+        entry_value = tiers[tier]
+    elif tier == "apex" and tier_model(tiers.get("flagship")) is not None:
+        entry_value = tiers["flagship"]
+        notices.append(
+            f"{harness}/{spec.name}: no apex model configured; using flagship '{tier_model(entry_value)}'"
+        )
+    elif tiers:
+        notices.append(f"{harness}/{spec.name}: no {tier} model configured; inheriting the session model")
+    model = tier_model(entry_value)
+    # Precedence: per-agent override > tier entry > role source.
+    if "effort" not in per_agent and isinstance(entry_value, dict) and "effort" in entry_value:
+        effort_level = entry_value["effort"]
     effort = effort_map.get(effort_level, effort_level)
     if spec.name in SHADOWED_NAMES.get(harness, frozenset()):
         notices.append(f"{harness}/{spec.name}: shadows the built-in agent of the same name")

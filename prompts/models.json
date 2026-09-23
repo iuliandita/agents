@@ -5,10 +5,14 @@
       "low": "low",
       "medium": "medium",
       "high": "high",
-      "xhigh": "xhigh"
+      "xhigh": "xhigh",
+      "max": "max"
     },
     "tiers": {
-      "cheap": "haiku",
+      "cheap": {
+        "model": "sonnet",
+        "effort": "low"
+      },
       "mid": "sonnet",
       "flagship": "opus",
       "apex": "fable"
@@ -20,12 +24,13 @@
       "low": "low",
       "medium": "medium",
       "high": "high",
-      "xhigh": "xhigh"
+      "xhigh": "xhigh",
+      "max": "max"
     },
     "tiers": {
-      "cheap": "gpt-5.6-luna",
-      "mid": "gpt-5.6-terra",
-      "flagship": "gpt-5.6-sol",
+      "cheap": "gpt-6-luna",
+      "mid": "gpt-6-sol",
+      "flagship": "gpt-6-sol",
       "apex": "gpt-6-astra"
     }
   },
@@ -35,7 +40,8 @@
       "low": "low",
       "medium": "medium",
       "high": "high",
-      "xhigh": "high"
+      "xhigh": "high",
+      "max": "high"
     },
     "tiers": {
       "cheap": "opencode-go/deepseek-v4.1-flash",
@@ -49,12 +55,13 @@
       "low": "low",
       "medium": "medium",
       "high": "high",
-      "xhigh": "high"
+      "xhigh": "high",
+      "max": "high"
     },
     "tiers": {
-      "cheap": "openrouter/deepseek/deepseek-v4-flash",
-      "mid": "ollama/qwen3.6-plus",
-      "flagship": "openrouter/anthropic/claude-opus-5"
+      "cheap": "deepseek/deepseek-v4.1-flash",
+      "mid": "claude-sonnet-5",
+      "flagship": "claude-opus-5-5"
     }
   },
   "antigravity": {

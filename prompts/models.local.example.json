@@ -11,18 +11,21 @@
   },
   "opencode": {
     "effort_key": "reasoningEffort",
-    "effort_map": {"xhigh": "high"},
+    "effort_map": {"low": "low", "medium": "high", "high": "high", "xhigh": "max", "max": "max"},
     "tiers": {
-      "cheap": "opencode-go/deepseek-v4.1-flash",
-      "mid": "opencode-go/glm-5.3",
-      "flagship": "opencode-go/kimi-k3"
+      "cheap": {"model": "opencode-go/deepseek-v4.1-flash", "effort": "low"},
+      "mid": {"model": "opencode-go/deepseek-v4.1-flash", "effort": "high"},
+      "flagship": {"model": "opencode-go/deepseek-v4.1-flash", "effort": "max"}
+    },
+    "agents": {
+      "verifier": {"effort": "low"}
     }
   },
   "commandcode": {
     "tiers": {
-      "cheap": "openrouter/deepseek/deepseek-v4-flash",
-      "mid": "ollama/qwen3.6-plus",
-      "flagship": "openrouter/anthropic/claude-opus-5"
+      "cheap": "deepseek/deepseek-v4.1-flash",
+      "mid": "z-ai/glm-5.3-flash",
+      "flagship": "moonshotai/kimi-k3"
     }
   }
 }

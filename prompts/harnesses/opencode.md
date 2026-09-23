@@ -3,6 +3,7 @@
 - Same paths on macOS; on Windows run under WSL (recommended) or use `%USERPROFILE%\.config\opencode`. A WSL install reads the WSL home, separate from native Windows.
 - Non-interactive: `opencode run`; add `--format json` or `--continue` for pipelines. List models with `opencode models` and agents with `opencode agent list`.
 - Model and effort IDs live in `prompts/models.json` (`reasoningEffort` per agent). Routed and self-hosted providers ignore unsupported levels, so confirm the resolved model in the session header before trusting a tier.
+- On a single-model setup (for example DeepSeek V4.1 Flash on every tier, which accepts `low`, `high`, and `max`), tiers differ by effort, not model. The v2 runner may keep frontmatter effort without sending it, so confirm in the session before relying on a role's effort.
 - Skills are native, no plugin required. Discovery spans global `~/.claude/skills`, `~/.agents/skills`, and `~/.config/opencode/skills`, then project `.claude/skills`, `.agents/skills`, and `.opencode/skills` searched upward from CWD, with later sources winning.
 - Subagents are markdown in `agents/`; invoke with `@name` or the Task tool. Deny `task` in a subagent to stop nested delegation.
 - Permissions use `permission:` keys (`read`, `edit`, `bash`, `task`, `todowrite`, `webfetch`, `websearch`, `external_directory`, `lsp`, `skill`, `question`); unlisted custom and MCP tools fall back to global config, so a read-only role needs an explicit deny-all before its allowances.

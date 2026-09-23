@@ -268,11 +268,13 @@ def test_vendor_harnesses_define_model_ladders():
     claude = (repo / "prompts" / "harnesses" / "claude.md").read_text(encoding="utf-8")
     codex = (repo / "prompts" / "harnesses" / "codex.md").read_text(encoding="utf-8")
 
-    assert "Haiku = lower cost/fast" in claude
-    assert "Sonnet = balanced default" in claude
-    assert "Fable = tier above Opus" in claude
-    assert "Luna-class) = lower cost" in codex
-    assert "flagship (Sol-class" in codex
+    assert "Sonnet 5 at `low` = cheap tier" in claude
+    assert "`medium` as its default effort" in claude
+    assert "Fable 5.1 = apex" in claude
+    assert "Haiku 4.5 has no effort control" in claude
+    assert "GPT-6 Luna = cheap tier" in codex
+    assert "GPT-6 Sol = balanced and flagship" in codex
+    assert "GPT-6 Astra = apex" in codex
     assert "do not freeze stale names" in codex
 
 
@@ -322,9 +324,10 @@ def test_fragments_track_fable_5_1_and_current_cli_defaults():
     assert "do not promote scratch checks to permanent test files" in core
     assert "a plan, or a promise about work not yet done" in core
 
-    assert "the default `high` fits most work on Fable 5.1 and Opus 5" in claude
+    assert "`xhigh` and `max` earn their cost only on measured quality gains" in claude
+    assert '"attribution": false' in claude
     assert "safeguard false positives" in claude
-    assert "When migrating to Astra, preserve effective effort initially" in codex
+    assert "Astra accepts `low` through `max`" in codex
     assert "do not assume API and app effort ranges match" in codex
     assert "/effort xhigh" not in claude
     assert "--restricted" in claude

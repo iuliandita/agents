@@ -192,6 +192,97 @@ def test_resolve_applies_tier_and_agent_overrides():
     assert resolved.effort == "medium"
 
 
+def test_resolve_claude_cheap_tier_forces_low_effort():
+    resolved = ra.resolve(spec(tier="cheap", effort="medium"), "claude", {}, DEFAULTS)
+    assert resolved.model == "sonnet"
+    assert resolved.effort == "low"
+
+
+FLASH = "opencode-go/deepseek-v4.1-flash"
+SINGLE_MODEL = {
+    "opencode": {
+        "tiers": {
+            "cheap": {"model": FLASH, "effort": "low"},
+            "mid": {"model": FLASH},
+            "flagship": {"model": FLASH, "effort": "max"},
+        },
+        "effort_map": {"max": "max"},
+    }
+}
+
+
+def test_resolve_tier_effort_overrides_role_effort():
+    resolved = ra.resolve(spec(tier="flagship", effort="high"), "opencode", SINGLE_MODEL, DEFAULTS)
+    assert resolved.model == FLASH
+    assert resolved.effort == "max"
+
+
+def test_resolve_tier_object_without_effort_keeps_role_effort():
+    resolved = ra.resolve(spec(tier="mid", effort="medium"), "opencode", SINGLE_MODEL, DEFAULTS)
+    assert resolved.model == FLASH
+    assert resolved.effort == "medium"
+
+
+def test_resolve_agent_effort_beats_tier_effort():
+    overrides = {"opencode": dict(SINGLE_MODEL["opencode"], agents={"sample": {"effort": "low"}})}
+    resolved = ra.resolve(spec(tier="flagship", effort="high"), "opencode", overrides, DEFAULTS)
+    assert resolved.effort == "low"
+
+
+def test_resolve_agent_tier_override_uses_destination_tier_effort():
+    overrides = {"opencode": dict(SINGLE_MODEL["opencode"], agents={"sample": {"tier": "cheap"}})}
+    resolved = ra.resolve(spec(tier="flagship", effort="high"), "opencode", overrides, DEFAULTS)
+    assert resolved.effort == "low"
+
+
+def test_resolve_apex_fallback_carries_flagship_effort():
+    resolved = ra.resolve(spec(tier="apex", effort="medium"), "opencode", SINGLE_MODEL, DEFAULTS)
+    assert resolved.model == FLASH
+    assert resolved.effort == "max"
+    assert any("using flagship" in notice for notice in resolved.notices)
+
+
+def test_resolve_explicit_null_apex_inherits_without_fallback():
+    overrides = {"opencode": {"tiers": dict(SINGLE_MODEL["opencode"]["tiers"], apex=None)}}
+    resolved = ra.resolve(spec(tier="apex", effort="medium"), "opencode", overrides, DEFAULTS)
+    assert resolved.model is None
+    assert resolved.effort == "medium"
+    assert resolved.notices == []
+
+
+def test_resolve_string_override_replaces_whole_tier_object():
+    overrides = {"claude": {"tiers": {"cheap": "haiku"}}}
+    resolved = ra.resolve(spec(tier="cheap", effort="medium"), "claude", overrides, DEFAULTS)
+    assert resolved.model == "haiku"
+    assert resolved.effort == "medium"
+
+
+@pytest.mark.parametrize(("harness", "expected"), [("claude", "max"), ("codex", "max"), ("opencode", "high")])
+def test_resolve_maps_max_effort(harness, expected):
+    resolved = ra.resolve(spec(tier="mid", effort="max"), harness, {}, DEFAULTS)
+    assert resolved.effort == expected
+
+
+def test_load_agent_accepts_max_effort(tmp_path):
+    loaded = ra.load_agent(write_agent(tmp_path / "sample.md", effort="max"))
+    assert loaded.effort == "max"
+
+
+@pytest.mark.parametrize(
+    ("tier_value", "message"),
+    [
+        ({"model": "x", "colour": "red"}, "unknown keys"),
+        ({"effort": "low"}, "needs a 'model' key"),
+        ({"model": "x", "effort": "turbo"}, "is not one of"),
+        ({"model": 5}, "must be a non-empty string"),
+        ({"model": "bad model"}, "characters outside"),
+    ],
+)
+def test_validate_overrides_rejects_bad_tier_objects(tier_value, message):
+    with pytest.raises(SystemExit, match=message):
+        ra.validate_overrides({"opencode": {"tiers": {"cheap": tier_value}}}, Path("models.local.json"))
+
+
 @pytest.mark.parametrize(
     "payload",
     [
@@ -236,7 +327,7 @@ def test_render_claude_frontmatter_and_body():
         "name": "sample",
         "description": "Sample.",
         "tools": "Read, Grep, Glob",
-        "model": "haiku",
+        "model": "sonnet",
         "effort": "low",
         "maxTurns": "30",
     }
@@ -255,7 +346,7 @@ def test_render_codex_is_valid_toml_with_sandbox():
     read_only = ra.render_codex(spec(tools=("read", "search", "shell-ro")), ra.resolve(spec(), "codex", {}, DEFAULTS), INVARIANTS)
     data = tomllib.loads(read_only)
     assert data["name"] == "sample"
-    assert data["model"] == "gpt-5.6-luna"
+    assert data["model"] == "gpt-6-luna"
     assert data["model_reasoning_effort"] == "low"
     assert data["sandbox_mode"] == "read-only"
     assert "fork_turns" not in data
@@ -355,7 +446,7 @@ def test_render_commandcode_tools_list():
     assert fields["tools"] == "read_file, read_directory, grep, glob, web_fetch, web_search"
     assert fields["reasoningEffort"] == "low"
     assert fields["maxTurns"] == "30"
-    assert fields["model"] == "openrouter/deepseek/deepseek-v4-flash"
+    assert fields["model"] == "deepseek/deepseek-v4.1-flash"
     assert ra.GENERATED_MARKER in body
 
 
