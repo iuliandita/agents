@@ -204,7 +204,8 @@ def omp_profile(env: dict[str, str] | os._Environ[str]) -> str | None:
 def omp_config_root(home: str | Path | None, env: dict[str, str] | os._Environ[str]) -> Path:
     """omp builds every path from $HOME/$PI_CONFIG_DIR, defaulting to ~/.omp."""
     home_path = Path.home() if home is None else Path(home)
-    return home_path / (env.get("PI_CONFIG_DIR") or ".omp")
+    # Node's path.join appends an absolute PI_CONFIG_DIR under HOME; pathlib would replace it.
+    return home_path / (env.get("PI_CONFIG_DIR") or ".omp").lstrip("/\\")
 
 
 def omp_profile_agent_dir(home: str | Path | None, env: dict[str, str] | os._Environ[str]) -> Path | None:

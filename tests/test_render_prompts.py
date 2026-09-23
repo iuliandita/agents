@@ -939,3 +939,8 @@ def test_omp_profile_derived_match_is_exact(tmp_path):
     assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / ".omp-alt" / "agent" / "AGENTS.md"
     env["PI_CODING_AGENT_DIR"] = derived + "/"
     assert renderer.target_path("omp", home=tmp_path, env=env) == Path(derived) / "AGENTS.md"
+
+
+def test_omp_absolute_pi_config_dir_stays_under_home(tmp_path):
+    env = {"PI_CONFIG_DIR": "/srv/omp"}
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / "srv" / "omp" / "agent" / "AGENTS.md"
