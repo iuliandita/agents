@@ -911,3 +911,16 @@ def test_omp_explicit_path_beats_profile(tmp_path):
 def test_omp_invalid_profile_fails_loud(tmp_path, name):
     with pytest.raises(SystemExit, match="Invalid omp profile"):
         renderer.target_path("omp", home=tmp_path, env={"OMP_PROFILE": name})
+
+
+def test_omp_ignores_profile_derived_agent_dir_in_default_mode(tmp_path):
+    derived = str(tmp_path / ".omp" / "profiles" / "work" / "agent")
+    env = {"OMP_PROFILE": "", "PI_PROFILE": "work", "PI_CODING_AGENT_DIR": derived}
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / ".omp" / "agent" / "AGENTS.md"
+    env["OMP_PROFILE"] = "default"
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / ".omp" / "agent" / "AGENTS.md"
+
+
+def test_omp_keeps_unrelated_agent_dir_in_default_mode(tmp_path):
+    env = {"OMP_PROFILE": "", "PI_PROFILE": "work", "PI_CODING_AGENT_DIR": str(tmp_path / "custom")}
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / "custom" / "AGENTS.md"

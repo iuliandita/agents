@@ -210,19 +210,34 @@ def omp_profile_agent_dir(home: str | Path | None, env: dict[str, str] | os._Env
     return home_path / ".omp" / "profiles" / profile / "agent"
 
 
+def omp_is_profile_derived(home: str | Path | None, env: dict[str, str] | os._Environ[str], agent_dir: str) -> bool:
+    """omp ignores a PI_CODING_AGENT_DIR that a parent's profile switch propagated (PI_PROFILE's agent dir)."""
+    try:
+        legacy = omp_profile({"PI_PROFILE": env.get("PI_PROFILE", "")})
+    except SystemExit:
+        return False
+    if legacy is None:
+        return False
+    home_path = Path.home() if home is None else Path(home)
+    return Path(agent_dir).expanduser() == home_path / ".omp" / "profiles" / legacy / "agent"
+
+
 def target_path(harness: str, home: str | Path | None = None, env: dict[str, str] | None = None) -> Path | None:
     item = harness_by_name(harness)
     values = os.environ if env is None else env
     if item.env_var in values and values[item.env_var]:
         return Path(values[item.env_var]).expanduser()
 
+    native_dir = values.get(item.native_env_var) if item.native_env_var else None
     if harness == "omp":
         profile_dir = omp_profile_agent_dir(home, values)
         if profile_dir is not None:
             return profile_dir / item.native_filename
+        if native_dir and omp_is_profile_derived(home, values, native_dir):
+            native_dir = None
 
-    if item.native_env_var and values.get(item.native_env_var):
-        return Path(values[item.native_env_var]).expanduser() / item.native_filename
+    if native_dir:
+        return Path(native_dir).expanduser() / item.native_filename
 
     if item.target_template is None:
         return None
