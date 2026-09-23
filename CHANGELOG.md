@@ -3,11 +3,12 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
-## [Unreleased]
+## [2.4.0] - 2026-09-24
 
 ### Added
 
-- Oh My Pi (`omp`) harness: global rules at `~/.omp/agent/AGENTS.md` (follows `PI_CODING_AGENT_DIR`), and
+- Oh My Pi (`omp`) harness: global rules at `~/.omp/agent/AGENTS.md` (follows named profiles,
+  `PI_CONFIG_DIR`, and `PI_CODING_AGENT_DIR` the way omp resolves them), and
   the six roles as task agents in `~/.omp/agent/agents/` with `@smol`/`@default`/`@slow` role aliases and
   `thinkingLevel`. The rendered `reviewer` replaces omp's bundled one.
 - `max` effort level for roles, overrides, and effort maps.
