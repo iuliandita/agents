@@ -71,5 +71,20 @@
       "flagship": "pro",
       "apex": "pro"
     }
+  },
+  "omp": {
+    "effort_key": "thinkingLevel",
+    "effort_map": {
+      "low": "low",
+      "medium": "medium",
+      "high": "high",
+      "xhigh": "xhigh",
+      "max": "max"
+    },
+    "tiers": {
+      "cheap": "@smol",
+      "mid": "@default",
+      "flagship": "@slow"
+    }
   }
 }

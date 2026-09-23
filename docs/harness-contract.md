@@ -4,8 +4,9 @@ This is the single source of truth for the supported harnesses: global rules pat
 receipts behind the claim. If a harness is not here, the repo does not claim to support it; use the
 generic project-level `AGENTS.md` target instead.
 
-Verified 2026-09-17 against upstream docs. `confidence` reflects whether the vendor documents the path
-directly (`high`), it is inferred from a consistent pattern (`medium`), or it is not vendored (`n/a`).
+Verified 2026-09-17 against upstream docs; omp verified 2026-09-24 from installed source. `confidence`
+reflects whether the vendor documents the path directly (`high`), it is inferred from a consistent
+pattern (`medium`), or it is not vendored (`n/a`).
 
 | Harness | Global rules file | Override | Confidence | Source |
 |---|---|---|---|---|
@@ -15,6 +16,7 @@ directly (`high`), it is inferred from a consistent pattern (`medium`), or it is
 | Command Code | `~/.commandcode/AGENTS.md` (+ `settings.json`) | `COMMANDCODE_AGENTS_PATH` | medium | commandcode.ai/docs/memory |
 | Antigravity | `~/.gemini/GEMINI.md`; workspace `.agents/rules/` | `ANTIGRAVITY_AGENTS_PATH`, none native | high | antigravity.google/docs/rules-workflows/ |
 | Hermes Agent | `agent.coding_instructions` in `$HERMES_HOME/config.yaml`; project `.hermes.md`/`HERMES.md` > `AGENTS.override.md` > `AGENTS.md` | `HERMES_AGENTS_PATH` (project file) | high | hermes-agent.nousresearch.com/docs/user-guide/features/context-files |
+| Oh My Pi | `~/.omp/agent/AGENTS.md` (`<agentDir>/AGENTS.md`, follows `PI_CODING_AGENT_DIR`) | `OMP_AGENTS_PATH`, `PI_CODING_AGENT_DIR` | high | installed omp 18.2.11 source (omp.sh) |
 | Generic | none (project-level `AGENTS.md` only) | `GENERIC_AGENTS_PATH` | n/a | - |
 
 ## Per-harness notes
@@ -81,8 +83,37 @@ directly (`high`), it is inferred from a consistent pattern (`medium`), or it is
 - Global rules are merged with `scripts/render-hermes --deploy`, a comment-preserving line edit that
   sets `agent.coding_instructions` and backs up `config.yaml` first.
 
+### Oh My Pi
+- Global rules `~/.omp/agent/AGENTS.md` (`<agentDir>/AGENTS.md`); `agentDir` defaults to
+  `~/.omp/agent` and follows `PI_CODING_AGENT_DIR`. Named profiles (`--profile`, `OMP_PROFILE`) move it
+  to `~/.omp/profiles/<name>/agent` and win over `PI_CODING_AGENT_DIR`; the renderers follow the same order
+  (`OMP_AGENTS_PATH`/`OMP_AGENTS_DIR`, then the profile, then `PI_CODING_AGENT_DIR` for the rules file,
+  ignoring a value that a parent's profile switch left behind). `PI_CONFIG_DIR` renames `~/.omp` for every path.
+- Also reads cross-harness user files `~/.agent/AGENTS.md` and `~/.agents/AGENTS.md`; `~/.claude` user
+  sources only when opted in (`skills.enableClaudeUser`).
+- Project context priority: `.omp/AGENTS.md` (from the nearest non-empty `.omp` dir; a nearer settings-only `.omp` hides a parent's) > `.claude/CLAUDE.md` >
+  `.agent(s)/AGENTS.md` > standalone `AGENTS.md`/`CLAUDE.md` walked up from cwd.
+- Config `~/.omp/agent/config.yml`, model roles under `modelRoles` (`default`, `smol`, `slow`, plus
+  `task`, `plan`, etc).
+- Task agents: user `~/.omp/agent/agents/*.md`, project `.omp/agents/*.md`; markdown with YAML
+  frontmatter `name`, `description`, `tools`, `model` (`@role` alias or provider/model id),
+  `thinkingLevel`, `spawns`. Precedence project > user > bundled (scout, reviewer, security-reviewer,
+  task, sonic); a user `reviewer` shadows the bundled one. User task agents resolve from HOME
+  (`~/.omp/agent/agents`, or the profile's `agent/agents`) and ignore `PI_CODING_AGENT_DIR`; this repo's
+  override is `OMP_AGENTS_DIR`. `.claude/agents` is not read as omp task
+  agents.
+- Skills `~/.omp/agent/skills`, `.omp/skills`, `~/.agents/skills`/`.agents/skills`; `~/.claude/skills`
+  only when opted in. Hooks `~/.omp/agent/hooks/pre|post` and `.omp/hooks/pre|post`; extensions in
+  `<configDir>/extensions`. No documented invariants-injection channel is wired by this repo (advisory,
+  like OpenCode/Codex).
+- Non-interactive: `omp -p`, `--mode json|rpc`; thinking depth via `--thinking <level>`. Surfaces:
+  CLI/TUI, plus `omp acp` (Agent Client Protocol server) for editors; no desktop app.
+- Linux/macOS `~/.omp/`; Windows native unverified (inferred `%USERPROFILE%\.omp\`); WSL reads the WSL
+  home. Plain `pi` (the upstream project omp forks) stays in `docs/legacy-harnesses.md`.
+
 ## Unverified
 
 - Command Code per-OS home spelling (medium).
 - Antigravity native-Windows config spelling; upstream writes `~/` without a Windows variant.
 - Antigravity global skills path (docs contradict).
+- Oh My Pi native-Windows home spelling; inferred `%USERPROFILE%\.omp\`, not vendor-documented.

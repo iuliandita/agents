@@ -172,6 +172,7 @@ ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/GEMINI.md" scripts/sync-ai-prompts --targ
 | OpenCode | deployable | `~/.config/opencode/AGENTS.md` | Same home-relative path on macOS; on Windows run under WSL or use %USERPROFILE%\.config\opencode. |
 | Command Code | deployable | `~/.commandcode/AGENTS.md` |  |
 | Antigravity | deployable | `~/.gemini/GEMINI.md` | Desktop, IDE, and CLI share ~/.gemini/GEMINI.md; workspace rules live in .agents/rules/ (12k char cap per file). |
+| Oh My Pi | deployable | `~/.omp/agent/AGENTS.md` | Global path follows PI_CODING_AGENT_DIR (default ~/.omp/agent); named profiles use ~/.omp/profiles/<name>/agent. |
 | Hermes Agent | manual | `manual override via HERMES_AGENTS_PATH` | Global rules merge into agent.coding_instructions in $HERMES_HOME/config.yaml; project rules deploy to HERMES.md or AGENTS.override.md via HERMES_AGENTS_PATH. |
 | Generic AGENTS.md | manual | `manual override via GENERIC_AGENTS_PATH` | Project-level AGENTS.md for tools with no verified global rules path; deploy with GENERIC_AGENTS_PATH pointing at a project file. |
 <!-- harness-targets:end -->
@@ -194,12 +195,17 @@ Deployment writes one file per agent into these directories. Override with the e
 | OpenCode | `~/.config/opencode/agents/` | `OPENCODE_AGENTS_DIR` |
 | Command Code | `~/.commandcode/agents/` | `COMMANDCODE_AGENTS_DIR` |
 | Antigravity | `~/.gemini/config/agents/` | `ANTIGRAVITY_AGENTS_DIR` |
+| Oh My Pi | `~/.omp/agent/agents/` | `OMP_AGENTS_DIR` |
+
+Oh My Pi reads task agents from `~/.omp/agent/agents`, or `~/.omp/profiles/<name>/agent/agents` when
+`OMP_PROFILE` (or `PI_PROFILE`) names a profile, even when `PI_CODING_AGENT_DIR` moves its rules file. The
+renderers follow the same profile resolution; `OMP_AGENTS_DIR` overrides it.
 
 Hermes has no per-role prompt file, so its six roles are a manual paste; delegation is configured under `delegation:` in `~/.hermes/config.yaml`.
 
 After a real deploy, `scripts/render-agents --verify` confirms all six role files exist in each harness's agent directory.
 
-`shell-ro` becomes shell access only on Codex, where `sandbox_mode = "read-only"` enforces the boundary. Claude Code, OpenCode, Command Code, and Antigravity omit shell access for those agents and keep their native read and search tools.
+`shell-ro` becomes shell access only on Codex, where `sandbox_mode = "read-only"` enforces the boundary. Claude Code, OpenCode, Command Code, Antigravity, and Oh My Pi omit shell access for those agents and keep their native read and search tools.
 
 Existing `shell_ro_wrappers` settings are accepted for compatibility but no longer grant shell access. Redeploying the agents removes their references to the old `agents-shell-ro-guard.py` hook; the previously deployed hook file is left in place and is unused by the updated agents.
 

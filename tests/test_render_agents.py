@@ -806,6 +806,7 @@ DOCUMENTED_KEYS = {
         "model",
         "commandExecutionPolicy",
     },
+    "omp": {"name", "description", "tools", "model", "thinkingLevel"},
 }
 
 OPENCODE_PERMISSION_KEYS = {
@@ -879,3 +880,64 @@ def test_cli_agent_deploy_requires_target():
     )
     assert result.returncode != 0
     assert "--deploy requires --target" in result.stdout + result.stderr
+
+
+def omp_fields(text):
+    return yaml.safe_load(text.split("---")[1])
+
+
+def test_render_omp_uses_role_alias_and_thinking_level():
+    resolved = ra.resolve(spec(tier="cheap", effort="low", tools=("read", "search", "web")), "omp", {}, DEFAULTS)
+    text = ra.render_omp(spec(tools=("read", "search", "web")), resolved, INVARIANTS)
+    assert 'model: "@smol"' in text
+    fields = omp_fields(text)
+    assert fields == {
+        "name": "sample",
+        "description": "Sample.",
+        "tools": ["read", "grep", "glob", "web_search"],
+        "model": "@smol",
+        "thinkingLevel": "low",
+    }
+    assert ra.GENERATED_MARKER in text
+
+
+def test_render_omp_empty_tool_expansion_stays_restricted():
+    resolved = ra.resolve(spec(), "omp", {}, DEFAULTS)
+    text = ra.render_omp(spec(tools=("shell-ro",)), resolved, INVARIANTS)
+    assert "tools: []" in text
+    assert omp_fields(text)["tools"] == []
+
+
+def test_render_omp_apex_falls_back_to_slow_role_with_max_effort():
+    resolved = ra.resolve(spec(tier="apex", effort="max"), "omp", {}, DEFAULTS)
+    assert resolved.model == "@slow"
+    assert resolved.effort == "max"
+
+
+def test_omp_reviewer_shadow_is_noticed():
+    resolved = ra.resolve(spec(name="reviewer"), "omp", {}, DEFAULTS)
+    assert any("shadows the built-in" in notice for notice in resolved.notices)
+
+
+def test_omp_agent_dir_ignores_pi_coding_agent_dir(tmp_path):
+    native = {"PI_CODING_AGENT_DIR": str(tmp_path / "custom")}
+    assert ra.agent_target_dir("omp", home=tmp_path, env=native) == tmp_path / ".omp" / "agent" / "agents"
+    explicit = dict(native, OMP_AGENTS_DIR=str(tmp_path / "explicit"))
+    assert ra.agent_target_dir("omp", home=tmp_path, env=explicit) == tmp_path / "explicit"
+
+
+def test_model_re_accepts_only_leading_role_alias():
+    assert ra.MODEL_RE.match("@smol")
+    assert not ra.MODEL_RE.match("smol@x")
+
+
+def test_omp_agent_dir_follows_profile(tmp_path):
+    env = {"OMP_PROFILE": "work", "PI_CODING_AGENT_DIR": str(tmp_path / "custom")}
+    assert ra.agent_target_dir("omp", home=tmp_path, env=env) == tmp_path / ".omp" / "profiles" / "work" / "agent" / "agents"
+    explicit = dict(env, OMP_AGENTS_DIR=str(tmp_path / "explicit"))
+    assert ra.agent_target_dir("omp", home=tmp_path, env=explicit) == tmp_path / "explicit"
+
+
+def test_omp_agent_dir_follows_pi_config_dir(tmp_path):
+    env = {"PI_CONFIG_DIR": ".omp-alt", "PI_CODING_AGENT_DIR": str(tmp_path / "custom")}
+    assert ra.agent_target_dir("omp", home=tmp_path, env=env) == tmp_path / ".omp-alt" / "agent" / "agents"

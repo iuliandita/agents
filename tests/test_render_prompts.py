@@ -35,7 +35,7 @@ def test_render_document_places_private_overlay_after_core():
     assert "private.example.md" in rendered
 
 
-def test_harness_catalog_is_the_six_supported_plus_generic():
+def test_harness_catalog_is_the_seven_supported_plus_generic():
     harnesses = set(renderer.harness_names())
 
     assert harnesses == {
@@ -44,6 +44,7 @@ def test_harness_catalog_is_the_six_supported_plus_generic():
         "opencode",
         "commandcode",
         "antigravity",
+        "omp",
         "hermes",
         "generic",
     }
@@ -856,7 +857,7 @@ def test_private_overlay_withheld_except_allowed_harnesses(tmp_path, monkeypatch
     (repo / "prompts" / "harnesses").mkdir(parents=True)
     (repo / "prompts" / "core.md").write_text("# Core\nshared\n", encoding="utf-8")
     (repo / "prompts" / "private.md").write_text("## Private\nlocal only\n", encoding="utf-8")
-    fragments = ("claude", "codex", "opencode", "commandcode", "antigravity", "hermes")
+    fragments = ("claude", "codex", "opencode", "commandcode", "antigravity", "omp", "hermes")
     for name in fragments:
         (repo / "prompts" / "harnesses" / f"{name}.md").write_text(f"## {name}\nx\n", encoding="utf-8")
     (repo / "prompts" / "harnesses" / "AGENTS.md").write_text("## Generic\nx\n", encoding="utf-8")
@@ -865,5 +866,81 @@ def test_private_overlay_withheld_except_allowed_harnesses(tmp_path, monkeypatch
 
     assert "local only" in written["claude"].read_text(encoding="utf-8")
     assert "local only" in written["codex"].read_text(encoding="utf-8")
-    for harness in ("opencode", "commandcode", "antigravity", "hermes"):
+    for harness in ("opencode", "commandcode", "antigravity", "omp", "hermes"):
         assert "local only" not in written[harness].read_text(encoding="utf-8")
+
+
+def test_omp_target_follows_native_agent_dir(tmp_path):
+    assert renderer.target_path("omp", home=tmp_path, env={}) == tmp_path / ".omp" / "agent" / "AGENTS.md"
+    native = {"PI_CODING_AGENT_DIR": str(tmp_path / "custom")}
+    assert renderer.target_path("omp", home=tmp_path, env=native) == tmp_path / "custom" / "AGENTS.md"
+    both = dict(native, OMP_AGENTS_PATH=str(tmp_path / "explicit.md"))
+    assert renderer.target_path("omp", home=tmp_path, env=both) == tmp_path / "explicit.md"
+
+
+def test_omp_fragment_covers_paths_roles_and_agents():
+    repo = Path(__file__).resolve().parents[1]
+    omp = (repo / "prompts" / "harnesses" / "omp.md").read_text(encoding="utf-8")
+    assert "~/.omp/agent/AGENTS.md" in omp
+    assert "PI_CODING_AGENT_DIR" in omp
+    assert "`@smol`" in omp
+    assert "~/.omp/agent/agents/" in omp
+    assert "thinkingLevel" in omp
+
+
+@pytest.mark.parametrize(
+    ("env", "expected"),
+    [
+        ({"OMP_PROFILE": "work"}, Path(".omp/profiles/work/agent/AGENTS.md")),
+        ({"PI_PROFILE": "work"}, Path(".omp/profiles/work/agent/AGENTS.md")),
+        ({"OMP_PROFILE": "", "PI_PROFILE": "work"}, Path(".omp/agent/AGENTS.md")),
+        ({"OMP_PROFILE": "default"}, Path(".omp/agent/AGENTS.md")),
+        ({"OMP_PROFILE": "work", "PI_CODING_AGENT_DIR": "/elsewhere"}, Path(".omp/profiles/work/agent/AGENTS.md")),
+    ],
+)
+def test_omp_target_follows_profile(tmp_path, env, expected):
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / expected
+
+
+def test_omp_explicit_path_beats_profile(tmp_path):
+    env = {"OMP_PROFILE": "work", "OMP_AGENTS_PATH": str(tmp_path / "explicit.md")}
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / "explicit.md"
+
+
+@pytest.mark.parametrize("name", ["Work", "../x", "trailing.", "con"])
+def test_omp_invalid_profile_fails_loud(tmp_path, name):
+    with pytest.raises(SystemExit, match="Invalid omp profile"):
+        renderer.target_path("omp", home=tmp_path, env={"OMP_PROFILE": name})
+
+
+def test_omp_ignores_profile_derived_agent_dir_in_default_mode(tmp_path):
+    derived = str(tmp_path / ".omp" / "profiles" / "work" / "agent")
+    env = {"OMP_PROFILE": "", "PI_PROFILE": "work", "PI_CODING_AGENT_DIR": derived}
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / ".omp" / "agent" / "AGENTS.md"
+    env["OMP_PROFILE"] = "default"
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / ".omp" / "agent" / "AGENTS.md"
+
+
+def test_omp_keeps_unrelated_agent_dir_in_default_mode(tmp_path):
+    env = {"OMP_PROFILE": "", "PI_PROFILE": "work", "PI_CODING_AGENT_DIR": str(tmp_path / "custom")}
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / "custom" / "AGENTS.md"
+
+
+def test_omp_paths_follow_pi_config_dir(tmp_path):
+    env = {"PI_CONFIG_DIR": ".omp-alt"}
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / ".omp-alt" / "agent" / "AGENTS.md"
+    env["OMP_PROFILE"] = "work"
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / ".omp-alt" / "profiles" / "work" / "agent" / "AGENTS.md"
+
+
+def test_omp_profile_derived_match_is_exact(tmp_path):
+    derived = str(tmp_path / ".omp-alt" / "profiles" / "work" / "agent")
+    env = {"PI_CONFIG_DIR": ".omp-alt", "PI_PROFILE": "work", "OMP_PROFILE": "", "PI_CODING_AGENT_DIR": derived}
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / ".omp-alt" / "agent" / "AGENTS.md"
+    env["PI_CODING_AGENT_DIR"] = derived + "/"
+    assert renderer.target_path("omp", home=tmp_path, env=env) == Path(derived) / "AGENTS.md"
+
+
+def test_omp_absolute_pi_config_dir_stays_under_home(tmp_path):
+    env = {"PI_CONFIG_DIR": "/srv/omp"}
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / "srv" / "omp" / "agent" / "AGENTS.md"

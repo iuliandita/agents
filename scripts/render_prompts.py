@@ -36,7 +36,7 @@ class Harness(NamedTuple):
     native_filename: str = ""
 
 
-# Six supported harnesses plus one generic project-level target. Paths, overrides,
+# Seven supported harnesses plus one generic project-level target. Paths, overrides,
 # and verification receipts live in docs/harness-contract.md. Only add a harness
 # here once its rules path is confirmed against upstream docs.
 HARNESSES: tuple[Harness, ...] = (
@@ -102,6 +102,19 @@ HARNESSES: tuple[Harness, ...] = (
         notes="Desktop, IDE, and CLI share ~/.gemini/GEMINI.md; workspace rules live in .agents/rules/ (12k char cap per file).",
         source_url="https://antigravity.google/docs/rules-workflows/",
         verified_on="2026-09-17",
+    ),
+    Harness(
+        "omp",
+        "Oh My Pi",
+        "omp.md",
+        "AGENTS.md",
+        "{home}/.omp/agent/AGENTS.md",
+        "OMP_AGENTS_PATH",
+        notes="Global path follows PI_CODING_AGENT_DIR (default ~/.omp/agent); named profiles use ~/.omp/profiles/<name>/agent.",
+        source_url="https://omp.sh",
+        verified_on="2026-09-24",
+        native_env_var="PI_CODING_AGENT_DIR",
+        native_filename="AGENTS.md",
     ),
     Harness(
         "hermes",
@@ -173,14 +186,71 @@ def selected_harnesses(selected: list[str] | None) -> list[Harness]:
     return [harness_by_name(name) for name in names]
 
 
+OMP_PROFILE_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+WINDOWS_RESERVED_RE = re.compile(r"^(?:CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(?:\..*)?$", re.IGNORECASE)
+
+
+def omp_profile(env: dict[str, str] | os._Environ[str]) -> str | None:
+    """Active omp profile, resolved as omp does: OMP_PROFILE wins even when empty."""
+    raw = env["OMP_PROFILE"] if "OMP_PROFILE" in env else env.get("PI_PROFILE")
+    name = (raw or "").strip()
+    if not name or name == "default":
+        return None
+    if name.endswith(".") or not OMP_PROFILE_RE.match(name) or WINDOWS_RESERVED_RE.match(name):
+        raise SystemExit(f"Invalid omp profile {name!r}; names must match {OMP_PROFILE_RE.pattern}")
+    return name
+
+
+def omp_config_root(home: str | Path | None, env: dict[str, str] | os._Environ[str]) -> Path:
+    """omp builds every path from $HOME/$PI_CONFIG_DIR, defaulting to ~/.omp."""
+    home_path = Path.home() if home is None else Path(home)
+    # Node's path.join appends an absolute PI_CONFIG_DIR under HOME; pathlib would replace it.
+    return home_path / (env.get("PI_CONFIG_DIR") or ".omp").lstrip("/\\")
+
+
+def omp_profile_agent_dir(home: str | Path | None, env: dict[str, str] | os._Environ[str]) -> Path | None:
+    """A named profile moves omp's agent dir, taking precedence over PI_CODING_AGENT_DIR."""
+    profile = omp_profile(env)
+    if profile is None:
+        return None
+    return omp_config_root(home, env) / "profiles" / profile / "agent"
+
+
+def omp_agent_dir(home: str | Path | None, env: dict[str, str] | os._Environ[str]) -> Path:
+    """Agent dir from HOME and profile only; omp task agents ignore PI_CODING_AGENT_DIR."""
+    return omp_profile_agent_dir(home, env) or omp_config_root(home, env) / "agent"
+
+
+def omp_is_profile_derived(home: str | Path | None, env: dict[str, str] | os._Environ[str], agent_dir: str) -> bool:
+    """omp ignores a PI_CODING_AGENT_DIR equal to PI_PROFILE's agent dir (raw string match, as omp does)."""
+    try:
+        legacy = omp_profile({"PI_PROFILE": env.get("PI_PROFILE", "")})
+    except SystemExit:
+        return False
+    if legacy is None:
+        return False
+    return agent_dir == str(omp_config_root(home, env) / "profiles" / legacy / "agent")
+
+
 def target_path(harness: str, home: str | Path | None = None, env: dict[str, str] | None = None) -> Path | None:
     item = harness_by_name(harness)
     values = os.environ if env is None else env
     if item.env_var in values and values[item.env_var]:
         return Path(values[item.env_var]).expanduser()
 
-    if item.native_env_var and values.get(item.native_env_var):
-        return Path(values[item.native_env_var]).expanduser() / item.native_filename
+    native_dir = values.get(item.native_env_var) if item.native_env_var else None
+    if harness == "omp":
+        profile_dir = omp_profile_agent_dir(home, values)
+        if profile_dir is not None:
+            return profile_dir / item.native_filename
+        if native_dir and omp_is_profile_derived(home, values, native_dir):
+            native_dir = None
+
+    if native_dir:
+        return Path(native_dir).expanduser() / item.native_filename
+
+    if harness == "omp":
+        return omp_agent_dir(home, values) / item.native_filename
 
     if item.target_template is None:
         return None
