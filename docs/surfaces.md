@@ -48,5 +48,5 @@ documents cross-reading `%USERPROFILE%`. Point both at one home with the native 
   directory.
 - Antigravity: global `~/.gemini/GEMINI.md` plus workspace `.agents/rules/` (activation modes).
 - Hermes: exactly one project context file, first match wins (see `docs/harness-contract.md`).
-- Oh My Pi: `.omp/AGENTS.md` (nearest ancestor) > `.claude/CLAUDE.md` > `.agent(s)/AGENTS.md` >
+- Oh My Pi: `.omp/AGENTS.md` (nearest non-empty `.omp` dir only) > `.claude/CLAUDE.md` > `.agent(s)/AGENTS.md` >
   standalone `AGENTS.md`/`CLAUDE.md` walked up from cwd.

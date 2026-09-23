@@ -186,11 +186,40 @@ def selected_harnesses(selected: list[str] | None) -> list[Harness]:
     return [harness_by_name(name) for name in names]
 
 
+OMP_PROFILE_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+WINDOWS_RESERVED_RE = re.compile(r"^(?:CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(?:\..*)?$", re.IGNORECASE)
+
+
+def omp_profile(env: dict[str, str] | os._Environ[str]) -> str | None:
+    """Active omp profile, resolved as omp does: OMP_PROFILE wins even when empty."""
+    raw = env["OMP_PROFILE"] if "OMP_PROFILE" in env else env.get("PI_PROFILE")
+    name = (raw or "").strip()
+    if not name or name == "default":
+        return None
+    if name.endswith(".") or not OMP_PROFILE_RE.match(name) or WINDOWS_RESERVED_RE.match(name):
+        raise SystemExit(f"Invalid omp profile {name!r}; names must match {OMP_PROFILE_RE.pattern}")
+    return name
+
+
+def omp_profile_agent_dir(home: str | Path | None, env: dict[str, str] | os._Environ[str]) -> Path | None:
+    """A named profile moves omp's agent dir, taking precedence over PI_CODING_AGENT_DIR."""
+    profile = omp_profile(env)
+    if profile is None:
+        return None
+    home_path = Path.home() if home is None else Path(home)
+    return home_path / ".omp" / "profiles" / profile / "agent"
+
+
 def target_path(harness: str, home: str | Path | None = None, env: dict[str, str] | None = None) -> Path | None:
     item = harness_by_name(harness)
     values = os.environ if env is None else env
     if item.env_var in values and values[item.env_var]:
         return Path(values[item.env_var]).expanduser()
+
+    if harness == "omp":
+        profile_dir = omp_profile_agent_dir(home, values)
+        if profile_dir is not None:
+            return profile_dir / item.native_filename
 
     if item.native_env_var and values.get(item.native_env_var):
         return Path(values[item.native_env_var]).expanduser() / item.native_filename

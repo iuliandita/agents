@@ -886,3 +886,28 @@ def test_omp_fragment_covers_paths_roles_and_agents():
     assert "`@smol`" in omp
     assert "~/.omp/agent/agents/" in omp
     assert "thinkingLevel" in omp
+
+
+@pytest.mark.parametrize(
+    ("env", "expected"),
+    [
+        ({"OMP_PROFILE": "work"}, Path(".omp/profiles/work/agent/AGENTS.md")),
+        ({"PI_PROFILE": "work"}, Path(".omp/profiles/work/agent/AGENTS.md")),
+        ({"OMP_PROFILE": "", "PI_PROFILE": "work"}, Path(".omp/agent/AGENTS.md")),
+        ({"OMP_PROFILE": "default"}, Path(".omp/agent/AGENTS.md")),
+        ({"OMP_PROFILE": "work", "PI_CODING_AGENT_DIR": "/elsewhere"}, Path(".omp/profiles/work/agent/AGENTS.md")),
+    ],
+)
+def test_omp_target_follows_profile(tmp_path, env, expected):
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / expected
+
+
+def test_omp_explicit_path_beats_profile(tmp_path):
+    env = {"OMP_PROFILE": "work", "OMP_AGENTS_PATH": str(tmp_path / "explicit.md")}
+    assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / "explicit.md"
+
+
+@pytest.mark.parametrize("name", ["Work", "../x", "trailing.", "con"])
+def test_omp_invalid_profile_fails_loud(tmp_path, name):
+    with pytest.raises(SystemExit, match="Invalid omp profile"):
+        renderer.target_path("omp", home=tmp_path, env={"OMP_PROFILE": name})

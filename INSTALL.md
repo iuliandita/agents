@@ -197,8 +197,9 @@ Deployment writes one file per agent into these directories. Override with the e
 | Antigravity | `~/.gemini/config/agents/` | `ANTIGRAVITY_AGENTS_DIR` |
 | Oh My Pi | `~/.omp/agent/agents/` | `OMP_AGENTS_DIR` |
 
-Oh My Pi reads task agents from `~/.omp/agent/agents` (or the active profile's `agent/agents`) even
-when `PI_CODING_AGENT_DIR` moves its rules file, so only `OMP_AGENTS_DIR` changes the agent target.
+Oh My Pi reads task agents from `~/.omp/agent/agents`, or `~/.omp/profiles/<name>/agent/agents` when
+`OMP_PROFILE` (or `PI_PROFILE`) names a profile, even when `PI_CODING_AGENT_DIR` moves its rules file. The
+renderers follow the same profile resolution; `OMP_AGENTS_DIR` overrides it.
 
 Hermes has no per-role prompt file, so its six roles are a manual paste; delegation is configured under `delegation:` in `~/.hermes/config.yaml`.
 

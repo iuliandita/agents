@@ -929,3 +929,10 @@ def test_omp_agent_dir_ignores_pi_coding_agent_dir(tmp_path):
 def test_model_re_accepts_only_leading_role_alias():
     assert ra.MODEL_RE.match("@smol")
     assert not ra.MODEL_RE.match("smol@x")
+
+
+def test_omp_agent_dir_follows_profile(tmp_path):
+    env = {"OMP_PROFILE": "work", "PI_CODING_AGENT_DIR": str(tmp_path / "custom")}
+    assert ra.agent_target_dir("omp", home=tmp_path, env=env) == tmp_path / ".omp" / "profiles" / "work" / "agent" / "agents"
+    explicit = dict(env, OMP_AGENTS_DIR=str(tmp_path / "explicit"))
+    assert ra.agent_target_dir("omp", home=tmp_path, env=explicit) == tmp_path / "explicit"

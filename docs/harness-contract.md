@@ -86,10 +86,11 @@ pattern (`medium`), or it is not vendored (`n/a`).
 ### Oh My Pi
 - Global rules `~/.omp/agent/AGENTS.md` (`<agentDir>/AGENTS.md`); `agentDir` defaults to
   `~/.omp/agent` and follows `PI_CODING_AGENT_DIR`. Named profiles (`--profile`, `OMP_PROFILE`) move it
-  to `~/.omp/profiles/<name>/agent`. This repo's override is `OMP_AGENTS_PATH`.
+  to `~/.omp/profiles/<name>/agent` and win over `PI_CODING_AGENT_DIR`; the renderers follow the same order
+  (`OMP_AGENTS_PATH`/`OMP_AGENTS_DIR`, then the profile, then `PI_CODING_AGENT_DIR` for the rules file).
 - Also reads cross-harness user files `~/.agent/AGENTS.md` and `~/.agents/AGENTS.md`; `~/.claude` user
   sources only when opted in (`skills.enableClaudeUser`).
-- Project context priority: `.omp/AGENTS.md` (nearest ancestor) > `.claude/CLAUDE.md` >
+- Project context priority: `.omp/AGENTS.md` (from the nearest non-empty `.omp` dir; a nearer settings-only `.omp` hides a parent's) > `.claude/CLAUDE.md` >
   `.agent(s)/AGENTS.md` > standalone `AGENTS.md`/`CLAUDE.md` walked up from cwd.
 - Config `~/.omp/agent/config.yml`, model roles under `modelRoles` (`default`, `smol`, `slow`, plus
   `task`, `plan`, etc).
