@@ -7,6 +7,9 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
 ### Added
 
+- Oh My Pi (`omp`) harness: global rules at `~/.omp/agent/AGENTS.md` (follows `PI_CODING_AGENT_DIR`), and
+  the six roles as task agents in `~/.omp/agent/agents/` with `@smol`/`@default`/`@slow` role aliases and
+  `thinkingLevel`. The rendered `reviewer` replaces omp's bundled one.
 - `max` effort level for roles, overrides, and effort maps.
 - Tier entries can carry an effort: `{"model": "...", "effort": "..."}`. A harness that runs one model on
   every tier (for example DeepSeek V4.1 Flash) now varies depth by tier. Precedence is per-agent override,

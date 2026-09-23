@@ -36,7 +36,7 @@ class Harness(NamedTuple):
     native_filename: str = ""
 
 
-# Six supported harnesses plus one generic project-level target. Paths, overrides,
+# Seven supported harnesses plus one generic project-level target. Paths, overrides,
 # and verification receipts live in docs/harness-contract.md. Only add a harness
 # here once its rules path is confirmed against upstream docs.
 HARNESSES: tuple[Harness, ...] = (
@@ -102,6 +102,19 @@ HARNESSES: tuple[Harness, ...] = (
         notes="Desktop, IDE, and CLI share ~/.gemini/GEMINI.md; workspace rules live in .agents/rules/ (12k char cap per file).",
         source_url="https://antigravity.google/docs/rules-workflows/",
         verified_on="2026-09-17",
+    ),
+    Harness(
+        "omp",
+        "Oh My Pi",
+        "omp.md",
+        "AGENTS.md",
+        "{home}/.omp/agent/AGENTS.md",
+        "OMP_AGENTS_PATH",
+        notes="Global path follows PI_CODING_AGENT_DIR (default ~/.omp/agent); named profiles use ~/.omp/profiles/<name>/agent.",
+        source_url="https://omp.sh",
+        verified_on="2026-09-24",
+        native_env_var="PI_CODING_AGENT_DIR",
+        native_filename="AGENTS.md",
     ),
     Harness(
         "hermes",

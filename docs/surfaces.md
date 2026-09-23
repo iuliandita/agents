@@ -13,6 +13,7 @@ so there is no separate desktop deployment; the account-synced chat surfaces are
 | OpenCode | TUI, CLI, desktop, GitHub Action | Yes - config "applies across all interfaces" | opencode.ai/docs/config |
 | Antigravity | Desktop 2.0, IDE extensions, `agy` CLI | Yes for rules/MCP/workspace - all share `~/.gemini/GEMINI.md` and `.agents/` | antigravity.google/docs/rules-workflows |
 | Hermes | CLI and desktop | Yes - desktop shares `HERMES_HOME` (same config, sessions, skills, memory) | hermes-agent.nousresearch.com/docs/user-guide/desktop |
+| Oh My Pi | CLI/TUI, `omp acp` (editor server) | Yes - all surfaces read the same `~/.omp/agent/AGENTS.md`; no desktop app | installed omp 18.2.11 source (omp.sh) |
 
 ## Domain-specific extras (not deployed by this repo)
 
@@ -34,6 +35,7 @@ The supported tools all use a home-relative dotdir; only the home prefix changes
 | Command Code | `~/.commandcode/` | `%USERPROFILE%\.commandcode\` | WSL home |
 | Antigravity | `~/.gemini/` | `%USERPROFILE%\.gemini\` (unverified, inferred) | WSL home |
 | Hermes | `~/.hermes/` | `%LOCALAPPDATA%\hermes\` | WSL home |
+| Oh My Pi | `~/.omp/` | `%USERPROFILE%\.omp\` (unverified, inferred) | WSL home |
 
 A tool installed inside WSL reads the WSL home, separate from the native Windows install; no vendor
 documents cross-reading `%USERPROFILE%`. Point both at one home with the native env var
@@ -46,3 +48,5 @@ documents cross-reading `%USERPROFILE%`. Point both at one home with the native 
   directory.
 - Antigravity: global `~/.gemini/GEMINI.md` plus workspace `.agents/rules/` (activation modes).
 - Hermes: exactly one project context file, first match wins (see `docs/harness-contract.md`).
+- Oh My Pi: `.omp/AGENTS.md` (nearest ancestor) > `.claude/CLAUDE.md` > `.agent(s)/AGENTS.md` >
+  standalone `AGENTS.md`/`CLAUDE.md` walked up from cwd.

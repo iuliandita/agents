@@ -35,7 +35,7 @@ def test_render_document_places_private_overlay_after_core():
     assert "private.example.md" in rendered
 
 
-def test_harness_catalog_is_the_six_supported_plus_generic():
+def test_harness_catalog_is_the_seven_supported_plus_generic():
     harnesses = set(renderer.harness_names())
 
     assert harnesses == {
@@ -44,6 +44,7 @@ def test_harness_catalog_is_the_six_supported_plus_generic():
         "opencode",
         "commandcode",
         "antigravity",
+        "omp",
         "hermes",
         "generic",
     }
@@ -856,7 +857,7 @@ def test_private_overlay_withheld_except_allowed_harnesses(tmp_path, monkeypatch
     (repo / "prompts" / "harnesses").mkdir(parents=True)
     (repo / "prompts" / "core.md").write_text("# Core\nshared\n", encoding="utf-8")
     (repo / "prompts" / "private.md").write_text("## Private\nlocal only\n", encoding="utf-8")
-    fragments = ("claude", "codex", "opencode", "commandcode", "antigravity", "hermes")
+    fragments = ("claude", "codex", "opencode", "commandcode", "antigravity", "omp", "hermes")
     for name in fragments:
         (repo / "prompts" / "harnesses" / f"{name}.md").write_text(f"## {name}\nx\n", encoding="utf-8")
     (repo / "prompts" / "harnesses" / "AGENTS.md").write_text("## Generic\nx\n", encoding="utf-8")
@@ -865,5 +866,23 @@ def test_private_overlay_withheld_except_allowed_harnesses(tmp_path, monkeypatch
 
     assert "local only" in written["claude"].read_text(encoding="utf-8")
     assert "local only" in written["codex"].read_text(encoding="utf-8")
-    for harness in ("opencode", "commandcode", "antigravity", "hermes"):
+    for harness in ("opencode", "commandcode", "antigravity", "omp", "hermes"):
         assert "local only" not in written[harness].read_text(encoding="utf-8")
+
+
+def test_omp_target_follows_native_agent_dir(tmp_path):
+    assert renderer.target_path("omp", home=tmp_path, env={}) == tmp_path / ".omp" / "agent" / "AGENTS.md"
+    native = {"PI_CODING_AGENT_DIR": str(tmp_path / "custom")}
+    assert renderer.target_path("omp", home=tmp_path, env=native) == tmp_path / "custom" / "AGENTS.md"
+    both = dict(native, OMP_AGENTS_PATH=str(tmp_path / "explicit.md"))
+    assert renderer.target_path("omp", home=tmp_path, env=both) == tmp_path / "explicit.md"
+
+
+def test_omp_fragment_covers_paths_roles_and_agents():
+    repo = Path(__file__).resolve().parents[1]
+    omp = (repo / "prompts" / "harnesses" / "omp.md").read_text(encoding="utf-8")
+    assert "~/.omp/agent/AGENTS.md" in omp
+    assert "PI_CODING_AGENT_DIR" in omp
+    assert "`@smol`" in omp
+    assert "~/.omp/agent/agents/" in omp
+    assert "thinkingLevel" in omp

@@ -8,11 +8,11 @@ This is an opinionated toolkit shaped by 20+ years in IT and DevOps, production 
 
 - Stores canonical prompt fragments in `prompts/`.
 - Merges an optional gitignored private overlay from `prompts/private.md`.
-- Renders public operational-rule variants for Claude Code, OpenAI Codex, OpenCode, Command Code, Antigravity, and Hermes Agent, plus a generic project-level `AGENTS.md` target for other tools.
+- Renders public operational-rule variants for Claude Code, OpenAI Codex, OpenCode, Command Code, Antigravity, Oh My Pi, and Hermes Agent, plus a generic project-level `AGENTS.md` target for other tools.
 - Separates deployable global targets from manual project-local targets when no verified global operational rules path is known.
 - Does not generate persona, identity, memory, provider credential, model settings, MCP, plugin, or assistant-profile files.
 - Deploys rendered files to resolved global paths with backups.
-- Renders six reusable subagent roles from `agents/` into five harness formats.
+- Renders six reusable subagent roles from `agents/` into six harness formats.
 - Provides opt-in shared/local project instruction templates and a portable context-consolidation skill.
 - Lints public prompt sources, including `prompts/private.example.md`, for private paths, token-like secrets, missing harness fragments, and non-ASCII drift.
 
@@ -162,7 +162,7 @@ Per-turn injection is intentional: `SessionStart` runs once and gets buried, whe
 
 ## Subagent Roster
 
-Specialized subagents beat general-purpose ones for two reasons: a clean context window per dispatch, and a fixed compact output the main thread can consume cheaply. `agents/*.md` defines six roles once, tool-agnostic; `scripts/render-agents` emits native definitions for Claude Code, Codex, OpenCode, Command Code, and Antigravity. Hermes has no per-role prompt file (delegation is configured under `delegation:` in `config.yaml`), so its six roles are a documented manual paste rather than a rendered file.
+Specialized subagents beat general-purpose ones for two reasons: a clean context window per dispatch, and a fixed compact output the main thread can consume cheaply. `agents/*.md` defines six roles once, tool-agnostic; `scripts/render-agents` emits native definitions for Claude Code, Codex, OpenCode, Command Code, Antigravity, and Oh My Pi. Hermes has no per-role prompt file (delegation is configured under `delegation:` in `config.yaml`), so its six roles are a documented manual paste rather than a rendered file.
 
 | agent | tier | effort | tools | returns |
 |---|---|---|---|---|
@@ -197,7 +197,7 @@ Codex only uses a custom role when the parent calls `spawn_agent` with `agent_ty
 
 ## Supported Harnesses
 
-Six harnesses are supported, each with a rules path verified against upstream docs, plus one generic
+Seven harnesses are supported, each with a rules path verified against upstream docs, plus one generic
 project-level target. Receipts, overrides, and per-surface behavior live in
 [docs/harness-contract.md](docs/harness-contract.md) and [docs/surfaces.md](docs/surfaces.md).
 
@@ -208,6 +208,7 @@ project-level target. Receipts, overrides, and per-surface behavior live in
 | OpenCode | deployable | `~/.config/opencode/AGENTS.md` |
 | Command Code | deployable | `~/.commandcode/AGENTS.md` |
 | Antigravity | deployable | `~/.gemini/GEMINI.md` |
+| Oh My Pi | deployable | `~/.omp/agent/AGENTS.md` |
 | Hermes Agent | manual | project `HERMES.md` / `$HERMES_HOME/config.yaml` |
 | Generic AGENTS.md | manual | project `AGENTS.md` only |
 
