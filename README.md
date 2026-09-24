@@ -4,6 +4,18 @@ Portable instructions, subagent roles, and context-consolidation workflows for c
 
 This is an opinionated toolkit shaped by 20+ years in IT and DevOps, production incidents, code reviews, and research. Pick the parts that fit your workflow: global prompts, specialized subagents, project instruction templates, or context consolidation. Each is maintained here and installed separately.
 
+## Set Up With an Agent
+
+Point your coding agent at this repository and ask it to set things up, for example:
+
+> Set up https://github.com/iuliandita/agents for the coding agents I use, following its INSTALL.md
+> "Agent-Driven Setup" runbook, and keep it updated daily.
+
+The runbook is written for an agent to follow step by step: clone, detect installed harnesses, confirm
+the target list and any private-overlay trust with you, preview, deploy, verify, and schedule
+`scripts/update`, which pulls, checks, redeploys, and fails loudly. Everything it deploys is backed up
+first, and nothing outside the listed harnesses is touched.
+
 ## What This Repo Does
 
 - Stores canonical prompt fragments in `prompts/`.
@@ -79,6 +91,8 @@ scripts/
   render_agents.py        # subagent renderer
   render_hermes.py        # Hermes global-rules merger (agent.coding_instructions)
   render-hermes           # wrapper for the Hermes merger
+  update.py               # pull, check, and redeploy everything for saved targets (cron-safe)
+  update                  # wrapper for the updater (update.ps1 on native Windows)
   python-runtime.sh       # POSIX interpreter selection (sourced by bash wrappers)
   python-runtime.ps1      # PowerShell interpreter selection (sourced by .ps1 wrappers)
   sync-ai-prompts.ps1     # PowerShell counterparts of the bash launchers (native Windows)

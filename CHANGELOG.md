@@ -17,6 +17,12 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 - `prompts/local.md` overlay for provider-safe operational preferences, appended after the core for every
   global target, with a tracked `prompts/local.example.md` template.
 - `all` in the private trust list sends `prompts/private.md` to every supported harness.
+- `scripts/update` pulls fast-forward only, refuses to run over local tracked edits, checks, redeploys
+  prompts, the Hermes merge, subagents, and the Claude invariants hook for the harnesses in
+  `prompts/deploy-targets.txt`, then verifies; any failure exits non-zero, so it is safe on a schedule.
+  `--detect` lists installed supported harnesses; `--dry-run` previews.
+- An "Agent-Driven Setup" runbook in INSTALL.md, linked from the top of the README, for coding agents
+  setting the repo up and scheduling daily updates.
 
 ### Changed
 
