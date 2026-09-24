@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
-## [Unreleased]
+## [3.0.0] - 2026-09-24
 
 ### Breaking
 
@@ -28,6 +28,11 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
 - Project-level targets (`generic`, and Hermes through `HERMES_AGENTS_PATH`) never receive either
   overlay, since those files can be committed. The global Hermes merge follows the trust list.
+- Subagent directories follow `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and `OPENCODE_CONFIG_DIR`, and the Claude
+  invariants hook and `settings.json` follow `CLAUDE_CONFIG_DIR`, matching the rules files. Dedicated
+  `*_AGENTS_DIR`, `CLAUDE_HOOKS_DIR`, and `CLAUDE_SETTINGS_PATH` overrides still win.
+- Dry runs report hand-written rules files, subagent files, and Hermes `coding_instructions` as
+  `would replace unmanaged` before a deploy would replace them (after a backup).
 
 ## [2.4.0] - 2026-09-24
 
