@@ -341,14 +341,14 @@ def private_harnesses(repo_root: Path, env: dict[str, str] | None = None) -> fro
             for line in path.read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.strip().startswith("#")
         ]
-    if ALL_HARNESSES_KEYWORD in names:
-        return frozenset(harness_names())
-    unknown = sorted(set(names) - set(harness_names()))
+    unknown = sorted(set(names) - set(harness_names()) - {ALL_HARNESSES_KEYWORD})
     if unknown:
         raise SystemExit(
             f"Unknown harness in private trust list: {', '.join(unknown)}. "
             f"Supported: {', '.join(harness_names())}, or {ALL_HARNESSES_KEYWORD}"
         )
+    if ALL_HARNESSES_KEYWORD in names:
+        return frozenset(harness_names())
     return frozenset(names)
 
 

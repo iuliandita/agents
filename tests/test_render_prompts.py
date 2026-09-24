@@ -860,9 +860,17 @@ def test_private_harnesses_all_keyword(tmp_path):
     assert renderer.private_harnesses(tmp_path, env={}) == everything
 
 
-def test_private_harnesses_rejects_unknown_names(tmp_path):
+@pytest.mark.parametrize("names", ["claud", "all,claud"])
+def test_private_harnesses_rejects_unknown_names_from_env(tmp_path, names):
     with pytest.raises(SystemExit, match="Unknown harness in private trust list: claud"):
-        renderer.private_harnesses(tmp_path, env={"AGENTS_PRIVATE_HARNESSES": "claud"})
+        renderer.private_harnesses(tmp_path, env={"AGENTS_PRIVATE_HARNESSES": names})
+
+
+def test_private_harnesses_rejects_unknown_names_from_file(tmp_path):
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "private-harnesses.txt").write_text("all\nclaud\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="Unknown harness in private trust list: claud"):
+        renderer.private_harnesses(tmp_path, env={})
 
 
 def test_private_harnesses_file_overrides_default(tmp_path):
@@ -1010,3 +1018,38 @@ def test_omp_profile_derived_match_is_exact(tmp_path):
 def test_omp_absolute_pi_config_dir_stays_under_home(tmp_path):
     env = {"PI_CONFIG_DIR": "/srv/omp"}
     assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / "srv" / "omp" / "agent" / "AGENTS.md"
+
+
+def test_deploy_keeps_project_level_targets_clean_under_trust_all(tmp_path, monkeypatch):
+    repo = overlay_repo(tmp_path)
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
+    monkeypatch.setenv("HERMES_AGENTS_PATH", str(tmp_path / "proj" / "HERMES.md"))
+    monkeypatch.setenv("GENERIC_AGENTS_PATH", str(tmp_path / "proj" / "AGENTS.md"))
+
+    deployed = renderer.deploy(
+        repo_root=repo, selected=["hermes", "generic"], stamp=None, dry_run=False, backup_dir=tmp_path / "b"
+    )
+
+    assert set(deployed) == {"hermes", "generic"}
+    for path in deployed.values():
+        text = path.read_text(encoding="utf-8")
+        assert "local layer" not in text and "private layer" not in text
+
+
+def test_revoked_trust_shows_as_drift_and_redeploy_removes_private(tmp_path, monkeypatch, capsys):
+    repo = overlay_repo(tmp_path)
+    target = tmp_path / "opencode" / "AGENTS.md"
+    monkeypatch.setenv("OPENCODE_AGENTS_PATH", str(target))
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "opencode")
+    renderer.deploy(repo_root=repo, selected=["opencode"], stamp=None, dry_run=False, backup_dir=tmp_path / "b")
+    assert "private layer" in target.read_text(encoding="utf-8")
+    assert renderer.status(repo, ["opencode"], None) == 0
+
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "claude")
+    assert renderer.status(repo, ["opencode"], None) == 1
+    assert "opencode: drift from current render" in capsys.readouterr().out
+
+    renderer.deploy(repo_root=repo, selected=["opencode"], stamp=None, dry_run=False, backup_dir=tmp_path / "b")
+    text = target.read_text(encoding="utf-8")
+    assert "private layer" not in text and "local layer" in text
+    assert renderer.status(repo, ["opencode"], None) == 0
