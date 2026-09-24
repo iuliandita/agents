@@ -318,14 +318,6 @@ def read_overlay(repo_root: Path, name: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def read_private(repo_root: Path) -> str:
-    return read_overlay(repo_root, "private.md")
-
-
-def read_local(repo_root: Path) -> str:
-    return read_overlay(repo_root, "local.md")
-
-
 PRIVATE_HARNESSES_ENV = "AGENTS_PRIVATE_HARNESSES"
 PRIVATE_HARNESSES_FILE = "private-harnesses.txt"
 # prompts/local.md reaches every harness. prompts/private.md can hold hosts, identities, and
@@ -367,7 +359,9 @@ class Overlays(NamedTuple):
 
 
 def load_overlays(repo_root: Path) -> Overlays:
-    return Overlays(read_local(repo_root), read_private(repo_root), private_harnesses(repo_root))
+    return Overlays(
+        read_overlay(repo_root, "local.md"), read_overlay(repo_root, "private.md"), private_harnesses(repo_root)
+    )
 
 
 def global_target(harness: Harness) -> bool:
