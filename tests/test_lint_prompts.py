@@ -226,3 +226,42 @@ def test_main_lints_agent_sources(tmp_path, capsys):
     assert rc == 1
     assert "explorer.md" in captured.out
     assert "private path or name marker" in captured.out
+
+
+def git_repo_with(tmp_path, files):
+    import subprocess
+
+    for name, text in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "init", "-q"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "add", *files], check=True)
+    return tmp_path
+
+
+def test_tracked_marker_scan_covers_every_tracked_file(tmp_path, capsys):
+    repo = git_repo_with(tmp_path, {"README.md": "see lab.example.net\n", "docs/x.md": "clean\n"})
+    (repo / "untracked.md").write_text("lab.example.net\n", encoding="utf-8")
+    assert linter.lint_tracked_markers(repo, ("lab.example.net",)) == 1
+    out = capsys.readouterr().out
+    assert "README.md: tracked file contains local marker: lab.example.net" in out
+    assert "untracked.md" not in out
+
+
+def test_tracked_marker_scan_skips_example_and_binaries(tmp_path):
+    repo = git_repo_with(
+        tmp_path, {"prompts/private-patterns.example.txt": "lab.example.net\n", "blob.bin": "x\0lab.example.net"}
+    )
+    assert linter.lint_tracked_markers(repo, ("lab.example.net",)) == 0
+
+
+def test_tracked_marker_scan_is_noop_without_user_markers(tmp_path):
+    repo = git_repo_with(tmp_path, {"README.md": "internal.example\n"})
+    assert linter.lint_tracked_markers(repo, ()) == 0
+
+
+def test_user_patterns_exclude_builtin_defaults(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTS_PRIVATE_PATTERNS", "mine.example")
+    assert linter.load_user_patterns(tmp_path) == ("mine.example",)
+    assert "internal.example" in linter.load_private_patterns(tmp_path)

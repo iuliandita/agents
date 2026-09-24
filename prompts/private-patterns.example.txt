@@ -1,5 +1,26 @@
-# Optional local-only markers for scripts/lint_prompts.py.
-# Copy to prompts/private-patterns.txt and add one marker per line.
-# Keep prompts/private-patterns.txt out of git.
-internal.example
-company.internal
+# Local leak markers for scripts/lint_prompts.py.
+# Copy to prompts/private-patterns.txt (gitignored), replace these placeholders with your own values,
+# and keep one marker per line. Lint fails if any tracked file contains one, so pick strings that are
+# specific to you: a common word like "home" or "work" would flag every file.
+# AGENTS_PRIVATE_PATTERNS (comma- or newline-separated) adds markers without a file.
+
+# Machine and user
+my-workstation
+/home/jdoe/
+/Users/jdoe/
+C:\Users\jdoe\
+
+# Home lab and private networks
+lab.example.net
+nas01.lab.example.net
+10.20.30.
+192.168.77.
+
+# Employer and clients
+examplecorp
+examplecorp.internal
+vpn.examplecorp.com
+
+# Identities that must stay private
+jdoe@examplecorp.com
+jdoe-personal-handle

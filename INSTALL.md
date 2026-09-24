@@ -111,7 +111,9 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
    **ask** before creating `prompts/private.md` or `prompts/private-harnesses.txt`: which harnesses may
    receive hosts, identities, and paths depends on the model provider behind each one, which only the
    user knows. Never write `all` without the user saying so, and check that `AGENTS_PRIVATE_HARNESSES` is
-   not already set in the environment, since it overrides the file.
+   not already set in the environment, since it overrides the file. If the user will edit or contribute
+   to the repo, offer to list their private hosts and names in `prompts/private-patterns.txt` so lint
+   catches them in any tracked file.
 6. **Preview**: `scripts/update --no-pull --dry-run`. It prints the effective overlay trust (`private
    overlay: sent to ...` and where the list came from), then every file it would write. Check: it ends with
    `update complete` and names only the confirmed targets. **ask** before continuing if any line says

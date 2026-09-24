@@ -137,7 +137,11 @@ end up committed; Hermes' global `agent.coding_instructions` merge does.
 Rendered output can contain overlay content. Do not publish generated files or copy them into tracked
 project instructions.
 
-For local leak checks that should not be committed, copy `prompts/private-patterns.example.txt` to `prompts/private-patterns.txt` or set `AGENTS_PRIVATE_PATTERNS` to comma- or newline-separated markers.
+To keep your own hosts, domains, and names out of a fork or a contribution, list them as leak markers:
+copy `prompts/private-patterns.example.txt` to `prompts/private-patterns.txt` (gitignored) and replace the
+placeholders, or set `AGENTS_PRIVATE_PATTERNS` to comma- or newline-separated markers. `python
+scripts/lint_prompts.py` then fails if any tracked file, not only the prompt sources, contains one. Without
+a local list the scan is skipped, so CI on a clean fork is unaffected.
 
 ## Workflow Activation
 
