@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [Unreleased]
+
+### Changed
+
+- Tone rules: separate verified facts from inference and flag real uncertainty, match explanation depth
+  to the reader's demonstrated familiarity, and omit routine closing questions and offers.
+
 ## [3.1.0] - 2026-09-24
 
 ### Changed
