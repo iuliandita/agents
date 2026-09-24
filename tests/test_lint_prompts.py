@@ -1,6 +1,8 @@
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 import lint_prompts as linter
 
 
@@ -105,11 +107,12 @@ def test_lint_line_count_returns_zero_when_only_warning(tmp_path):
     assert failures == 0
 
 
-def test_tracked_private_example_is_lint_clean():
+@pytest.mark.parametrize("name", ["private.example.md", "local.example.md"])
+def test_tracked_overlay_examples_are_lint_clean(name):
     repo = Path(__file__).resolve().parents[1]
-    target = repo / "prompts" / "private.example.md"
+    target = repo / "prompts" / name
 
-    assert target.exists(), "prompts/private.example.md is a tracked template"
+    assert target.exists(), f"prompts/{name} is a tracked template"
     assert linter.lint_file(target) == 0
     assert (
         linter.lint_line_count(
@@ -136,6 +139,7 @@ def test_main_flags_orphan_harness_fragment(tmp_path, capsys):
     (prompts / "harnesses" / "orphan.md").write_text(
         "## Orphan\nclean line\n", encoding="utf-8"
     )
+    (prompts / "local.example.md").write_text("# Local\nclean line\n", encoding="utf-8")
     (prompts / "private.example.md").write_text(
         "# Example\nclean line\n", encoding="utf-8"
     )
@@ -169,6 +173,7 @@ def test_main_lints_private_example_when_present(tmp_path, capsys):
             "## Fragment\nclean line\n", encoding="utf-8"
         )
     (prompts / "private-patterns.txt").write_text("internal.example\n", encoding="utf-8")
+    (prompts / "local.example.md").write_text("# Local\nclean line\n", encoding="utf-8")
     (prompts / "private.example.md").write_text(
         "# Example\nLeaks internal.example/secret path.\n", encoding="utf-8"
     )
@@ -201,6 +206,7 @@ def test_main_lints_agent_sources(tmp_path, capsys):
         (prompts / "harnesses" / harness.fragment).write_text(
             "## Fragment\nclean line\n", encoding="utf-8"
         )
+    (prompts / "local.example.md").write_text("# Local\nclean line\n", encoding="utf-8")
     (prompts / "private.example.md").write_text("# Example\nclean line\n", encoding="utf-8")
     agents = repo_root / "agents"
     agents.mkdir()

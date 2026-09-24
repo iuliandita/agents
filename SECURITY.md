@@ -19,5 +19,6 @@ dependency vulnerabilities in the pinned tooling.
 ## Not in scope
 
 - The behavior of third-party agent harnesses themselves.
-- The contents of `prompts/private.md` after it is rendered and deployed; the overlay is local by
-  design and is never committed.
+- The contents of `prompts/local.md` and `prompts/private.md` after they are rendered and deployed; the
+  overlays are local by design and are never committed. Which harnesses receive `private.md` is the
+  user's trust list.

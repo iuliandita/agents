@@ -103,7 +103,7 @@ Existing files are backed up under `.backups/` before replacement. Deploy writes
 
 Real deploys refuse when two selected harnesses resolve to the same path, for example after overriding a path with its `*_AGENTS_PATH` env var. Use `--target` for routine deploys so only the harnesses you use are written.
 
-If `prompts/private.md` exists, it is merged into the rendered/deployed file after the shared core. It is applied to Claude Code and Codex only by default; add harnesses with `AGENTS_PRIVATE_HARNESSES` (comma-separated) or `prompts/private-harnesses.txt` (one name per line). Use `prompts/private.example.md` as the template.
+If `prompts/local.md` exists, it is merged into every rendered and deployed file after the shared core. If `prompts/private.md` exists, it follows `local.md`, but only for harnesses listed in `prompts/private-harnesses.txt` (one name per line) or `AGENTS_PRIVATE_HARNESSES` (comma-separated); `all` lists every supported harness, and there is no default. A withheld private overlay prints a notice. Project-level targets (`generic`, and `hermes` through `HERMES_AGENTS_PATH`) never receive either overlay; the global Hermes merge through `scripts/render-hermes` follows the same rules as the other harnesses. Start from `prompts/local.example.md` and `prompts/private.example.md`.
 
 ## Dry Run
 
@@ -230,7 +230,7 @@ Start with [the shared template](templates/project/AGENTS.md.example) and
 [the local template](templates/project/AGENTS.local.md.example). Fill in real
 project context and verification commands before using the shared template.
 Do not copy globally rendered output into the shared file: it can contain the
-private overlay from `prompts/private.md`.
+local and private overlays (`prompts/local.md`, `prompts/private.md`).
 
 Claude loads `CLAUDE.local.md` alongside `CLAUDE.md`. Codex's documented discovery
 loads at most one instruction file per directory; `AGENTS.override.md` replaces

@@ -32,7 +32,14 @@ def test_render_document_places_private_overlay_after_core():
 
     assert rendered.index("claude body") < rendered.index("core body")
     assert rendered.index("core body") < rendered.index("private body")
-    assert "private.example.md" in rendered
+    assert ".example.md templates" in rendered
+
+
+def test_render_document_orders_local_before_private():
+    rendered = renderer.render_document(
+        fragment="## Frag\n", core="# Core\ncore body\n", private="private body\n", local="local body\n", stamp="x"
+    )
+    assert rendered.index("core body") < rendered.index("local body") < rendered.index("private body")
 
 
 def test_harness_catalog_is_the_seven_supported_plus_generic():
@@ -166,6 +173,8 @@ def test_render_all_writes_selected_harnesses_to_output_dir(tmp_path):
         encoding="utf-8",
     )
 
+    (repo / "prompts" / "private-harnesses.txt").write_text("codex\n", encoding="utf-8")
+
     written = renderer.render_all(
         repo_root=repo,
         out_dir=tmp_path / "out",
@@ -180,6 +189,7 @@ def test_render_all_writes_selected_harnesses_to_output_dir(tmp_path):
     assert "claude only" in written["claude"].read_text(encoding="utf-8")
     assert "shared" in written["codex"].read_text(encoding="utf-8")
     assert "local only" in written["codex"].read_text(encoding="utf-8")
+    assert "local only" not in written["claude"].read_text(encoding="utf-8")
 
 
 def test_full_catalog_render_places_colliding_outputs_in_harness_subdirectories(tmp_path):
@@ -471,7 +481,7 @@ def test_destructive_infra_commands_require_confirmation():
 def test_core_keeps_iac_checks_and_moves_personal_prefs_to_overlay():
     repo = Path(__file__).resolve().parents[1]
     core = (repo / "prompts" / "core.md").read_text(encoding="utf-8")
-    example = (repo / "prompts" / "private.example.md").read_text(encoding="utf-8")
+    example = (repo / "prompts" / "local.example.md").read_text(encoding="utf-8")
 
     assert "Prefer Bun over npm/yarn/pnpm" not in core
     assert "Prefer Bun over npm/yarn/pnpm" in example
@@ -835,12 +845,32 @@ def test_render_document_header_has_no_git_revision_churn():
     assert re.search(r"rev [0-9a-f]{12}\. ", header)
 
 
-def test_private_harnesses_default_and_env_override():
-    repo = Path(__file__).resolve().parents[1]
-    assert renderer.private_harnesses(repo, env={}) == frozenset({"claude", "codex"})
+def test_private_harnesses_default_is_empty_and_env_overrides(tmp_path):
+    assert renderer.private_harnesses(tmp_path, env={}) == frozenset()
     assert renderer.private_harnesses(
-        repo, env={"AGENTS_PRIVATE_HARNESSES": "opencode, claude"}
+        tmp_path, env={"AGENTS_PRIVATE_HARNESSES": "opencode, claude"}
     ) == frozenset({"opencode", "claude"})
+
+
+def test_private_harnesses_all_keyword(tmp_path):
+    everything = frozenset(renderer.harness_names())
+    assert renderer.private_harnesses(tmp_path, env={"AGENTS_PRIVATE_HARNESSES": "all"}) == everything
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "private-harnesses.txt").write_text("all\n", encoding="utf-8")
+    assert renderer.private_harnesses(tmp_path, env={}) == everything
+
+
+@pytest.mark.parametrize("names", ["claud", "all,claud"])
+def test_private_harnesses_rejects_unknown_names_from_env(tmp_path, names):
+    with pytest.raises(SystemExit, match="Unknown harness in private trust list: claud"):
+        renderer.private_harnesses(tmp_path, env={"AGENTS_PRIVATE_HARNESSES": names})
+
+
+def test_private_harnesses_rejects_unknown_names_from_file(tmp_path):
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "private-harnesses.txt").write_text("all\nclaud\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="Unknown harness in private trust list: claud"):
+        renderer.private_harnesses(tmp_path, env={})
 
 
 def test_private_harnesses_file_overrides_default(tmp_path):
@@ -851,23 +881,67 @@ def test_private_harnesses_file_overrides_default(tmp_path):
     assert renderer.private_harnesses(tmp_path, env={}) == frozenset({"opencode"})
 
 
-def test_private_overlay_withheld_except_allowed_harnesses(tmp_path, monkeypatch):
-    monkeypatch.delenv("AGENTS_PRIVATE_HARNESSES", raising=False)
+def overlay_repo(tmp_path):
     repo = tmp_path / "repo"
     (repo / "prompts" / "harnesses").mkdir(parents=True)
     (repo / "prompts" / "core.md").write_text("# Core\nshared\n", encoding="utf-8")
-    (repo / "prompts" / "private.md").write_text("## Private\nlocal only\n", encoding="utf-8")
-    fragments = ("claude", "codex", "opencode", "commandcode", "antigravity", "omp", "hermes")
-    for name in fragments:
+    (repo / "prompts" / "local.md").write_text("## Local\nlocal layer\n", encoding="utf-8")
+    (repo / "prompts" / "private.md").write_text("## Private\nprivate layer\n", encoding="utf-8")
+    for name in ("claude", "codex", "opencode", "commandcode", "antigravity", "omp", "hermes"):
         (repo / "prompts" / "harnesses" / f"{name}.md").write_text(f"## {name}\nx\n", encoding="utf-8")
     (repo / "prompts" / "harnesses" / "AGENTS.md").write_text("## Generic\nx\n", encoding="utf-8")
+    return repo
+
+
+def test_private_overlay_withheld_everywhere_without_trust_list(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("AGENTS_PRIVATE_HARNESSES", raising=False)
+    repo = overlay_repo(tmp_path)
 
     written = renderer.render_all(repo_root=repo, out_dir=tmp_path / "out", stamp="2026-04-25")
 
-    assert "local only" in written["claude"].read_text(encoding="utf-8")
-    assert "local only" in written["codex"].read_text(encoding="utf-8")
-    for harness in ("opencode", "commandcode", "antigravity", "omp", "hermes"):
-        assert "local only" not in written[harness].read_text(encoding="utf-8")
+    for harness, path in written.items():
+        text = path.read_text(encoding="utf-8")
+        assert ("local layer" in text) == (renderer.harness_by_name(harness).support_level == renderer.DEPLOYABLE)
+        assert "private layer" not in text
+    notice = capsys.readouterr().out
+    assert "prompts/private.md withheld from claude, codex" in notice
+    assert "generic" not in notice
+
+
+def test_private_overlay_reaches_only_trusted_harnesses(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "opencode,omp")
+    repo = overlay_repo(tmp_path)
+
+    written = renderer.render_all(repo_root=repo, out_dir=tmp_path / "out", stamp="2026-04-25")
+
+    for harness, path in written.items():
+        assert ("private layer" in path.read_text(encoding="utf-8")) == (harness in {"opencode", "omp"})
+    notice = capsys.readouterr().out
+    assert "withheld from claude, codex, commandcode" in notice
+    assert "omp" not in notice.split("withheld from")[1].split(";")[0]
+
+
+def test_trust_all_reaches_every_global_target_without_notice(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
+    repo = overlay_repo(tmp_path)
+
+    written = renderer.render_all(repo_root=repo, out_dir=tmp_path / "out", stamp="2026-04-25")
+
+    for harness, path in written.items():
+        text = path.read_text(encoding="utf-8")
+        is_global = renderer.harness_by_name(harness).support_level == renderer.DEPLOYABLE
+        assert ("private layer" in text) == is_global
+        assert ("local layer" in text) == is_global
+    assert "withheld" not in capsys.readouterr().out
+
+
+def test_project_level_targets_never_carry_overlays(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
+    repo = overlay_repo(tmp_path)
+    written = renderer.render_all(repo_root=repo, out_dir=tmp_path / "out", selected=["generic", "hermes"], stamp="x")
+    for path in written.values():
+        text = path.read_text(encoding="utf-8")
+        assert "local layer" not in text and "private layer" not in text
 
 
 def test_omp_target_follows_native_agent_dir(tmp_path):
@@ -944,3 +1018,38 @@ def test_omp_profile_derived_match_is_exact(tmp_path):
 def test_omp_absolute_pi_config_dir_stays_under_home(tmp_path):
     env = {"PI_CONFIG_DIR": "/srv/omp"}
     assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / "srv" / "omp" / "agent" / "AGENTS.md"
+
+
+def test_deploy_keeps_project_level_targets_clean_under_trust_all(tmp_path, monkeypatch):
+    repo = overlay_repo(tmp_path)
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
+    monkeypatch.setenv("HERMES_AGENTS_PATH", str(tmp_path / "proj" / "HERMES.md"))
+    monkeypatch.setenv("GENERIC_AGENTS_PATH", str(tmp_path / "proj" / "AGENTS.md"))
+
+    deployed = renderer.deploy(
+        repo_root=repo, selected=["hermes", "generic"], stamp=None, dry_run=False, backup_dir=tmp_path / "b"
+    )
+
+    assert set(deployed) == {"hermes", "generic"}
+    for path in deployed.values():
+        text = path.read_text(encoding="utf-8")
+        assert "local layer" not in text and "private layer" not in text
+
+
+def test_revoked_trust_shows_as_drift_and_redeploy_removes_private(tmp_path, monkeypatch, capsys):
+    repo = overlay_repo(tmp_path)
+    target = tmp_path / "opencode" / "AGENTS.md"
+    monkeypatch.setenv("OPENCODE_AGENTS_PATH", str(target))
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "opencode")
+    renderer.deploy(repo_root=repo, selected=["opencode"], stamp=None, dry_run=False, backup_dir=tmp_path / "b")
+    assert "private layer" in target.read_text(encoding="utf-8")
+    assert renderer.status(repo, ["opencode"], None) == 0
+
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "claude")
+    assert renderer.status(repo, ["opencode"], None) == 1
+    assert "opencode: drift from current render" in capsys.readouterr().out
+
+    renderer.deploy(repo_root=repo, selected=["opencode"], stamp=None, dry_run=False, backup_dir=tmp_path / "b")
+    text = target.read_text(encoding="utf-8")
+    assert "private layer" not in text and "local layer" in text
+    assert renderer.status(repo, ["opencode"], None) == 0

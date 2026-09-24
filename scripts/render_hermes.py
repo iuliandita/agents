@@ -40,14 +40,13 @@ def hermes_config_path(env: dict[str, str] | None = None) -> Path:
 
 def render_rules(repo_root: Path) -> str:
     harness = render_prompts.harness_by_name("hermes")
-    allowed = render_prompts.private_harnesses(repo_root)
-    private = render_prompts.read_private(repo_root) if "hermes" in allowed else ""
-    return render_prompts.render_document(
-        render_prompts.read_fragment(repo_root, harness),
-        (repo_root / "prompts" / "core.md").read_text(encoding="utf-8"),
-        private=private,
-        enabled_optional=frozenset(harness.optional_blocks),
-    )
+    overlays = render_prompts.load_overlays(repo_root)
+    notice = render_prompts.withheld_notice(overlays, [harness.name])
+    if notice:
+        print(notice)
+    core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
+    # agent.coding_instructions is a global rules slot, unlike Hermes' project-file target.
+    return render_prompts.render_for(repo_root, harness, core, overlays, with_overlays=True)
 
 
 def _block_end(lines: list[str], start: int, min_indent: int) -> int:
