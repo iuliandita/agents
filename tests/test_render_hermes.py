@@ -100,3 +100,11 @@ def test_render_rules_includes_private_when_trusted(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "hermes")
     rules = rh.render_rules(overlay_repo(tmp_path))
     assert rules.index("local layer") < rules.index("private layer")
+
+
+def test_dry_run_flags_unmanaged_coding_instructions(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("AGENTS_PRIVATE_HARNESSES", raising=False)
+    config = tmp_path / "config.yaml"
+    config.write_text("agent:\n  coding_instructions: my own rules\n", encoding="utf-8")
+    rh.deploy(overlay_repo(tmp_path), config, tmp_path / "b", dry_run=True)
+    assert "would replace unmanaged hermes agent.coding_instructions" in capsys.readouterr().out

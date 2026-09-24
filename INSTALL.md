@@ -103,7 +103,9 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
    `scripts/sync-ai-prompts --list-targets` (rules files) and `scripts/render-agents --list-targets`
    (subagent dirs). Customized homes (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `OPENCODE_CONFIG_DIR`,
    `PI_CODING_AGENT_DIR`, `OMP_PROFILE`, `HERMES_HOME`) are honored when they are set in this shell.
-   Hermes merges into its `config.yaml`; every other target is one rules file plus six subagent files.
+   Hermes is different: its global rules merge into `agent.coding_instructions` in `$HERMES_HOME/config.yaml`
+   (default `~/.hermes/config.yaml`), shown by `scripts/render-hermes --dry-run`; ignore the `HERMES.md`
+   project-file line in `--list-targets`. Every other target is one rules file plus six subagent files.
 5. **Optional overlays** (see [Local and private overlays](README.md#local-and-private-overlays)): copy
    `prompts/local.example.md` to `prompts/local.md` for preferences that are safe with any model provider.
    **ask** before creating `prompts/private.md` or `prompts/private-harnesses.txt`: which harnesses may
@@ -113,12 +115,14 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
 6. **Preview**: `scripts/update --no-pull --dry-run`. It prints the effective overlay trust (`private
    overlay: sent to ...` and where the list came from), then every file it would write. Check: it ends with
    `update complete` and names only the confirmed targets. **ask** before continuing if any line says
-   `would replace unmanaged`: that is a file the user wrote (for example their own `reviewer.md`), which
-   deploy replaces after backing it up.
+   `would replace unmanaged`: that is content the user wrote (their own `CLAUDE.md`, `reviewer.md`, or
+   Hermes `coding_instructions`), which deploy replaces after backing it up.
 7. **Deploy**: `scripts/update --no-pull`. Existing files are backed up to `.backups/` first. Check: it
    ends with `update complete`; its last steps are `--verify` (every role file present) and `--status`
    (every rules file in sync).
-8. **Schedule** a daily run. `scripts/update` pulls fast-forward only, never prompts (git runs
+8. **Schedule** a daily run. **ask** which scheduler, what time (local timezone), and how failures should
+   reach the user (log file, syslog/journal, or mail); default to the platform's native scheduler, 06:30,
+   and the scheduler's own failure log if they have no preference. `scripts/update` pulls fast-forward only, never prompts (git runs
    non-interactively with a timeout), refuses to run over local tracked edits or alongside another run, and
    exits non-zero on any failure. Schedulers start with a minimal environment: copy into the job every
    variable the setup relied on (`AGENTS_PYTHON`, customized homes from step 4, `*_AGENTS_PATH` or

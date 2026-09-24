@@ -1053,3 +1053,15 @@ def test_revoked_trust_shows_as_drift_and_redeploy_removes_private(tmp_path, mon
     text = target.read_text(encoding="utf-8")
     assert "private layer" not in text and "local layer" in text
     assert renderer.status(repo, ["opencode"], None) == 0
+
+
+def test_deploy_dry_run_flags_unmanaged_rules_file(tmp_path, monkeypatch, capsys):
+    repo = overlay_repo(tmp_path)
+    mine = tmp_path / "CLAUDE.md"
+    mine.write_text("my own rules\n", encoding="utf-8")
+    monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(mine))
+    renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=True, backup_dir=tmp_path / "b")
+    assert f"would replace unmanaged claude: {mine}" in capsys.readouterr().out
+    renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=False, backup_dir=tmp_path / "b")
+    renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=True, backup_dir=tmp_path / "b")
+    assert f"would update claude: {mine}" in capsys.readouterr().out

@@ -155,3 +155,12 @@ def test_dry_run_writes_nothing(tmp_path):
     ri.deploy(REPO, hooks_dir, settings_path, tmp_path / "b", dry_run=True)
     assert not hooks_dir.exists()
     assert not settings_path.exists()
+
+
+def test_hook_paths_follow_claude_config_dir(tmp_path):
+    env = {"CLAUDE_CONFIG_DIR": str(tmp_path / "claude-home")}
+    assert ri.resolve_hooks_dir(tmp_path, env) == tmp_path / "claude-home" / "hooks"
+    assert ri.resolve_settings_path(tmp_path, env) == tmp_path / "claude-home" / "settings.json"
+    env.update(CLAUDE_HOOKS_DIR=str(tmp_path / "hooks"), CLAUDE_SETTINGS_PATH=str(tmp_path / "s.json"))
+    assert ri.resolve_hooks_dir(tmp_path, env) == tmp_path / "hooks"
+    assert ri.resolve_settings_path(tmp_path, env) == tmp_path / "s.json"
