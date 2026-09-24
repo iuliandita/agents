@@ -584,6 +584,8 @@ TARGET_DIRS = {
     # omp resolves task agents from HOME or the active profile, not PI_CODING_AGENT_DIR.
     "omp": ("{home}/.omp/agent/agents", "OMP_AGENTS_DIR"),
 }
+# Native config-home variables that also relocate the agent dir, matching the rules-file target.
+NATIVE_AGENT_HOMES = {"claude": "CLAUDE_CONFIG_DIR", "codex": "CODEX_HOME", "opencode": "OPENCODE_CONFIG_DIR"}
 HARNESS_DISPLAY = {
     "claude": "Claude Code",
     "codex": "OpenAI Codex",
@@ -632,6 +634,9 @@ def agent_target_dir(harness: str, home: Path | None = None, env: dict[str, str]
         return Path(values[env_var]).expanduser()
     if harness == "omp":
         return omp_agent_dir(home, values) / "agents"
+    native = NATIVE_AGENT_HOMES.get(harness)
+    if native and values.get(native):
+        return Path(values[native]).expanduser() / "agents"
     home_path = Path.home() if home is None else Path(home)
     return Path(template.format(home=home_path)).expanduser()
 
@@ -750,8 +755,10 @@ def print_dry_run(harness: str, dest: Path, text: str) -> None:
         print(f"would create {harness}: {dest}")
     elif existing == text:
         print(f"unchanged {harness}: {dest}")
-    else:
+    elif GENERATED_MARKER in existing:
         print(f"would replace {harness}: {dest}")
+    else:
+        print(f"would replace unmanaged {harness}: {dest} (not written by this repo; backed up first)")
 
 
 def preflight_target(target: Path, files: dict[str, str]) -> None:

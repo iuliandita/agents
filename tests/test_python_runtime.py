@@ -9,7 +9,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 BASH = shutil.which("bash")
-WRAPPERS = ("sync-ai-prompts", "render-agents", "render-invariants", "render-hermes")
+WRAPPERS = ("sync-ai-prompts", "render-agents", "render-invariants", "render-hermes", "update")
 
 
 @pytest.fixture

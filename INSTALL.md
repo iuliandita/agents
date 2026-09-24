@@ -74,15 +74,100 @@ reads the WSL home, separate from a native Windows install. Point both at one
 home with the native env var (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `HERMES_HOME`)
 if you want a shared config.
 
-Deployment is separate for each component; none of these commands installs the others:
+Each component deploys separately. `scripts/update` runs the prompt, Hermes, subagent, and invariants-hook deploys in order for the harnesses in `prompts/deploy-targets.txt`; the consolidation skill and project files stay manual:
 
 | Component | Command | Details |
 |---|---|---|
+| Everything for saved targets | `scripts/update` | [Agent-driven setup](#agent-driven-setup) |
 | Global prompts | `scripts/sync-ai-prompts` | [Render and deploy](#render) |
 | Subagent definitions | `scripts/render-agents` | [Agent targets](#agent-targets) |
 | Invariants hook | `scripts/render-invariants` | [Hook setup](README.md#invariants-reinforcement) |
 | Consolidation skill | `python scripts/install_workflow.py` | [Workflow installation](#context-consolidation-workflow) |
 | Shared/local project files | Manual opt-in | [Project instructions](#project-instructions-shared-or-private) |
+
+## Agent-Driven Setup
+
+This runbook is for a coding agent setting the repo up on its user's machine. Run each step, check its
+result, and stop on any failure. Steps marked **ask** need the user's answer; do not guess them.
+
+1. **Clone** with git (not a zip download; updates use `git pull --ff-only`) to a stable location, for
+   example `~/code/agents`, then `cd` into it. Check: `git status` shows a clean `main`.
+2. **Python**: follow [Prerequisites](#prerequisites). Check: `python3 --version` is 3.11 or newer.
+   Rendering and deploying need only the standard library.
+3. **Detect** installed harnesses: `scripts/update --detect` (`./scripts/update.ps1 --detect` on native
+   Windows). It prints one supported harness per line with the evidence found (a binary on PATH, or the
+   config home this repo would deploy to, including customized homes such as `CODEX_HOME`). A harness it
+   misses can still be listed by hand in the next step.
+4. **ask** which harnesses to manage, then write them to `prompts/deploy-targets.txt`, one per line
+   (gitignored). Show the user where each will be written and get a yes before going on:
+   `scripts/sync-ai-prompts --list-targets` (rules files) and `scripts/render-agents --list-targets`
+   (subagent dirs). Customized homes (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `OPENCODE_CONFIG_DIR`,
+   `PI_CODING_AGENT_DIR`, `OMP_PROFILE`, `HERMES_HOME`) are honored when they are set in this shell.
+   Hermes is different: its global rules merge into `agent.coding_instructions` in `$HERMES_HOME/config.yaml`
+   (default `~/.hermes/config.yaml`), shown by `scripts/render-hermes --dry-run`; ignore the `HERMES.md`
+   project-file line in `--list-targets`. Every other target is one rules file plus six subagent files.
+5. **Optional overlays** (see [Local and private overlays](README.md#local-and-private-overlays)): copy
+   `prompts/local.example.md` to `prompts/local.md` for preferences that are safe with any model provider.
+   **ask** before creating `prompts/private.md` or `prompts/private-harnesses.txt`: which harnesses may
+   receive hosts, identities, and paths depends on the model provider behind each one, which only the
+   user knows. Never write `all` without the user saying so, and check that `AGENTS_PRIVATE_HARNESSES` is
+   not already set in the environment, since it overrides the file.
+6. **Preview**: `scripts/update --no-pull --dry-run`. It prints the effective overlay trust (`private
+   overlay: sent to ...` and where the list came from), then every file it would write. Check: it ends with
+   `update complete` and names only the confirmed targets. **ask** before continuing if any line says
+   `would replace unmanaged`: that is content the user wrote (their own `CLAUDE.md`, `reviewer.md`, or
+   Hermes `coding_instructions`), which deploy replaces after backing it up.
+7. **Deploy**: `scripts/update --no-pull`. Existing files are backed up to `.backups/` first. Check: it
+   ends with `update complete`; its last steps are `--verify` (every role file present) and `--status`
+   (every rules file in sync).
+8. **Schedule** a daily run. **ask** which scheduler, what time (local timezone), and how failures should
+   reach the user (log file, syslog/journal, or mail); default to the platform's native scheduler, 06:30,
+   and the scheduler's own failure log if they have no preference. `scripts/update` pulls fast-forward only, never prompts (git runs
+   non-interactively with a timeout), refuses to run over local tracked edits or alongside another run, and
+   exits non-zero on any failure. Schedulers start with a minimal environment: copy into the job every
+   variable the setup relied on (`AGENTS_PYTHON`, customized homes from step 4, `*_AGENTS_PATH` or
+   `*_AGENTS_DIR` overrides, `AGENTS_PRIVATE_HARNESSES`). Replace `<checkout>` with the real absolute path.
+
+   ```bash
+   # cron (Linux/macOS): daily at 06:30; failures also go to syslog
+   mkdir -p "$HOME/.cache"
+   crontab -l 2>/dev/null | { cat; echo '30 6 * * * cd "<checkout>" && scripts/update >> "$HOME/.cache/agents-update.log" 2>&1 || logger -t agents-update "update failed, see ~/.cache/agents-update.log"'; } | crontab -
+   ```
+
+   ```ini
+   # systemd user units (Linux): two files, then
+   #   systemctl --user daemon-reload && systemctl --user enable --now agents-update.timer
+   # Failures show in `systemctl --user status agents-update` and `journalctl --user -u agents-update`.
+
+   # ~/.config/systemd/user/agents-update.service
+   [Service]
+   Type=oneshot
+   WorkingDirectory=<checkout>
+   ExecStart=<checkout>/scripts/update
+   # Environment=CODEX_HOME=/path/if/customized
+
+   # ~/.config/systemd/user/agents-update.timer
+   [Timer]
+   OnCalendar=daily
+   Persistent=true
+
+   [Install]
+   WantedBy=timers.target
+   ```
+
+   ```powershell
+   # Windows Task Scheduler (PowerShell 7); the inner quotes keep paths with spaces intact
+   $script = "<checkout>\scripts\update.ps1"
+   schtasks /Create /SC DAILY /ST 06:30 /TN agents-update /TR "pwsh -NoProfile -File `"$script`""
+   ```
+
+   Check: trigger the scheduled job itself once (`systemctl --user start agents-update.service`,
+   `schtasks /Run /TN agents-update`, or the cron command in a minimal shell such as `env -i HOME="$HOME"
+   sh -c '...'`) and confirm it exits 0 and `--status` reports every target in sync.
+
+Report to the user what was deployed where, the backup location, and when the schedule runs. To change
+targets later, edit `prompts/deploy-targets.txt`; the next run applies it. `AGENTS_DEPLOY_TARGETS` or
+`--targets` override the file for one run.
 
 ## Render
 

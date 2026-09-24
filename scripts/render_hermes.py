@@ -128,7 +128,10 @@ def deploy(repo_root: Path, config_path: Path, backup_dir: Path, dry_run: bool) 
         print(f"unchanged hermes: {config_path}")
         return 0
     if dry_run:
-        print(f"would update hermes: {config_path}")
+        if KEY in original and render_prompts.PROMPT_MARKER not in original:
+            print(f"would replace unmanaged hermes {AGENT}.{KEY}: {config_path} (not written by this repo; backed up first)")
+        else:
+            print(f"would update hermes: {config_path}")
         return 0
     backup_existing(config_path, backup_dir)
     config_path.parent.mkdir(parents=True, exist_ok=True)

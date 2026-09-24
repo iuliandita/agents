@@ -34,6 +34,8 @@ ANTIGRAVITY_SETTINGS_NAME = "antigravity-hooks-snippet.json"
 ANTIGRAVITY_HOOK_PATH = "{home}/.gemini/config/" + ANTIGRAVITY_HOOK_NAME
 
 HOOKS_DIR_ENV = "CLAUDE_HOOKS_DIR"
+# Claude Code's own config-home variable; the dedicated overrides still win.
+CLAUDE_CONFIG_ENV = "CLAUDE_CONFIG_DIR"
 SETTINGS_PATH_ENV = "CLAUDE_SETTINGS_PATH"
 DEFAULT_HOOKS_DIR = "{home}/.claude/hooks"
 DEFAULT_SETTINGS_PATH = "{home}/.claude/settings.json"
@@ -191,12 +193,16 @@ def load_settings(path: Path) -> dict:
 def resolve_hooks_dir(home: Path, env: dict[str, str]) -> Path:
     if env.get(HOOKS_DIR_ENV):
         return Path(env[HOOKS_DIR_ENV]).expanduser()
+    if env.get(CLAUDE_CONFIG_ENV):
+        return Path(env[CLAUDE_CONFIG_ENV]).expanduser() / "hooks"
     return Path(DEFAULT_HOOKS_DIR.format(home=home))
 
 
 def resolve_settings_path(home: Path, env: dict[str, str]) -> Path:
     if env.get(SETTINGS_PATH_ENV):
         return Path(env[SETTINGS_PATH_ENV]).expanduser()
+    if env.get(CLAUDE_CONFIG_ENV):
+        return Path(env[CLAUDE_CONFIG_ENV]).expanduser() / "settings.json"
     return Path(DEFAULT_SETTINGS_PATH.format(home=home))
 
 

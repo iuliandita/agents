@@ -941,3 +941,26 @@ def test_omp_agent_dir_follows_profile(tmp_path):
 def test_omp_agent_dir_follows_pi_config_dir(tmp_path):
     env = {"PI_CONFIG_DIR": ".omp-alt", "PI_CODING_AGENT_DIR": str(tmp_path / "custom")}
     assert ra.agent_target_dir("omp", home=tmp_path, env=env) == tmp_path / ".omp-alt" / "agent" / "agents"
+
+
+@pytest.mark.parametrize(
+    ("harness", "native"), [("claude", "CLAUDE_CONFIG_DIR"), ("codex", "CODEX_HOME"), ("opencode", "OPENCODE_CONFIG_DIR")]
+)
+def test_agent_dir_follows_native_config_home(tmp_path, harness, native):
+    env = {native: str(tmp_path / "home")}
+    assert ra.agent_target_dir(harness, home=tmp_path, env=env) == tmp_path / "home" / "agents"
+    _, dedicated = ra.TARGET_DIRS[harness]
+    env[dedicated] = str(tmp_path / "explicit")
+    assert ra.agent_target_dir(harness, home=tmp_path, env=env) == tmp_path / "explicit"
+
+
+def test_dry_run_flags_unmanaged_files(tmp_path, capsys):
+    managed = tmp_path / "managed.md"
+    managed.write_text(f"x {ra.GENERATED_MARKER} y", encoding="utf-8")
+    unmanaged = tmp_path / "mine.md"
+    unmanaged.write_text("hand written", encoding="utf-8")
+    ra.print_dry_run("claude", managed, "new")
+    ra.print_dry_run("claude", unmanaged, "new")
+    out = capsys.readouterr().out
+    assert f"would replace claude: {managed}" in out
+    assert f"would replace unmanaged claude: {unmanaged}" in out
