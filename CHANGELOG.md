@@ -3,6 +3,26 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [Unreleased]
+
+### Breaking
+
+- `prompts/private.md` no longer reaches Claude Code and Codex by default. There is no built-in trust
+  list: it reaches only harnesses named in `prompts/private-harnesses.txt` or `AGENTS_PRIVATE_HARNESSES`.
+  To keep the old behavior, put `claude` and `codex` in `prompts/private-harnesses.txt`. Render and deploy
+  print a notice for each harness the overlay is withheld from, and unknown names fail the render.
+
+### Added
+
+- `prompts/local.md` overlay for provider-safe operational preferences, appended after the core for every
+  global target, with a tracked `prompts/local.example.md` template.
+- `all` in the private trust list sends `prompts/private.md` to every supported harness.
+
+### Changed
+
+- Project-level targets (`generic`, and Hermes through `HERMES_AGENTS_PATH`) never receive either
+  overlay, since those files can be committed. The global Hermes merge follows the trust list.
+
 ## [2.4.0] - 2026-09-24
 
 ### Added

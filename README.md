@@ -7,7 +7,7 @@ This is an opinionated toolkit shaped by 20+ years in IT and DevOps, production 
 ## What This Repo Does
 
 - Stores canonical prompt fragments in `prompts/`.
-- Merges an optional gitignored private overlay from `prompts/private.md`.
+- Merges two optional gitignored overlays: `prompts/local.md` for every harness and `prompts/private.md` for the harnesses you trust.
 - Renders public operational-rule variants for Claude Code, OpenAI Codex, OpenCode, Command Code, Antigravity, Oh My Pi, and Hermes Agent, plus a generic project-level `AGENTS.md` target for other tools.
 - Separates deployable global targets from manual project-local targets when no verified global operational rules path is known.
 - Does not generate persona, identity, memory, provider credential, model settings, MCP, plugin, or assistant-profile files.
@@ -59,8 +59,10 @@ agents/                   # tool-agnostic subagent sources
 prompts/
   core.md                 # shared rules
   invariants.md           # non-negotiable rules for hook/subagent reinforcement
-  private.example.md      # tracked template for private local rules
-  private.md              # optional gitignored local overlay
+  local.example.md        # tracked template for the local overlay
+  local.md                # optional gitignored overlay, every harness
+  private.example.md      # tracked template for the private overlay
+  private.md              # optional gitignored overlay, trusted harnesses only
   private-patterns.example.txt  # template for local leak-check markers
   harnesses/
     claude.md             # prepended to Claude output
@@ -94,22 +96,32 @@ tests/                    # render, deploy, installer, lint, and CI regression t
 docs/                     # harness contract, surfaces, legacy harnesses, design specs
 ```
 
-## Private Overlay
+## Local and Private Overlays
 
-Public prompt fragments stay anonymized. Put personal paths, internal repo names, local command quirks, and private company rules in `prompts/private.md`.
+Public prompt fragments stay anonymized. Your own rules go in two gitignored overlays, appended after the
+shared core in this order:
+
+| Overlay | Holds | Reaches |
+|---|---|---|
+| `prompts/local.md` | Operational preferences safe for any provider: shell quirks, deploy lists, branch and release habits, tool preferences | Every harness you render or deploy |
+| `prompts/private.md` | Sensitive context: hosts, networks, identities, machine paths, company rules | Only harnesses you list as trusted |
 
 ```bash
+cp prompts/local.example.md prompts/local.md
 cp prompts/private.example.md prompts/private.md
+printf '%s\n' claude codex > prompts/private-harnesses.txt   # or: echo all > prompts/private-harnesses.txt
 ```
 
-`prompts/private.md` is gitignored and appended after the shared core during render/deploy.
-It can extend the public config locally, but rendered output can contain private content.
-Do not publish generated files or copy them into tracked project instructions.
+The harness is not the trust boundary, the model provider behind it is, and only you know which provider
+each harness uses. So there is no built-in trust list: `prompts/private.md` reaches only the harnesses named
+in `prompts/private-harnesses.txt` (one per line) or `AGENTS_PRIVATE_HARNESSES` (comma-separated), and `all`
+covers every supported harness. Unknown names fail the render. When the private overlay exists but is
+withheld from a selected harness, render and deploy print a notice naming it. Project-level targets
+(`generic`, and Hermes through `HERMES_AGENTS_PATH`) never receive either overlay, because those files can
+end up committed; Hermes' global `agent.coding_instructions` merge does.
 
-The overlay is applied to **Claude Code and Codex only** by default, because it can hold home-lab
-hosts, identities, and local paths that should not reach third-party models. Add other harnesses with
-`AGENTS_PRIVATE_HARNESSES` (comma-separated) or a `prompts/private-harnesses.txt` file with one harness
-name per line. Opt in only for providers you trust with the overlay contents.
+Rendered output can contain overlay content. Do not publish generated files or copy them into tracked
+project instructions.
 
 For local leak checks that should not be committed, copy `prompts/private-patterns.example.txt` to `prompts/private-patterns.txt` or set `AGENTS_PRIVATE_PATTERNS` to comma- or newline-separated markers.
 

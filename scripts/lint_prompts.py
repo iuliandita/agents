@@ -33,6 +33,8 @@ HARNESS_WARN_LINES = 20
 HARNESS_MAX_LINES = 24
 PRIVATE_EXAMPLE_WARN_LINES = 30
 PRIVATE_EXAMPLE_MAX_LINES = 40
+# Tracked templates for the gitignored overlays; both are linted like public prompt sources.
+OVERLAY_EXAMPLES = ("local.example.md", "private.example.md")
 AGENT_WARN_LINES = 70
 AGENT_MAX_LINES = 90
 
@@ -155,17 +157,14 @@ def main() -> int:
         failures += lint_line_count(agent_path, AGENT_WARN_LINES, AGENT_MAX_LINES)
         failures += lint_file(agent_path, private_patterns=private_patterns)
 
-    private_example = prompt_root / "private.example.md"
-    if not private_example.exists():
-        error("missing prompts/private.example.md")
-        failures += 1
-    else:
-        failures += lint_line_count(
-            private_example,
-            PRIVATE_EXAMPLE_WARN_LINES,
-            PRIVATE_EXAMPLE_MAX_LINES,
-        )
-        failures += lint_file(private_example, private_patterns=private_patterns)
+    for example_name in OVERLAY_EXAMPLES:
+        example = prompt_root / example_name
+        if not example.exists():
+            error(f"missing prompts/{example_name}")
+            failures += 1
+            continue
+        failures += lint_line_count(example, PRIVATE_EXAMPLE_WARN_LINES, PRIVATE_EXAMPLE_MAX_LINES)
+        failures += lint_file(example, private_patterns=private_patterns)
 
     if failures:
         print(f"Prompt lint failed: {failures} issue(s)")

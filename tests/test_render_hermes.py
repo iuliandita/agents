@@ -76,3 +76,27 @@ def test_deploy_dry_run_writes_nothing(tmp_path):
     assert rh.deploy(REPO, config, tmp_path / "b", dry_run=True) == 0
     assert config.read_text(encoding="utf-8") == before
     assert not (tmp_path / "b").exists()
+
+
+def overlay_repo(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "prompts" / "harnesses").mkdir(parents=True)
+    (repo / "prompts" / "core.md").write_text("# Core\nshared\n", encoding="utf-8")
+    (repo / "prompts" / "harnesses" / "hermes.md").write_text("## Hermes\nx\n", encoding="utf-8")
+    (repo / "prompts" / "local.md").write_text("local layer\n", encoding="utf-8")
+    (repo / "prompts" / "private.md").write_text("private layer\n", encoding="utf-8")
+    return repo
+
+
+def test_render_rules_adds_local_and_withholds_untrusted_private(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("AGENTS_PRIVATE_HARNESSES", raising=False)
+    rules = rh.render_rules(overlay_repo(tmp_path))
+    assert "local layer" in rules
+    assert "private layer" not in rules
+    assert "withheld from hermes" in capsys.readouterr().out
+
+
+def test_render_rules_includes_private_when_trusted(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "hermes")
+    rules = rh.render_rules(overlay_repo(tmp_path))
+    assert rules.index("local layer") < rules.index("private layer")
