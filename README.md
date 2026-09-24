@@ -123,7 +123,7 @@ shared core in this order:
 ```bash
 cp prompts/local.example.md prompts/local.md
 cp prompts/private.example.md prompts/private.md
-printf '%s\n' claude codex > prompts/private-harnesses.txt   # or: echo all > prompts/private-harnesses.txt
+printf '%s\n' claude codex > prompts/private-harnesses.txt   # only harnesses whose provider you trust; 'all' for every one
 ```
 
 The harness is not the trust boundary, the model provider behind it is, and only you know which provider
@@ -212,10 +212,10 @@ scripts/render-agents                # build/agents/<harness>/
 scripts/render-agents --check
 scripts/render-agents --dry-run
 scripts/render-agents --target claude,codex --deploy
-scripts/render-agents --verify        # after --deploy: confirm the roles landed in each agent dir
+scripts/render-agents --target claude,codex --verify   # after --deploy: confirm the roles landed
 ```
 
-Deploy backs up overwritten files into `.backups/` and removes only stale files that carry the generated marker; hand-written agents in the same directory are left alone. After a deploy, `--verify` checks that all six role files exist in each harness's agent directory. Prune old backups with `scripts/sync-ai-prompts --prune-backups 50 --dry-run` (drop `--dry-run` to delete). The hard invariants are rendered into every agent from `prompts/invariants.md`, so the manual subagent paste is only needed for agents defined outside this repo.
+Deploy backs up overwritten files into `.backups/` and removes only stale files that carry the generated marker. Hand-written agents with other names are left alone, but a hand-written file with the same name as a role (for example your own `reviewer.md`) is replaced after its backup; `--dry-run` reports those as `would replace unmanaged`, so rename yours first if you want both. After a deploy, `scripts/render-agents --target <list> --verify` checks that all six role files exist in each selected harness's agent directory. Prune old backups with `scripts/sync-ai-prompts --prune-backups 50 --dry-run` (drop `--dry-run` to delete). The hard invariants are rendered into every agent from `prompts/invariants.md`, so the manual subagent paste is only needed for agents defined outside this repo.
 
 `shell-ro` is rendered only when the harness can enforce it as a real sandbox boundary. Codex maps it to shell access under `sandbox_mode = "read-only"`. Claude Code, OpenCode, Command Code, and Antigravity omit shell access for `shell-ro` agents and retain their native read and search tools. This costs explorer and reviewer direct git-history access on those harnesses, but keeps the read-only contract honest. Full `shell` roles are unchanged.
 
@@ -273,11 +273,11 @@ python scripts/scan_prompt_sources.py
 python scripts/check_harness_docs.py
 python scripts/check_harness_contract.py
 python -m pytest -q
-bash -n scripts/sync-ai-prompts scripts/render-invariants scripts/render-agents
-python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/render_agents.py scripts/install_workflow.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py
+bash -n scripts/sync-ai-prompts scripts/render-invariants scripts/render-agents scripts/render-hermes scripts/update
+python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/render_agents.py scripts/install_workflow.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py scripts/render_hermes.py scripts/update.py
 scripts/sync-ai-prompts --check
 scripts/sync-ai-prompts --dry-run
-scripts/sync-ai-prompts --status
+scripts/sync-ai-prompts --target claude,codex --status
 scripts/render-agents --check
 ```
 

@@ -10,38 +10,62 @@ a non-zero exit so a scheduler can report it.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 from render_agents import AGENT_HARNESSES
-from render_prompts import DEPLOYABLE, harness_by_name, harness_names
+from render_hermes import hermes_config_path
+from render_prompts import (
+    DEPLOYABLE,
+    PRIVATE_HARNESSES_ENV,
+    PRIVATE_HARNESSES_FILE,
+    harness_by_name,
+    harness_names,
+    load_overlays,
+    target_path,
+)
 
 TARGETS_ENV = "AGENTS_DEPLOY_TARGETS"
 TARGETS_FILE = ("prompts", "deploy-targets.txt")
 
-# Evidence that a harness is installed: a binary on PATH or its config home.
-DETECTION = {
-    "claude": (("claude",), "~/.claude"),
-    "codex": (("codex",), "~/.codex"),
-    "opencode": (("opencode",), "~/.config/opencode"),
-    "commandcode": (("commandcode", "command-code", "cmdc"), "~/.commandcode"),
-    "antigravity": (("agy",), "~/.gemini"),
-    "omp": (("omp",), "~/.omp"),
-    "hermes": (("hermes",), "~/.hermes"),
+GIT_TIMEOUT_SECONDS = 300
+# Binaries that show a harness is installed; config homes come from the deploy resolvers.
+BINARIES = {
+    "claude": ("claude",),
+    "codex": ("codex",),
+    "opencode": ("opencode",),
+    "commandcode": ("commandcode", "command-code", "cmdc"),
+    "antigravity": ("agy",),
+    "omp": ("omp",),
+    "hermes": ("hermes",),
 }
 
 
-def detect(home: Path | None = None) -> dict[str, str]:
+def config_home(name: str, home: Path | None, env: dict[str, str]) -> Path | None:
+    if name == "hermes":
+        explicit = env.get("HERMES_CONFIG_PATH") or env.get("HERMES_HOME")
+        if home is not None and not explicit:
+            return Path(home) / ".hermes"
+        return hermes_config_path(env).parent
+    target = target_path(name, home=home, env=env)
+    return None if target is None else target.parent
+
+
+def detect(home: Path | None = None, env: dict[str, str] | None = None) -> dict[str, str]:
+    """Supported harnesses with a binary on PATH or a config home where this repo would deploy."""
+    values = dict(os.environ) if env is None else env
     found: dict[str, str] = {}
-    for name, (binaries, config) in DETECTION.items():
+    for name, binaries in BINARIES.items():
         binary = next((b for b in binaries if shutil.which(b)), None)
-        config_dir = Path(config.replace("~", str(home), 1)) if home else Path(config).expanduser()
+        config_dir = config_home(name, home, values)
         if binary:
             found[name] = f"binary {binary}"
-        elif config_dir.is_dir():
+        elif config_dir is not None and config_dir.is_dir():
             found[name] = f"config {config_dir}"
     return found
 
@@ -53,7 +77,7 @@ def parse_names(raw: str) -> list[str]:
 def load_targets(repo_root: Path, cli: str | None, env: dict[str, str] | None = None) -> list[str]:
     values = os.environ if env is None else env
     path = repo_root.joinpath(*TARGETS_FILE)
-    if cli:
+    if cli is not None:
         names, source = parse_names(cli), "--targets"
     elif values.get(TARGETS_ENV, "").strip():
         names, source = parse_names(values[TARGETS_ENV]), TARGETS_ENV
@@ -80,10 +104,9 @@ def plan(repo_root: Path, targets: list[str], dry_run: bool) -> list[list[str]]:
     global_targets = [name for name in targets if harness_by_name(name).support_level == DEPLOYABLE]
     agent_targets = [name for name in targets if name in AGENT_HARNESSES]
     deploy_flag = "--dry-run" if dry_run else "--deploy"
-    steps = [
-        [str(scripts / "render_prompts.py"), "--check"],
-        [str(scripts / "render_agents.py"), "--check"],
-    ]
+    steps = [[str(scripts / "render_prompts.py"), "--target", ",".join(targets), "--check"]]
+    if agent_targets:
+        steps.append([str(scripts / "render_agents.py"), "--target", ",".join(agent_targets), "--check"])
     if global_targets:
         steps.append([str(scripts / "render_prompts.py"), "--target", ",".join(global_targets), deploy_flag])
     if "hermes" in targets:
@@ -100,21 +123,64 @@ def plan(repo_root: Path, targets: list[str], dry_run: bool) -> list[list[str]]:
     return [[sys.executable, *step, "--repo-root", str(repo_root)] for step in steps]
 
 
-def tracked_changes(repo_root: Path) -> str:
-    result = subprocess.run(
-        ["git", "-C", str(repo_root), "status", "--porcelain", "--untracked-files=no"],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return result.stdout.strip()
+def git(repo_root: Path, *args: str, capture: bool = False) -> subprocess.CompletedProcess[str]:
+    # Unattended runs must fail instead of waiting on a password prompt or a stalled remote.
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+    env.setdefault("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
+    try:
+        return subprocess.run(
+            ["git", "-C", str(repo_root), *args],
+            capture_output=capture,
+            text=True,
+            check=True,
+            env=env,
+            timeout=GIT_TIMEOUT_SECONDS,
+        )
+    except FileNotFoundError:
+        raise SystemExit("git is not on PATH; install it or run with --no-pull")
+    except subprocess.TimeoutExpired:
+        raise SystemExit(f"git {' '.join(args)} timed out after {GIT_TIMEOUT_SECONDS}s")
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(f"git {' '.join(args)} failed with exit {exc.returncode}")
 
 
 def pull(repo_root: Path) -> None:
-    dirty = tracked_changes(repo_root)
+    dirty = git(repo_root, "status", "--porcelain", "--untracked-files=no", capture=True).stdout.strip()
     if dirty:
         raise SystemExit(f"Local tracked changes in {repo_root}; not updating:\n{dirty}")
-    subprocess.run(["git", "-C", str(repo_root), "pull", "--ff-only"], check=True)
+    git(repo_root, "pull", "--ff-only")
+
+
+@contextlib.contextmanager
+def run_lock(repo_root: Path) -> Iterator[None]:
+    """Refuse to start while another update runs from the same checkout."""
+    handle = open(repo_root / ".update.lock", "a+")
+    try:
+        try:
+            import fcntl
+
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except ImportError:
+            import msvcrt
+
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError:
+            raise SystemExit(f"Another update is running in {repo_root}")
+        yield
+    finally:
+        handle.close()
+
+
+def overlay_summary(repo_root: Path, targets: list[str]) -> list[str]:
+    overlays = load_overlays(repo_root)
+    lines = [f"local overlay: {'prompts/local.md' if overlays.local.strip() else 'none'}"]
+    if not overlays.private.strip():
+        lines.append("private overlay: none")
+        return lines
+    source = PRIVATE_HARNESSES_ENV if os.environ.get(PRIVATE_HARNESSES_ENV, "").strip() else f"prompts/{PRIVATE_HARNESSES_FILE}"
+    sent = [name for name in targets if name in overlays.trusted]
+    lines.append(f"private overlay: sent to {', '.join(sent) or 'no target'} (trust list from {source})")
+    return lines
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -135,15 +201,18 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{name}\t{evidence}")
         return 0
     targets = load_targets(args.repo_root, args.targets)
-    if not args.no_pull:
-        pull(args.repo_root)
-    for step in plan(args.repo_root, targets, args.dry_run):
-        label = " ".join([Path(step[1]).name, *step[2:-2]])
-        print(f"==> {label}", flush=True)
-        result = subprocess.run(step)
-        if result.returncode != 0:
-            print(f"update failed at: {label}", file=sys.stderr)
-            return result.returncode
+    with run_lock(args.repo_root):
+        if not args.no_pull:
+            pull(args.repo_root)
+        for line in overlay_summary(args.repo_root, targets):
+            print(line)
+        for step in plan(args.repo_root, targets, args.dry_run):
+            label = " ".join([Path(step[1]).name, *step[2:-2]])
+            print(f"==> {label}", flush=True)
+            result = subprocess.run(step)
+            if result.returncode != 0:
+                print(f"update failed at: {label}", file=sys.stderr)
+                return result.returncode
     print(f"update complete for: {', '.join(targets)}")
     return 0
 

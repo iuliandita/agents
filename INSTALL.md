@@ -95,36 +95,54 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
 2. **Python**: follow [Prerequisites](#prerequisites). Check: `python3 --version` is 3.11 or newer.
    Rendering and deploying need only the standard library.
 3. **Detect** installed harnesses: `scripts/update --detect` (`./scripts/update.ps1 --detect` on native
-   Windows). It prints one supported harness per line with the evidence found.
-4. **ask** which of the detected harnesses to manage. Write them to `prompts/deploy-targets.txt`, one per
-   line (gitignored). Hermes merges into its `config.yaml`; every other target is a single rules file
-   plus subagent files.
+   Windows). It prints one supported harness per line with the evidence found (a binary on PATH, or the
+   config home this repo would deploy to, including customized homes such as `CODEX_HOME`). A harness it
+   misses can still be listed by hand in the next step.
+4. **ask** which harnesses to manage, then write them to `prompts/deploy-targets.txt`, one per line
+   (gitignored). Show the user where each will be written and get a yes before going on:
+   `scripts/sync-ai-prompts --list-targets` (rules files) and `scripts/render-agents --list-targets`
+   (subagent dirs). Customized homes (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `OPENCODE_CONFIG_DIR`,
+   `PI_CODING_AGENT_DIR`, `OMP_PROFILE`, `HERMES_HOME`) are honored when they are set in this shell.
+   Hermes merges into its `config.yaml`; every other target is one rules file plus six subagent files.
 5. **Optional overlays** (see [Local and private overlays](README.md#local-and-private-overlays)): copy
    `prompts/local.example.md` to `prompts/local.md` for preferences that are safe with any model provider.
    **ask** before creating `prompts/private.md` or `prompts/private-harnesses.txt`: which harnesses may
    receive hosts, identities, and paths depends on the model provider behind each one, which only the
-   user knows.
-6. **Preview**: `scripts/update --no-pull --dry-run`. Check: it ends with `update complete` and lists only
-   the confirmed targets.
+   user knows. Never write `all` without the user saying so, and check that `AGENTS_PRIVATE_HARNESSES` is
+   not already set in the environment, since it overrides the file.
+6. **Preview**: `scripts/update --no-pull --dry-run`. It prints the effective overlay trust (`private
+   overlay: sent to ...` and where the list came from), then every file it would write. Check: it ends with
+   `update complete` and names only the confirmed targets. **ask** before continuing if any line says
+   `would replace unmanaged`: that is a file the user wrote (for example their own `reviewer.md`), which
+   deploy replaces after backing it up.
 7. **Deploy**: `scripts/update --no-pull`. Existing files are backed up to `.backups/` first. Check: it
-   ends with `update complete`; the last steps are `--verify` (every role file present) and `--status`
+   ends with `update complete`; its last steps are `--verify` (every role file present) and `--status`
    (every rules file in sync).
-8. **Schedule** a daily update. `scripts/update` pulls fast-forward only, refuses to run over local
-   tracked edits, and exits non-zero on any failure, so the scheduler's failure reporting works:
+8. **Schedule** a daily run. `scripts/update` pulls fast-forward only, never prompts (git runs
+   non-interactively with a timeout), refuses to run over local tracked edits or alongside another run, and
+   exits non-zero on any failure. Schedulers start with a minimal environment: copy into the job every
+   variable the setup relied on (`AGENTS_PYTHON`, customized homes from step 4, `*_AGENTS_PATH` or
+   `*_AGENTS_DIR` overrides, `AGENTS_PRIVATE_HARNESSES`). Replace `<checkout>` with the real absolute path.
 
    ```bash
-   # cron (Linux/macOS): daily at 06:30
-   30 6 * * * cd "$HOME/code/agents" && scripts/update >> "$HOME/.cache/agents-update.log" 2>&1
+   # cron (Linux/macOS): daily at 06:30; failures also go to syslog
+   mkdir -p "$HOME/.cache"
+   crontab -l 2>/dev/null | { cat; echo '30 6 * * * cd "<checkout>" && scripts/update >> "$HOME/.cache/agents-update.log" 2>&1 || logger -t agents-update "update failed, see ~/.cache/agents-update.log"'; } | crontab -
    ```
 
    ```ini
-   # systemd user units: ~/.config/systemd/user/agents-update.service and .timer,
-   # then: systemctl --user enable --now agents-update.timer
+   # systemd user units (Linux): two files, then
+   #   systemctl --user daemon-reload && systemctl --user enable --now agents-update.timer
+   # Failures show in `systemctl --user status agents-update` and `journalctl --user -u agents-update`.
+
+   # ~/.config/systemd/user/agents-update.service
    [Service]
    Type=oneshot
-   WorkingDirectory=%h/code/agents
-   ExecStart=%h/code/agents/scripts/update
+   WorkingDirectory=<checkout>
+   ExecStart=<checkout>/scripts/update
+   # Environment=CODEX_HOME=/path/if/customized
 
+   # ~/.config/systemd/user/agents-update.timer
    [Timer]
    OnCalendar=daily
    Persistent=true
@@ -134,12 +152,14 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
    ```
 
    ```powershell
-   # Windows Task Scheduler
-   schtasks /Create /SC DAILY /ST 06:30 /TN agents-update /TR "pwsh -NoProfile -File $HOME\code\agents\scripts\update.ps1"
+   # Windows Task Scheduler (PowerShell 7); the inner quotes keep paths with spaces intact
+   $script = "<checkout>\scripts\update.ps1"
+   schtasks /Create /SC DAILY /ST 06:30 /TN agents-update /TR "pwsh -NoProfile -File `"$script`""
    ```
 
-   The service and timer blocks above go in separate files. Check: run the job once by hand
-   (`systemctl --user start agents-update.service`, or the cron command) and confirm it exits 0.
+   Check: trigger the scheduled job itself once (`systemctl --user start agents-update.service`,
+   `schtasks /Run /TN agents-update`, or the cron command in a minimal shell such as `env -i HOME="$HOME"
+   sh -c '...'`) and confirm it exits 0 and `--status` reports every target in sync.
 
 Report to the user what was deployed where, the backup location, and when the schedule runs. To change
 targets later, edit `prompts/deploy-targets.txt`; the next run applies it. `AGENTS_DEPLOY_TARGETS` or

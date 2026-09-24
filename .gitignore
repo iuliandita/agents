@@ -8,6 +8,7 @@ prompts/local.md
 prompts/private-patterns.txt
 prompts/private-harnesses.txt
 prompts/deploy-targets.txt
+.update.lock
 prompts/models.local.json
 SECURITY-AUDIT.md
 /.claude/
