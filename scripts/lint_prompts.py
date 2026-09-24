@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
 from pathlib import Path
 
 from render_prompts import HARNESSES
@@ -66,18 +67,60 @@ def split_env_patterns(raw: str) -> list[str]:
     return parts
 
 
-def load_private_patterns(repo_root: Path) -> tuple[str, ...]:
-    patterns: list[str] = list(DEFAULT_LOCAL_MARKERS)
-    patterns.extend(split_env_patterns(os.environ.get("AGENTS_PRIVATE_PATTERNS", "")))
+PATTERNS_EXAMPLE = Path("prompts") / "private-patterns.example.txt"
 
+
+def load_user_patterns(repo_root: Path) -> tuple[str, ...]:
+    """The user's own markers: AGENTS_PRIVATE_PATTERNS plus prompts/private-patterns.txt."""
+    patterns = split_env_patterns(os.environ.get("AGENTS_PRIVATE_PATTERNS", ""))
     pattern_file = repo_root / "prompts" / "private-patterns.txt"
     if pattern_file.exists():
         for line in pattern_file.read_text(encoding="utf-8").splitlines():
             value = line.strip()
             if value and not value.startswith("#"):
                 patterns.append(value)
-
     return tuple(dict.fromkeys(patterns))
+
+
+def load_private_patterns(repo_root: Path) -> tuple[str, ...]:
+    return tuple(dict.fromkeys([*DEFAULT_LOCAL_MARKERS, *load_user_patterns(repo_root)]))
+
+
+def tracked_files(repo_root: Path) -> list[Path] | None:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "ls-files", "-z"], capture_output=True, check=True
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+    return [repo_root / name for name in result.stdout.decode("utf-8").split("\0") if name]
+
+
+def lint_tracked_markers(repo_root: Path, patterns: tuple[str, ...]) -> int:
+    """Check every tracked text file for the user's own markers.
+
+    The built-in placeholder markers are left out on purpose: the repo's own tests and this linter
+    contain them. Without a local marker list this is a no-op, so CI stays green on a clean fork.
+    """
+    if not patterns:
+        return 0
+    files = tracked_files(repo_root)
+    if files is None:
+        warn("not a git checkout or git missing; skipped the tracked-file marker scan")
+        return 0
+    failures = 0
+    for path in files:
+        if path.relative_to(repo_root) == PATTERNS_EXAMPLE or not path.is_file():
+            continue
+        raw = path.read_bytes()
+        if b"\0" in raw:
+            continue
+        text = raw.decode("utf-8", errors="replace")
+        for needle in patterns:
+            if needle in text:
+                error(f"{path.relative_to(repo_root)}: tracked file contains local marker: {needle}")
+                failures += 1
+    return failures
 
 
 def lint_file(path: Path, private_patterns: tuple[str, ...] = DEFAULT_LOCAL_MARKERS) -> int:
@@ -165,6 +208,8 @@ def main() -> int:
             continue
         failures += lint_line_count(example, PRIVATE_EXAMPLE_WARN_LINES, PRIVATE_EXAMPLE_MAX_LINES)
         failures += lint_file(example, private_patterns=private_patterns)
+
+    failures += lint_tracked_markers(repo_root, load_user_patterns(repo_root))
 
     if failures:
         print(f"Prompt lint failed: {failures} issue(s)")

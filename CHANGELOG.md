@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [Unreleased]
+
+### Changed
+
+- Local leak markers (`prompts/private-patterns.txt`, `AGENTS_PRIVATE_PATTERNS`) are checked against every
+  tracked text file, not only prompt sources. The built-in placeholder markers still apply to prompt
+  sources only. With no local markers the scan is skipped.
+- `prompts/private-patterns.example.txt` shows generic marker categories: machine and user paths, home-lab
+  hosts and private IP prefixes, employer names, and private identities.
+
 ## [3.0.0] - 2026-09-24
 
 ### Breaking
