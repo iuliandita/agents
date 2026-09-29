@@ -111,6 +111,70 @@ pattern (`medium`), or it is not vendored (`n/a`).
 - Linux/macOS `~/.omp/`; Windows native unverified (inferred `%USERPROFILE%\.omp\`); WSL reads the WSL
   home. Plain `pi` (the upstream project omp forks) stays in `docs/legacy-harnesses.md`.
 
+## Model migration compatibility (2026-09-29)
+
+These model-specific receipts cover the Sonnet 5.5 and GPT-6.1 Sol migration, not a fresh verification
+of every harness above. This repo renders prompts and role definitions; API requirements below apply
+to integrations that send requests. They do not establish that every supported harness implements the
+new APIs or beta features.
+
+### Claude Sonnet 5.5
+
+The API model ID is `claude-sonnet-5-5`. Current Claude Code resolves `sonnet` to Sonnet 5.5 on the
+Anthropic API; other providers can resolve an older version, and environment overrides can pin it.
+Keep the portable alias and cheap-tier `low` effort. Start bounded coding at `medium`, harder work at
+`high`, and routine lookup at `low`; recalibrate on representative tasks. The adaptive API default of
+`high` is not a coding-effort recommendation. See [Claude Code model configuration](https://code.claude.com/docs/en/model-config)
+and the [Sonnet 5.5 prompting guide](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5).
+
+API integrations must account for five compatibility changes:
+
+- Thinking cannot be disabled, and manual token budgets are rejected. Adaptive thinking is the
+  default; `between_tools` is the lowest mode without up-front thinking and accepts `low`, `medium`,
+  or `high`, with no extra display, budget, or binding fields and no mid-conversation effort changes.
+  `xhigh` and `max` require adaptive thinking.
+- Forced `tool_choice` values `any` and `tool` are rejected; use `auto` or `none`.
+- Thinking is bound to the model, account, and conversation. Replaying it after editing system
+  instructions, tools, or history can return HTTP 400; new accounts default to enforcement from
+  August 31, 2026. Keep history append-only or use documented binding/drop controls. Preserve signed
+  compaction blocks rather than arbitrarily rewriting history.
+- Longer progress updates can appear in thinking. Adaptive display updates are a beta option for
+  user-facing notes; shorter text is unaffected. Prompt instructions cannot fix a renderer that
+  does not expose these updates.
+- The old computer tool is rejected on the Claude API and Google Cloud, with a Bedrock exception.
+  Advisor pairings cannot use older Opus 4.8, Opus 4.7, or Sonnet 5 models.
+
+These requirements and provider exceptions come from [What's new in Sonnet 5.5](https://platform.claude.com/docs/en/models/sonnet-5-5/whats-new-sonnet-5-5).
+Per-message effort, signed compaction, and inline tool additions are API/beta opportunities: enable
+them only after verifying the harness and provider support. This migration adds no API integration.
+
+### OpenAI GPT-6.1 Sol
+
+Codex `mid` and `flagship` tiers use `gpt-6.1-sol`, split by role effort. The API accepts `low`,
+`medium` (default), `high`, `xhigh`, and `max`; it rejects `none` and `minimal`. Tool calling requires
+the Responses API. See the [GPT-6.1 Sol model reference](https://developers.openai.com/api/docs/models/gpt-6.1-sol).
+
+Native Responses multi-agent is beta and shares the model and tools across agents; it is separate
+from Codex custom roles with independent model, effort, and tool settings. Async execution and
+mid-turn steering are existing GPT-6 family features, not new GPT-6.1 features. See the
+[Responses multi-agent guide](https://developers.openai.com/api/docs/guides/responses-multi-agent).
+Cache-preserving effort changes through `configuration_update` apply only to standard single-agent
+mode, not native multi-agent. Verify harness support before relying on this API control; see the
+[reasoning guide](https://developers.openai.com/api/docs/guides/reasoning#change-reasoning-mid-conversation).
+
+### Deployment receipt
+
+On 2026-09-29, installed Command Code v1.70.0 returned exit 0 from
+`commandcode --no-auto-update --list-models`, listing `claude-sonnet-5-5` as recommended and
+`claude-sonnet-5` as previous. This confirms its advertised model ID, not API compatibility.
+
+Preview the selected targets, then verify the rendered and deployed role files with
+`scripts/render-agents --target <list> --check` and `scripts/render-agents --target <list> --verify`.
+Also inspect the running harness's resolved model, provider, supported effort, and account access;
+role-file presence alone does not prove model availability or alias resolution. Local model and
+effort overrides intentionally win over tracked defaults. Record the effective configuration in a
+private deployment receipt rather than publishing local override values.
+
 ## Unverified
 
 - Command Code per-OS home spelling (medium).

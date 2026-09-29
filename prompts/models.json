@@ -29,8 +29,8 @@
     },
     "tiers": {
       "cheap": "gpt-6-luna",
-      "mid": "gpt-6-sol",
-      "flagship": "gpt-6-sol",
+      "mid": "gpt-6.1-sol",
+      "flagship": "gpt-6.1-sol",
       "apex": "gpt-6-astra"
     }
   },
@@ -60,7 +60,7 @@
     },
     "tiers": {
       "cheap": "deepseek/deepseek-v4.1-flash",
-      "mid": "claude-sonnet-5",
+      "mid": "claude-sonnet-5-5",
       "flagship": "claude-opus-5-5"
     }
   },

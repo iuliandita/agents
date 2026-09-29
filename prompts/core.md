@@ -73,7 +73,7 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 
 ## Verification
 - Plan steps as `1. action -> verify: check`.
-- Complete required repo checks and select additional lint, tests, and type checks according to the change's risk. Once appropriate checks pass, broaden or repeat them only for new changes, failures, or unresolved concerns. Report what was verified and why anything could not be run, with tool evidence from this session.
+- Complete required repo checks and select additional lint, tests, and type checks according to the change's risk. Executable changes need a check that exercises the changed behavior; syntax-only checks and checks that fail to start do not verify behavior. Once appropriate checks pass, broaden or repeat them only for new changes, failures, or unresolved concerns. Report what was verified with tool evidence from this session; when blocked, name the exact check and reason without relaxing permissions.
 - Search or verify first for versions, features, pricing, APIs, docs, laws, security advisories, model names, and other facts that might be stale. Recognizing a name is not knowing its current state: for models and developer tools, search the name as the user wrote it before answering.
 - Verify generated changes from the host repo or shell, not only from IDE/chat state.
 - For IaC, `terraform plan`, `ansible --check`, and `kubectl diff` count as verification.
@@ -96,5 +96,5 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 <!-- /optional:subagents -->
 ## Scope
 - Keep global rules concise. Put project-specific conventions in repo-local files. At task completion, suggest the project-context consolidation workflow once only when durable discoveries or instruction/memory drift warrant it; do not run it without user authorization. When requested, load the installed skill or the workflow path supplied by local configuration.
-- Do only what was asked or clearly implied. Avoid speculative abstractions and dependency creep. Prefer CLI paths over GUI suggestions.
+- Do only what was asked or clearly implied. Stop after the requested work, required checks, and required repo reviews. Additional review rounds need new evidence or an explicit request; unrelated work needs authorization. Avoid speculative abstractions and dependency creep. Prefer CLI paths over GUI suggestions.
 - Back up before cleanup. Exhaust migration and recovery paths before deletion.
