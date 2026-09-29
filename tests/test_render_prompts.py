@@ -279,14 +279,26 @@ def test_vendor_harnesses_define_model_ladders():
     claude = (repo / "prompts" / "harnesses" / "claude.md").read_text(encoding="utf-8")
     codex = (repo / "prompts" / "harnesses" / "codex.md").read_text(encoding="utf-8")
 
-    assert "Sonnet 5 at `low` = cheap tier" in claude
+    assert "Sonnet 5.5 at `low` = cheap tier" in claude
     assert "`medium` as its default effort" in claude
     assert "Fable 5.1 = apex" in claude
     assert "Haiku 4.5 has no effort control" in claude
     assert "GPT-6 Luna = cheap tier" in codex
-    assert "GPT-6 Sol = balanced and flagship" in codex
+    assert "GPT-6.1 Sol = balanced and flagship" in codex
     assert "GPT-6 Astra = apex" in codex
     assert "do not freeze stale names" in codex
+    assert "use `medium` for bounded coding and `high` for hard reasoning or long work" in claude
+    assert "recalibrate effort after model changes" in claude
+    assert "check the resolved model and provider" in claude
+    assert "aliases may be overridden" in claude
+    assert "`sonnet` selects 5.5 only on the Anthropic API" in claude
+    assert "other providers may resolve older models" in claude
+    assert "GPT-6.1 Sol accepts `low`, `medium` (default), `high`, `xhigh`, and `max`" in codex
+    assert "with no `none` or `minimal`" in codex
+    assert "Luna accepts `none`" in codex
+    assert "Native Responses multi-agent uses the same request model and tools" in codex
+    assert "custom Codex roles can select per-role models and tools" in codex
+    assert "Prompt text does not enable API features" in codex
 
 
 @pytest.mark.parametrize("harness", ["claude", "codex", "opencode", "commandcode"])
@@ -373,6 +385,12 @@ def test_core_tracks_fable_5_1_and_gpt_5_6_prompting_guides():
         "Delegate by default whenever a bounded task",
         "Preserve authorization across turns",
         "Once appropriate checks pass",
+        "Executable changes need a check that exercises the changed behavior",
+        "syntax-only checks and checks that fail to start do not verify behavior",
+        "name the exact check and reason without relaxing permissions",
+        "Stop after the requested work, required checks, and required repo reviews",
+        "Additional review rounds need new evidence or an explicit request",
+        "unrelated work needs authorization",
         "while workers run",
         "Maximize useful delegation, not agent count",
         "configured Jev/TypeSafe API key",

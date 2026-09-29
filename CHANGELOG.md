@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [3.4.0] - 2026-09-29
+
+### Changed
+
+- Codex mid and flagship defaults move to GPT-6.1 Sol; Claude guidance covers Sonnet 5.5 while
+  preserving the portable `sonnet` alias, cheap-tier `low`, and local model overrides.
+- Command Code's tracked mid-tier default moves to `claude-sonnet-5-5`.
+- Model guidance uses `medium` for bounded coding and `high` for harder work, with meaningful checks,
+  explicit stopping conditions, and scope control.
+- Dated migration receipts document API compatibility, provider-dependent alias resolution, and
+  deployment verification without claiming new API features in every supported harness.
+
 ## [3.3.0] - 2026-09-25
 
 ### Changed

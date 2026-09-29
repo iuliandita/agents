@@ -163,6 +163,42 @@ def test_resolve_claude_defaults():
     assert resolved.notices == []
 
 
+@pytest.mark.parametrize("tier", ["mid", "flagship"])
+@pytest.mark.parametrize("effort", ["low", "medium", "high", "xhigh", "max"])
+def test_codex_sol_tiers_render_new_model_and_keep_role_effort(tier, effort):
+    role = spec(tier=tier, effort=effort)
+    resolved = ra.resolve(role, "codex", {}, DEFAULTS)
+    data = tomllib.loads(ra.render_codex(role, resolved, INVARIANTS))
+    assert data["model"] == "gpt-6.1-sol"
+    assert data["model_reasoning_effort"] == effort
+    assert resolved.notices == []
+
+
+@pytest.mark.parametrize("effort", ["low", "medium", "high", "xhigh", "max"])
+def test_commandcode_mid_renders_sonnet_5_5_with_mapped_effort(effort):
+    role = spec(tier="mid", effort=effort)
+    resolved = ra.resolve(role, "commandcode", {}, DEFAULTS)
+    data = yaml.safe_load(ra.render_commandcode(role, resolved, INVARIANTS).split("---")[1])
+    assert data["model"] == "claude-sonnet-5-5"
+    assert data["reasoningEffort"] == DEFAULTS["commandcode"]["effort_map"][effort]
+    assert resolved.notices == []
+
+
+@pytest.mark.parametrize(
+    ("harness", "model"), [("codex", "custom-sol"), ("commandcode", "custom-sonnet")]
+)
+def test_upgraded_model_tiers_keep_local_overrides(harness, model):
+    overrides = {
+        harness: {
+            "tiers": {"mid": model},
+            "agents": {"sample": {"effort": "high"}},
+        }
+    }
+    resolved = ra.resolve(spec(tier="mid", effort="medium"), harness, overrides, DEFAULTS)
+    assert resolved.model == model
+    assert resolved.effort == "high"
+
+
 def test_resolve_codex_apex_uses_astra():
     resolved = ra.resolve(spec(tier="apex"), "codex", {}, DEFAULTS)
     assert resolved.model == "gpt-6-astra"
