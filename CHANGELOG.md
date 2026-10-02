@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [3.4.1] - 2026-10-03
+
+### Fixed
+
+- `consolidate-agents-md` backup and clearing steps are exact, verifiable commands: a progress checklist,
+  a manifest-driven archive with a file-count check, memory checksums, and a checksum-gated clearing loop
+  with no globs or recursive deletes.
+
 ## [3.4.0] - 2026-09-29
 
 ### Changed
