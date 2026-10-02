@@ -32,6 +32,19 @@ This workflow is independent of the current harness.
 
 ## Workflow
 
+Copy this checklist into the transcript and tick items as they pass:
+
+```text
+- [ ] 1. Scope, authority, and instruction inventory resolved
+- [ ] 2. Memory stores identified; manifest written; backup verified
+- [ ] 3. Items classified; canonical files written
+- [ ] 4a. Companions aligned; consolidation verified (on failure: back to 3)
+- [ ] 4b. Memory checksums re-verified; listed files cleared (on mismatch: back to 2)
+- [ ] 5. Final state re-read and reported
+```
+
+Never start clearing while any earlier item is unticked.
+
 ### 1. Resolve scope and authority
 
 Use the supplied repository path; otherwise identify the current repository root.
@@ -65,6 +78,27 @@ the tracked tree with restricted access. Record original paths, symlink targets,
 the exact files or remote record IDs in scope. Back up original bytes, including ignored
 files, and verify the backup is readable and complete. Do not rely on the transcript
 or git history as the only recovery copy. Never commit backups.
+
+For local files, use these commands without modification. On macOS, replace `sha256sum`
+with `shasum -a 256`; on Windows, apply the same manifest, archive, and checksum checks
+with PowerShell equivalents.
+
+```sh
+umask 077
+backup="$(mktemp -d)" && echo "$backup"
+```
+
+Shell variables may not survive between tool calls: start each later command with
+`backup=<printed path>`. Write every in-scope file path (instructions, companions, memory), one absolute path
+per line, to `"$backup/manifest"`, and the memory file paths alone to `"$backup/memory"`.
+
+```sh
+tar -cf "$backup/originals.tar" -T "$backup/manifest"
+while IFS= read -r f; do sha256sum -- "$f"; done < "$backup/memory" > "$backup/sums"
+test "$(tar -tf "$backup/originals.tar" | wc -l)" -eq "$(wc -l < "$backup/manifest")"
+```
+
+The `test` line must exit 0 before anything changes; otherwise fix the manifest and rerun.
 
 Read every in-scope memory entry and show its original contents in the transcript,
 as requested by this workflow. Redact secret values such as tokens and passwords;
@@ -119,6 +153,17 @@ the exact backed-up and consolidated record IDs using the verified supported int
 Leave unresolved records and their usable index entries intact; never claim the entire
 store was cleared if any items remain. Do not clear a store modified since the backup:
 re-read and reconcile it first. Stop clearing on any write or verification failure.
+
+For local per-fact files, list the consolidated paths (a subset of `"$backup/memory"`)
+in `"$backup/clear"` and run exactly this. No globs, no recursive deletes:
+
+```sh
+sha256sum -c --status "$backup/sums" &&
+while IFS= read -r f; do rm -- "$f" || { echo "stopped at: $f" >&2; break; }; done < "$backup/clear"
+```
+
+A checksum failure means a store changed since the backup: return to step 2.
+Edit the memory index by hand to the canonical pointer; do not delete it.
 
 ### 5. Report
 
