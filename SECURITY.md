@@ -11,9 +11,11 @@ a few days; this is a personal project without a guaranteed response time.
 
 ## Scope
 
-This repository ships prompt fragments, prompt-rendering scripts, and a subagent renderer. Relevant
+This repository ships prompt fragments, prompt-rendering scripts, a subagent renderer, the invariants
+hook and Hermes config installers, the updater, and the consolidation skill with its installer. Relevant
 issues include a prompt or rendered output that can be used to exfiltrate secrets, injection-scan
-bypasses, unsafe deploy behavior (writing through symlinks, clobbering unrelated files), and
+bypasses, unsafe deploy behavior (writing through symlinks, clobbering unrelated files), consolidation steps that
+delete or clear files outside their backup manifest, and
 dependency vulnerabilities in the pinned tooling.
 
 ## Not in scope

@@ -157,7 +157,7 @@ For project instructions shared with colleagues, use the optional [shared and lo
 
 The portable [consolidate-agents-md skill](skills/consolidate-agents-md/SKILL.md)
 keeps project instructions lean, aligns companion files, and consolidates then clears
-project memory after verified backups and writes. It preserves shared/local separation.
+project memory after a manifest-checked backup, verified writes, and a checksum gate. It preserves shared/local separation.
 The global prompt suggests it once at task completion when durable discoveries or drift
 warrant it; only explicit invocation runs it. See [installation and invocation](INSTALL.md#context-consolidation-workflow).
 Prompt deployment does not install this skill. Run its installer separately; installing
@@ -209,7 +209,7 @@ Model and reasoning effort are chosen separately for each task, using the cheape
 
 When a configured Jev/TypeSafe API key and a relevant installed skill such as `typesafe-ai` or `jevify` are available, the prompt calls for proactive Jev use for suitable bounded decisions, including routing, triage, ranking, and context selection, when it improves cost or speed at the required quality. Credentials stay private, exact rules remain deterministic, and uncertain results or service failures fall back to the main model or a worker. Missing access does not block the task.
 
-Tiers map to models per harness: Claude Code `sonnet` at `low` effort for `cheap`, `sonnet`, `opus`, and `fable` for `apex`; Codex `gpt-6-luna`, `gpt-6.1-sol` for both `mid` and `flagship` (split by role effort), and `gpt-6-astra` for `apex`; Antigravity `flash` and `pro`. OpenCode and Command Code get working defaults from the tracked `prompts/models.json` (`opencode-go/...` and Command Code's own model IDs), so tiering is on out of the box. A tier can carry an effort (`{"model": "...", "effort": "max"}`), so a harness that runs one model on every tier still varies depth by tier. Effort levels run `low`, `medium`, `high`, `xhigh`, `max`. `prompts/models.local.json` overrides any tier, effort map, or single agent without touching tracked files; copy `prompts/models.local.example.json` to start. A harness with no tier map fails loudly unless you pass `--allow-inherit`.
+Tiers map to models per harness: Claude Code `sonnet` at `low` effort for `cheap`, `sonnet`, `opus`, and `fable` for `apex`; Codex `gpt-6-luna`, `gpt-6.1-sol` for both `mid` and `flagship` (split by role effort), and `gpt-6-astra` for `apex`; Antigravity `flash` and `pro`; Oh My Pi its `@smol`, `@default`, and `@slow` model roles. OpenCode and Command Code get working defaults from the tracked `prompts/models.json` (`opencode-go/...` and Command Code's own model IDs), so tiering is on out of the box. A tier can carry an effort (`{"model": "...", "effort": "max"}`), so a harness that runs one model on every tier still varies depth by tier. Effort levels run `low`, `medium`, `high`, `xhigh`, `max`. `prompts/models.local.json` overrides any tier, effort map, or single agent without touching tracked files; copy `prompts/models.local.example.json` to start. A harness with no tier map fails loudly unless you pass `--allow-inherit`.
 
 The portable Claude `sonnet` alias resolves to Sonnet 5.5 on current Claude Code with the Anthropic API; other providers and local pins can resolve it differently. Keep `low` for routine lookup and the cheap tier, start bounded coding at `medium`, and use `high` for harder work. Check resolved models and API compatibility before deployment; see the [2026-09-29 model migration notes](docs/harness-contract.md#model-migration-compatibility-2026-09-29).
 
@@ -223,7 +223,7 @@ scripts/render-agents --target claude,codex --verify   # after --deploy: confirm
 
 Deploy backs up overwritten files into `.backups/` and removes only stale files that carry the generated marker. Hand-written agents with other names are left alone, but a hand-written file with the same name as a role (for example your own `reviewer.md`) is replaced after its backup; `--dry-run` reports those as `would replace unmanaged`, so rename yours first if you want both. After a deploy, `scripts/render-agents --target <list> --verify` checks that all six role files exist in each selected harness's agent directory. Prune old backups with `scripts/sync-ai-prompts --prune-backups 50 --dry-run` (drop `--dry-run` to delete). The hard invariants are rendered into every agent from `prompts/invariants.md`, so the manual subagent paste is only needed for agents defined outside this repo.
 
-`shell-ro` is rendered only when the harness can enforce it as a real sandbox boundary. Codex maps it to shell access under `sandbox_mode = "read-only"`. Claude Code, OpenCode, Command Code, and Antigravity omit shell access for `shell-ro` agents and retain their native read and search tools. This costs explorer and reviewer direct git-history access on those harnesses, but keeps the read-only contract honest. Full `shell` roles are unchanged.
+`shell-ro` is rendered only when the harness can enforce it as a real sandbox boundary. Codex maps it to shell access under `sandbox_mode = "read-only"`. Claude Code, OpenCode, Command Code, Antigravity, and Oh My Pi omit shell access for `shell-ro` agents and retain their native read and search tools. This costs explorer and reviewer direct git-history access on those harnesses, but keeps the read-only contract honest. Full `shell` roles are unchanged.
 
 Codex only uses a custom role when the parent calls `spawn_agent` with `agent_type` set to the role name, and a full-history fork (`fork_turns = "all"`) inherits the parent's model and effort regardless of the role file. The rendered Codex prompt tells the root agent to pass `agent_type` and `fork_turns = "none"`; task prompts must therefore be self-contained.
 
@@ -279,7 +279,7 @@ python scripts/scan_prompt_sources.py
 python scripts/check_harness_docs.py
 python scripts/check_harness_contract.py
 python -m pytest -q
-bash -n scripts/sync-ai-prompts scripts/render-invariants scripts/render-agents scripts/render-hermes scripts/update
+bash -n scripts/sync-ai-prompts scripts/render-invariants scripts/render-agents scripts/render-hermes scripts/update scripts/python-runtime.sh
 python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/render_agents.py scripts/install_workflow.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py scripts/render_hermes.py scripts/update.py
 scripts/sync-ai-prompts --check
 scripts/sync-ai-prompts --dry-run
@@ -289,7 +289,7 @@ scripts/render-agents --check
 
 ## GitHub Actions
 
-- `.github/workflows/ci.yml` runs the repo's prompt lint, prompt-injection scan, contract check, workflow lint, tests, shell syntax checks, Python compile checks, and dry-run render on a Python 3.11/3.13 matrix.
+- `.github/workflows/ci.yml` runs the repo's prompt lint, harness-doc and contract checks, prompt-injection scan, workflow lint, tests, shell syntax checks, Python compile checks, and dry-run render on a Python 3.11/3.13 matrix, plus a macOS setup smoke test on Python 3.11.
 - `.github/workflows/security.yml` runs CodeQL and Gitleaks.
 - `.github/workflows/release.yml` creates or updates a GitHub release from generated notes when a `v*` tag is pushed.
 - `.github/workflows/promptfoo-code-scan.yml` wires in Promptfoo's LLM security scanner for prompt-sensitive PRs when `PROMPTFOO_API_KEY` is configured. The Promptfoo GitHub App is the cleaner no-key setup if you want hosted PR comments without storing a token.

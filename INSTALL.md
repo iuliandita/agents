@@ -372,7 +372,9 @@ are opt-in examples, not an automatic migration or part of global deployment.
 
 `skills/consolidate-agents-md/SKILL.md` is the canonical workflow. It retains the
 original command's memory consolidation, transcript review, and clearing behavior,
-with recoverable file backups, secret redaction, and verification before clearing.
+with a manifest-checked backup archive, secret redaction, and a checksum gate before
+clearing. Its local-file steps use `tar` and `sha256sum` (`shasum -a 256` on macOS,
+PowerShell equivalents on native Windows).
 It operates on the selected project only and preserves shared versus local instructions.
 The installer installs instructions; it does not run consolidation or touch project memory.
 
