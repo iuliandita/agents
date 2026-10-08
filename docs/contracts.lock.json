@@ -8,11 +8,12 @@
       "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
     },
     "harnesses": {
-      "baseline": true,
       "breaking": "none",
-      "docs": [],
-      "fingerprint": "af5edcad45030ce4e76be2f6c053ae24feb257784219ee6c522ded60a8448bd7",
-      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+      "docs": [
+        "CHANGELOG.md"
+      ],
+      "fingerprint": "00f9001539e737a95e70396310020ac269fc5365d212d3bbf9910f796721cd20",
+      "note": "Record that dry-run now reports unchanged targets like a real deploy."
     },
     "maintenance": {
       "breaking": "none",

@@ -572,18 +572,16 @@ def test_sync_ai_prompts_check_mode_validates_render_shape():
     assert "Render shape check passed" in result.stdout
 
 
-def test_sync_ai_prompts_dry_run_reports_manual_skips():
+def test_sync_ai_prompts_dry_run_reports_manual_skips(tmp_path):
     repo = Path(__file__).resolve().parents[1]
+    # An empty home keeps the result independent of what is deployed on this machine.
+    native_vars = {harness.native_env_var for harness in renderer.HARNESSES if harness.native_env_var}
     scrubbed_env = {
         key: value
         for key, value in os.environ.items()
-        if key
-        not in {
-            "HERMES_AGENTS_PATH",
-            "GENERIC_AGENTS_PATH",
-            "ANTIGRAVITY_AGENTS_PATH",
-        }
+        if not key.endswith("_AGENTS_PATH") and key not in native_vars
     }
+    scrubbed_env.update(HOME=str(tmp_path), USERPROFILE=str(tmp_path))
 
     result = subprocess.run(
         ["scripts/sync-ai-prompts", "--dry-run"],
@@ -1083,5 +1081,9 @@ def test_deploy_dry_run_flags_unmanaged_rules_file(tmp_path, monkeypatch, capsys
     renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=True, backup_dir=tmp_path / "b")
     assert f"would replace unmanaged claude: {mine}" in capsys.readouterr().out
     renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=False, backup_dir=tmp_path / "b")
+    capsys.readouterr()
+    renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=True, backup_dir=tmp_path / "b")
+    assert f"unchanged claude: {mine}" in capsys.readouterr().out
+    mine.write_text(mine.read_text(encoding="utf-8") + "local edit\n", encoding="utf-8")
     renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=True, backup_dir=tmp_path / "b")
     assert f"would update claude: {mine}" in capsys.readouterr().out

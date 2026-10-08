@@ -581,6 +581,8 @@ def deploy(
             existing = dest.read_text(encoding="utf-8", errors="replace") if dest.exists() else None
             if existing is not None and PROMPT_MARKER not in existing:
                 print(f"would replace unmanaged {harness.name}: {dest} (not written by this repo; backed up first)")
+            elif existing == rendered:
+                print(f"unchanged {harness.name}: {dest}")
             else:
                 print(f"would update {harness.name}: {dest}")
             continue
