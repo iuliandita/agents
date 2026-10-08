@@ -14,6 +14,12 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
   command flags are checked. CI runs it against the PR base and the release workflow against the previous
   tag; see `docs/MAINTENANCE.md`.
 
+### Changed
+
+- Workflow checkouts no longer persist git credentials, Dependabot waits seven days before proposing a
+  release for both ecosystems and groups pip updates, the security workflow runs zizmor pinned by SHA,
+  and CI adds a Windows smoke test for the PowerShell launchers.
+
 ## [3.5.0] - 2026-10-08
 
 ### Changed

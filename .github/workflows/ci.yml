@@ -24,6 +24,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Set up Python
@@ -92,6 +93,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up minimum supported Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -111,3 +114,32 @@ jobs:
           /bin/bash scripts/sync-ai-prompts --target claude --dry-run
           /bin/bash scripts/render-agents --target claude --check
           /bin/bash scripts/render-invariants --dry-run
+
+  windows-setup:
+    name: Windows launcher smoke test
+    runs-on: windows-2025
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up minimum supported Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Render with the PowerShell launchers
+        shell: pwsh
+        run: |
+          ./scripts/sync-ai-prompts.ps1 --target claude --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/sync-ai-prompts.ps1 --target claude --dry-run
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/render-agents.ps1 --target claude --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/render-invariants.ps1 --dry-run
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -35,3 +35,28 @@ def test_ci_runs_a_python_matrix():
     assert "matrix:" in workflow
     assert '"3.11"' in workflow
     assert '"3.13"' in workflow
+
+
+def test_checkouts_do_not_persist_credentials():
+    repo = Path(__file__).resolve().parents[1]
+    for workflow in sorted((repo / ".github" / "workflows").glob("*.yml")):
+        lines = workflow.read_text(encoding="utf-8").splitlines()
+        for index, line in enumerate(lines):
+            if "uses: actions/checkout@" in line:
+                block = "\n".join(lines[index + 1 : index + 4])
+                assert "persist-credentials: false" in block, f"{workflow.name}:{index + 1}"
+
+
+def test_dependabot_waits_before_proposing_releases():
+    repo = Path(__file__).resolve().parents[1]
+    config = (repo / ".github" / "dependabot.yml").read_text(encoding="utf-8")
+
+    assert config.count("default-days: 7") == 2
+
+
+def test_ci_smoke_tests_powershell_launchers_on_windows():
+    repo = Path(__file__).resolve().parents[1]
+    workflow = (repo / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    assert "runs-on: windows-" in workflow
+    assert "./scripts/sync-ai-prompts.ps1 --target claude --check" in workflow
