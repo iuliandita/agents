@@ -45,9 +45,10 @@ jobs:
 
       - name: Check documentation impact
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          # Pull requests diff against their base; pushes to main against the previous tip.
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          if [ -n "$BASE_SHA" ]; then
+          if [ -n "$BASE_SHA" ] && [ "$BASE_SHA" != "0000000000000000000000000000000000000000" ]; then
             python scripts/check_docs_impact.py --base "$BASE_SHA"
           else
             python scripts/check_docs_impact.py

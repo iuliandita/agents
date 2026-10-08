@@ -17,6 +17,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 
@@ -99,6 +100,10 @@ ANCHOR_TAG_RE = re.compile(r"<a\s+(?:id|name)=\"([^\"]+)\"")
 INLINE_CODE_RE = re.compile(r"`([^`\n]+)`")
 HARNESS_NAME_RE = re.compile(r"Harness\(\s*\"([a-z0-9_-]+)\"")
 WRAPPED_PY_RE = re.compile(r"scripts/([a-z0-9_]+\.py)")
+SCRIPT_TOKEN_RE = re.compile(r"scripts/[A-Za-z0-9_.-]+")
+URL_SCHEME_RE = re.compile(r"[a-z][a-z0-9+.-]*:")
+COMMAND_LANGS = ("", "bash", "sh", "shell", "zsh", "powershell", "pwsh")
+MISSING_LOCK = f"{LOCK_PATH} is missing; create it once with --init --note"
 
 
 class ToolError(Exception):
@@ -117,7 +122,7 @@ def tracked_files(repo: Path) -> list[str]:
     return sorted(p for p in git(repo, "ls-files", "-z").split("\0") if p)
 
 
-def domain_of(path: str) -> list[str]:
+def owners_of(path: str) -> list[str]:
     return [
         name for name, spec in DOMAINS.items() if any(fnmatch.fnmatchcase(path, pat) for pat in spec["sources"])
     ]
@@ -126,7 +131,7 @@ def domain_of(path: str) -> list[str]:
 def domain_files(files: list[str]) -> dict[str, list[str]]:
     members: dict[str, list[str]] = {name: [] for name in DOMAINS}
     for path in files:
-        for name in domain_of(path):
+        for name in owners_of(path):
             members[name].append(path)
     return members
 
@@ -147,12 +152,75 @@ def load_lock_text(text: str, where: str) -> dict:
         raise ToolError(f"{where}: invalid JSON: {exc}") from exc
     if not isinstance(data, dict) or data.get("schema") != SCHEMA or not isinstance(data.get("domains"), dict):
         raise ToolError(f"{where}: expected schema {SCHEMA} with a 'domains' object; migrate the lock explicitly")
+    for name, receipt in data["domains"].items():
+        if not isinstance(receipt, dict):
+            raise ToolError(f"{where}: receipt for '{name}' must be an object")
     return data
 
 
 def read_lock(repo: Path) -> dict | None:
     path = repo / LOCK_PATH
     return load_lock_text(path.read_text(encoding="utf-8"), LOCK_PATH) if path.exists() else None
+
+
+def require_lock(repo: Path) -> dict:
+    lock = read_lock(repo)
+    if lock is None:
+        raise ToolError(MISSING_LOCK)
+    return lock
+
+
+def is_breaking(receipt: dict) -> bool:
+    return str(receipt.get("breaking", "none")).strip().lower() != "none"
+
+
+def specific(reason: str, minimum: int) -> bool:
+    cleaned = reason.strip().lower().rstrip(".")
+    return len(cleaned) >= minimum and len(cleaned.split()) >= 5 and cleaned not in GENERIC_REASONS
+
+
+def migration_complete(text: str) -> bool:
+    text = text.lower()
+    return (
+        "upgrade" in text
+        and ("rollback" in text or "roll back" in text)
+        and ("backup" in text or "back up" in text)
+    )
+
+
+def receipt_errors(name: str, receipt: dict) -> list[str]:
+    """The --accept rules, rechecked on every run so a hand-edited lock cannot skip them."""
+    errors = []
+    if not isinstance(receipt.get("fingerprint"), str):
+        errors.append(f"{name}: receipt has no fingerprint; record it with --accept {name}")
+    breaking = receipt.get("breaking")
+    if not isinstance(breaking, str) or not breaking.strip():
+        errors.append(f"{name}: --breaking must be 'none' or the concrete compatibility consequence")
+    docs = receipt.get("docs", [])
+    if not isinstance(docs, list):
+        return errors + [f"{name}: receipt 'docs' must be a list"]
+    allowed = DOMAINS.get(name, {}).get("docs", ())
+    errors += [f"{name} does not cover {doc}; allowed: {', '.join(allowed)}" for doc in docs if doc not in allowed]
+    note = receipt.get("note") or ""
+    no_impact = receipt.get("no_impact") or ""
+    if receipt.get("baseline"):
+        if docs or no_impact or is_breaking(receipt) or not specific(note, 20):
+            errors.append(f"{name}: a baseline receipt carries only a baseline note")
+        return errors
+    if docs and no_impact:
+        errors.append(f"{name}: pass either --docs with --note, or --no-impact")
+    elif docs and not specific(note, 20):
+        errors.append(f"{name}: --note must say what the docs now cover (20+ characters, five or more words)")
+    elif not docs and not specific(no_impact, 40):
+        errors.append(f"{name}: --no-impact needs a specific reason tied to this change (40+ characters, five or more words)")
+    if is_breaking(receipt):
+        if not docs:
+            errors.append(f"{name}: a breaking change cannot use --no-impact")
+        elif CHANGELOG not in docs:
+            errors.append(f"{name}: a breaking change must update {CHANGELOG}")
+        if not migration_complete(receipt.get("migration") or ""):
+            errors.append(f"{name}: --migration must give backup, upgrade, and rollback instructions")
+    return errors
 
 
 def write_lock(repo: Path, data: dict) -> None:
@@ -164,7 +232,7 @@ def write_lock(repo: Path, data: dict) -> None:
 def check_mapping(files: list[str]) -> list[str]:
     failures = []
     for path in files:
-        owners = domain_of(path)
+        owners = owners_of(path)
         if len(owners) > 1:
             failures.append(f"{path}: matched by several domains ({', '.join(owners)}); fix DOMAINS")
         elif not owners and path.startswith(MAPPED_ROOTS):
@@ -174,7 +242,7 @@ def check_mapping(files: list[str]) -> list[str]:
 
 def check_receipts(repo: Path, lock: dict | None, members: dict[str, list[str]]) -> list[str]:
     if lock is None:
-        return [f"{LOCK_PATH} is missing; create it once with --init --note"]
+        return [MISSING_LOCK]
     failures = []
     recorded = set(lock["domains"])
     if recorded != set(DOMAINS):
@@ -183,7 +251,10 @@ def check_receipts(repo: Path, lock: dict | None, members: dict[str, list[str]])
         )
     for name, paths in members.items():
         receipt = lock["domains"].get(name)
-        if receipt and receipt.get("fingerprint") != fingerprint(repo, paths):
+        if receipt is None:
+            continue
+        failures += receipt_errors(name, receipt)
+        if receipt.get("fingerprint") != fingerprint(repo, paths):
             failures.append(
                 f"{name}: sources changed since the last review; update its docs and run --accept {name} "
                 "(see docs/MAINTENANCE.md)"
@@ -193,32 +264,35 @@ def check_receipts(repo: Path, lock: dict | None, members: dict[str, list[str]])
 
 def github_slug(text: str) -> str:
     text = re.sub(r"<[^>]+>", "", text)
-    text = re.sub(r"[`*_~]|\[([^\]]*)\]\([^)]*\)", lambda m: m.group(1) or "", text)
+    # GitHub keeps word-internal underscores, so only backticks, asterisks, and tildes are stripped.
+    text = re.sub(r"[`*~]|\[([^\]]*)\]\([^)]*\)", lambda m: m.group(1) or "", text)
     text = re.sub(r"[^\w\- ]", "", text.strip().lower())
     return text.replace(" ", "-")
 
 
-def markdown_lines(text: str):
-    """Yield (line, in_fence, fence_lang) for each line."""
+def markdown_lines(text: str) -> Iterator[tuple[int, str, bool, str | None]]:
+    """Yield (number, line, in_fence, fence_lang); fence delimiter lines count as fenced with no language."""
     fence: str | None = None
     lang = ""
-    for line in text.splitlines():
+    for number, line in enumerate(text.splitlines(), start=1):
         stripped = line.lstrip()
         if stripped.startswith(("```", "~~~")):
             marker = stripped[:3]
             if fence is None:
                 fence, lang = marker, stripped[3:].strip().lower()
+                yield number, line, True, None
                 continue
             if marker == fence:
                 fence, lang = None, ""
+                yield number, line, True, None
                 continue
-        yield line, fence is not None, lang
+        yield number, line, fence is not None, lang
 
 
 def anchors_for(text: str) -> set[str]:
     seen: dict[str, int] = {}
     anchors: set[str] = set()
-    for line, in_fence, _ in markdown_lines(text):
+    for _, line, in_fence, _ in markdown_lines(text):
         if in_fence:
             continue
         anchors.update(ANCHOR_TAG_RE.findall(line))
@@ -239,11 +313,11 @@ def check_links(repo: Path, files: list[str]) -> list[str]:
     failures = []
     for doc in docs:
         text = (repo / doc).read_text(encoding="utf-8")
-        for number, (line, in_fence, _) in enumerate(markdown_lines(text), start=1):
+        for number, line, in_fence, _ in markdown_lines(text):
             if in_fence:
                 continue
             for target in LINK_RE.findall(INLINE_CODE_RE.sub("", line)):
-                if re.match(r"^[a-z][a-z0-9+.-]*:", target):
+                if URL_SCHEME_RE.match(target):
                     continue
                 path_part, _, anchor = target.partition("#")
                 resolved = doc if not path_part else posixpath.normpath(posixpath.join(posixpath.dirname(doc), path_part))
@@ -259,10 +333,18 @@ def check_links(repo: Path, files: list[str]) -> list[str]:
     return failures
 
 
-def command_snippets(text: str):
-    for number, (line, in_fence, lang) in enumerate(markdown_lines(text), start=1):
-        if in_fence and lang in ("", "bash", "sh", "shell", "zsh", "powershell", "pwsh"):
-            yield number, line.strip()
+def command_snippets(text: str) -> Iterator[tuple[int, str]]:
+    pending: tuple[int, str] | None = None
+    for number, line, in_fence, lang in markdown_lines(text):
+        if in_fence and lang in COMMAND_LANGS:
+            start, joined = pending or (number, "")
+            joined += " " + line.strip()
+            # Join backslash continuations so their flags are checked with the command.
+            if joined.endswith("\\"):
+                pending = (start, joined[:-1])
+                continue
+            pending = None
+            yield start, joined.strip()
         elif not in_fence:
             for span in INLINE_CODE_RE.findall(line):
                 yield number, span.strip()
@@ -288,7 +370,8 @@ def check_commands(repo: Path, files: list[str]) -> list[str]:
                 continue
             try:
                 tokens = shlex.split(snippet, comments=True, posix=True)
-            except ValueError:
+            except ValueError as exc:
+                failures.append(f"{doc}:{number}: cannot parse script command ({exc}): {snippet}")
                 continue
             script = None
             for token in tokens:
@@ -296,7 +379,7 @@ def check_commands(repo: Path, files: list[str]) -> list[str]:
                     script = None
                     continue
                 candidate = token.removeprefix("./")
-                if re.fullmatch(r"scripts/[A-Za-z0-9_.-]+", candidate):
+                if SCRIPT_TOKEN_RE.fullmatch(candidate):
                     if candidate not in tracked:
                         failures.append(f"{doc}:{number}: command references missing script '{candidate}'")
                         script = None
@@ -305,30 +388,25 @@ def check_commands(repo: Path, files: list[str]) -> list[str]:
                     continue
                 if script and token.startswith("--") and len(token) > 2:
                     flag = token.split("=", 1)[0]
-                    if flag not in script_flag_sources(repo, script):
+                    if not re.search(rf"{re.escape(flag)}(?![\w-])", script_flag_sources(repo, script)):
                         failures.append(f"{doc}:{number}: '{script}' does not define flag '{flag}'")
     return failures
 
 
-def harness_names(text: str) -> set[str]:
-    return set(HARNESS_NAME_RE.findall(text))
-
-
 def changed_since(repo: Path, base: str) -> set[str]:
-    changed = git(repo, "diff", "--name-only", base).split()
-    changed += git(repo, "diff", "--cached", "--name-only", base).split()
-    return set(changed)
+    # Diffing a commit against the work tree includes staged and unstaged changes.
+    return {p for p in git(repo, "diff", "--name-only", "-z", base).split("\0") if p}
 
 
 def check_range(repo: Path, base_rev: str, lock: dict | None) -> list[str]:
+    if lock is None:
+        return []
     merge_base = git(repo, "merge-base", base_rev, "HEAD").strip()
     if not merge_base:
         raise ToolError(f"no merge base between {base_rev} and HEAD; fetch full history (fetch-depth: 0)")
     changed = changed_since(repo, merge_base)
     base_text = git(repo, "show", f"{merge_base}:{LOCK_PATH}", check=False)
     base_lock = load_lock_text(base_text, f"{merge_base[:12]}:{LOCK_PATH}") if base_text else None
-    if lock is None:
-        return []
     failures = []
     base_domains = base_lock["domains"] if base_lock else {}
     for name, receipt in lock["domains"].items():
@@ -348,8 +426,10 @@ def check_range(repo: Path, base_rev: str, lock: dict | None) -> list[str]:
         if not text:
             continue
         for name, receipt in load_lock_text(text, f"{commit}:{LOCK_PATH}")["domains"].items():
-            final = lock["domains"].get(name, {})
-            if receipt.get("breaking", "none") != "none" and final.get("breaking", "none") == "none":
+            # A breaking receipt carried over unchanged from the base was reviewed in an earlier range.
+            if receipt == base_domains.get(name):
+                continue
+            if is_breaking(receipt) and not is_breaking(lock["domains"].get(name, {})):
                 failures.append(
                     f"{name}: commit {commit} recorded a breaking change, but the final receipt says none; "
                     "re-accept with the combined breaking and migration assessment for this range"
@@ -358,11 +438,11 @@ def check_range(repo: Path, base_rev: str, lock: dict | None) -> list[str]:
     base_registry = git(repo, "show", f"{merge_base}:scripts/render_prompts.py", check=False)
     head_registry = repo / "scripts/render_prompts.py"
     if base_registry and head_registry.is_file():
-        removed = harness_names(base_registry) - harness_names(head_registry.read_text(encoding="utf-8"))
+        removed = set(HARNESS_NAME_RE.findall(base_registry)) - set(
+            HARNESS_NAME_RE.findall(head_registry.read_text(encoding="utf-8"))
+        )
         receipt = lock["domains"].get("harnesses", {})
-        if removed and (
-            receipt.get("breaking", "none") == "none" or "docs/legacy-harnesses.md" not in receipt.get("docs", [])
-        ):
+        if removed and (not is_breaking(receipt) or "docs/legacy-harnesses.md" not in receipt.get("docs", [])):
             failures.append(
                 f"harnesses: removed {', '.join(sorted(removed))}; accept with --breaking, --migration, "
                 "and docs/legacy-harnesses.md"
@@ -380,50 +460,34 @@ def check_release(repo: Path, tag: str) -> list[str]:
     return []
 
 
-def specific(reason: str, minimum: int) -> bool:
-    cleaned = reason.strip().lower().rstrip(".")
-    return len(cleaned) >= minimum and len(cleaned.split()) >= 5 and cleaned not in GENERIC_REASONS
-
-
 def accept(repo: Path, args: argparse.Namespace, members: dict[str, list[str]]) -> None:
-    lock = read_lock(repo)
-    if lock is None:
-        raise ToolError(f"{LOCK_PATH} is missing; create it once with --init --note")
+    lock = require_lock(repo)
     name = args.accept
     if name not in DOMAINS:
         raise ToolError(f"unknown domain '{name}'; known: {', '.join(DOMAINS)}")
-    if args.breaking is None:
+    breaking = (args.breaking or "").strip()
+    if not breaking:
         raise ToolError("--breaking is required: 'none' or the concrete compatibility consequence")
-    docs = [d.strip() for d in (args.docs or "").split(",") if d.strip()]
+    docs = sorted({d.strip() for d in (args.docs or "").split(",") if d.strip()})
     if bool(docs) == bool(args.no_impact):
         raise ToolError("pass either --docs with --note, or --no-impact")
-    receipt: dict = {"fingerprint": fingerprint(repo, members[name]), "breaking": args.breaking.strip()}
+    for doc in docs:
+        if not (repo / doc).is_file():
+            raise ToolError(f"{doc} does not exist")
+    receipt: dict = {
+        "fingerprint": fingerprint(repo, members[name]),
+        "breaking": "none" if breaking.lower() == "none" else breaking,
+        "docs": docs,
+    }
     if docs:
-        allowed = DOMAINS[name]["docs"]
-        for doc in docs:
-            if doc not in allowed:
-                raise ToolError(f"{name} does not cover {doc}; allowed: {', '.join(allowed)}")
-            if not (repo / doc).is_file():
-                raise ToolError(f"{doc} does not exist")
-        if not args.note or not specific(args.note, 20):
-            raise ToolError("--note must say what the docs now cover (at least five words)")
-        receipt.update(docs=sorted(docs), note=args.note.strip())
+        receipt["note"] = (args.note or "").strip()
     else:
-        if not specific(args.no_impact, 40):
-            raise ToolError("--no-impact needs a specific reason tied to this change (40+ characters)")
-        receipt.update(docs=[], no_impact=args.no_impact.strip())
+        receipt["no_impact"] = args.no_impact.strip()
     if receipt["breaking"] != "none":
-        if not docs:
-            raise ToolError("a breaking change cannot use --no-impact")
-        if CHANGELOG not in docs:
-            raise ToolError(f"a breaking change must update {CHANGELOG}")
-        migration = (args.migration or "").lower()
-        if not (
-            "upgrade" in migration and ("rollback" in migration or "roll back" in migration)
-            and ("backup" in migration or "back up" in migration)
-        ):
-            raise ToolError("--migration must give backup, upgrade, and rollback instructions")
-        receipt["migration"] = args.migration.strip()
+        receipt["migration"] = (args.migration or "").strip()
+    errors = receipt_errors(name, receipt)
+    if errors:
+        raise ToolError(errors[0])
     lock["domains"][name] = receipt
     write_lock(repo, lock)
     print(f"Accepted {name}")

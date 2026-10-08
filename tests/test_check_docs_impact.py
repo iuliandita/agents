@@ -1,3 +1,4 @@
+import json
 import subprocess
 from pathlib import Path
 
@@ -66,6 +67,16 @@ def run(repo, capsys, *args):
     return code, captured.out + captured.err
 
 
+def lock_file(repo):
+    return repo / "docs/contracts.lock.json"
+
+
+def edit_lock(repo, name, receipt):
+    data = json.loads(lock_file(repo).read_text(encoding="utf-8"))
+    data["domains"][name] = receipt
+    lock_file(repo).write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def accept_prompts(repo, capsys, *extra, docs="README.md", breaking="none"):
     return run(repo, capsys, "--accept", "prompts", "--docs", docs, "--note", NOTE, "--breaking", breaking, *extra)
 
@@ -118,8 +129,9 @@ def test_receipt_citing_unchanged_doc_fails_range(tmp_path, capsys):
 def test_no_impact_must_be_specific(tmp_path, capsys):
     repo, _ = make_repo(tmp_path)
     write(repo, "prompts/core.md", "core v2\n")
-    code, _ = run(repo, capsys, "--accept", "prompts", "--no-impact", "docs reviewed", "--breaking", "none")
+    code, out = run(repo, capsys, "--accept", "prompts", "--no-impact", "docs reviewed", "--breaking", "none")
     assert code == 2
+    assert "specific reason" in out
     reason = "Typo fix in prompt wording only, no behavior or documented surface changed"
     code, out = run(repo, capsys, "--accept", "prompts", "--no-impact", reason, "--breaking", "none")
     assert code == 0, out
@@ -129,10 +141,12 @@ def test_no_impact_must_be_specific(tmp_path, capsys):
 def test_breaking_receipt_requirements(tmp_path, capsys):
     repo, _ = make_repo(tmp_path)
     write(repo, "prompts/core.md", "core v2\n")
-    code, _ = accept_prompts(repo, capsys, docs="CHANGELOG.md,README.md", breaking="x is removed")
+    code, out = accept_prompts(repo, capsys, docs="CHANGELOG.md,README.md", breaking="x is removed")
     assert code == 2
-    code, _ = accept_prompts(repo, capsys, "--migration", MIGRATION, docs="README.md", breaking="x is removed")
+    assert "--migration must give" in out
+    code, out = accept_prompts(repo, capsys, "--migration", MIGRATION, docs="README.md", breaking="x is removed")
     assert code == 2
+    assert "must update CHANGELOG.md" in out
     code, out = accept_prompts(
         repo, capsys, "--migration", MIGRATION, docs="CHANGELOG.md,README.md", breaking="x is removed"
     )
@@ -214,14 +228,17 @@ def test_release_tag_needs_dated_changelog_section(tmp_path, capsys):
     assert "no dated" in out
 
 
-def test_accept_without_lock_and_double_init_are_tool_errors(tmp_path, capsys):
+def test_accept_without_lock_is_tool_error(tmp_path, capsys):
     repo = bare_repo(tmp_path)
     commit(repo, "files")
     code, out = run(repo, capsys, "--accept", "prompts", "--no-impact", "x", "--breaking", "none")
     assert code == 2
     assert "is missing" in out
-    repo2, _ = make_repo(tmp_path / "second")
-    code, out = run(repo2, capsys, "--init", "--note", "Initial baseline for the fixture repository docs")
+
+
+def test_double_init_is_tool_error(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    code, out = run(repo, capsys, "--init", "--note", "Initial baseline for the fixture repository docs")
     assert code == 2
     assert "already exists" in out
 
@@ -230,4 +247,174 @@ def test_unknown_base_revision_is_tool_error(tmp_path, capsys):
     repo, _ = make_repo(tmp_path)
     code, out = run(repo, capsys, "--base", "no-such-rev")
     assert code == 2
-    assert "ERROR" in out
+    assert "failed" in out or "merge base" in out
+
+
+def test_hand_edited_receipt_without_reason_fails(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    write(repo, "prompts/core.md", "core v2\n")
+    assert accept_prompts(repo, capsys)[0] == 0
+    fingerprint = json.loads(lock_file(repo).read_text(encoding="utf-8"))["domains"]["prompts"]["fingerprint"]
+    edit_lock(repo, "prompts", {"fingerprint": fingerprint, "breaking": "none", "docs": []})
+    code, out = run(repo, capsys)
+    assert code == 1
+    assert "--no-impact needs a specific reason" in out
+
+
+def test_non_object_receipt_is_tool_error(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    edit_lock(repo, "prompts", "oops")
+    code, out = run(repo, capsys)
+    assert code == 2
+    assert "must be an object" in out
+
+
+def test_carried_over_breaking_receipt_is_not_reported(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    write(repo, "prompts/core.md", "core v2\n")
+    write(repo, "README.md", "# Readme\n\nv2\n")
+    write(repo, "CHANGELOG.md", FILES["CHANGELOG.md"] + "\nBreaking.\n")
+    code, out = accept_prompts(
+        repo, capsys, "--migration", MIGRATION, docs="CHANGELOG.md,README.md", breaking="x is removed"
+    )
+    assert code == 0, out
+    held = commit(repo, "breaking")
+    write(repo, "scripts/sync-ai-prompts", "#!/bin/sh\nexec python scripts/render_prompts.py --x\n")
+    write(repo, "README.md", "# Readme\n\nv3\n")
+    code, out = run(repo, capsys, "--accept", "harnesses", "--docs", "README.md", "--note", NOTE, "--breaking", "none")
+    assert code == 0, out
+    commit(repo, "harnesses")
+    write(repo, "prompts/core.md", "core v3\n")
+    write(repo, "README.md", "# Readme\n\nv4\n")
+    assert accept_prompts(repo, capsys)[0] == 0
+    commit(repo, "none")
+    code, out = run(repo, capsys, "--base", held)
+    assert code == 0, out
+    assert "recorded a breaking change" not in out
+
+
+def test_baseline_cannot_replace_existing_lock(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    write(repo, "prompts/core.md", "core v2\n")
+    write(repo, "README.md", "# Readme\n\nv2\n")
+    assert accept_prompts(repo, capsys)[0] == 0
+    accepted = commit(repo, "accepted")
+    fingerprint = json.loads(lock_file(repo).read_text(encoding="utf-8"))["domains"]["prompts"]["fingerprint"]
+    edit_lock(
+        repo,
+        "prompts",
+        {
+            "baseline": True,
+            "breaking": "none",
+            "docs": [],
+            "fingerprint": fingerprint,
+            "note": "Initial baseline for the fixture repository docs",
+        },
+    )
+    commit(repo, "rebaseline")
+    code, out = run(repo, capsys, "--base", accepted)
+    assert code == 1
+    assert "baseline receipts cannot replace" in out
+
+
+def test_removed_harness_with_breaking_receipt_passes(tmp_path, capsys):
+    repo, base = make_repo(tmp_path)
+    write(repo, "scripts/render_prompts.py", REGISTRY.replace('    Harness(\n        "codex",\n    ),\n', ""))
+    write(repo, "CHANGELOG.md", FILES["CHANGELOG.md"] + "\nRemoved codex.\n")
+    write(repo, "docs/legacy-harnesses.md", "# Legacy\n\ncodex\n")
+    code, out = run(
+        repo,
+        capsys,
+        "--accept",
+        "harnesses",
+        "--docs",
+        "CHANGELOG.md,docs/legacy-harnesses.md",
+        "--note",
+        NOTE,
+        "--breaking",
+        "Deploys that target codex now fail.",
+        "--migration",
+        "Back up the rules file, upgrade by dropping the target, roll back by checking out the previous tag.",
+    )
+    assert code == 0, out
+    code, out = run(repo, capsys, "--base", base)
+    assert code == 0, out
+
+
+def test_accept_input_errors(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    write(repo, "prompts/core.md", "core v2\n")
+    code, out = run(repo, capsys, "--accept", "nope", "--docs", "README.md", "--note", NOTE, "--breaking", "none")
+    assert code == 2
+    assert "unknown domain" in out
+    code, out = accept_prompts(repo, capsys, docs="docs/legacy-harnesses.md")
+    assert code == 2
+    assert "does not cover" in out
+    code, out = accept_prompts(repo, capsys, docs="docs/nope.md")
+    assert code == 2
+    assert "does not exist" in out
+
+
+def test_breaking_none_is_normalized(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    write(repo, "prompts/core.md", "core v2\n")
+    code, out = accept_prompts(repo, capsys, breaking="NONE")
+    assert code == 0, out
+    assert json.loads(lock_file(repo).read_text(encoding="utf-8"))["domains"]["prompts"]["breaking"] == "none"
+
+
+def test_malformed_release_tag_fails(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    code, out = run(repo, capsys, "--release-tag", "release-1")
+    assert code == 1
+    assert "is not vX.Y.Z" in out
+
+
+def test_base_without_lock_reports_only_missing_lock(tmp_path, capsys):
+    repo = bare_repo(tmp_path)
+    base = commit(repo, "files")
+    code, out = run(repo, capsys, "--base", base)
+    assert code == 1
+    assert "is missing" in out
+    assert "Traceback" not in out
+
+
+def test_explain_lists_domains(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    code, out = run(repo, capsys, "--explain")
+    assert code == 0
+    assert "prompts:" in out
+
+
+def test_underscore_slug_anchor_passes(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    write(repo, "INSTALL.md", "# Install\n\n## render_prompts.py usage\n")
+    write(repo, "README.md", "# Readme\n\n[x](INSTALL.md#render_promptspy-usage)\n")
+    code, out = run(repo, capsys)
+    assert code == 0, out
+
+
+def test_backslash_continuation_flags_are_checked(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    write(repo, "README.md", "# Readme\n\n```bash\nscripts/sync-ai-prompts \\\n  --bogus\n```\n")
+    code, out = run(repo, capsys)
+    assert code == 1
+    assert "README.md:4:" in out
+    assert "does not define flag '--bogus'" in out
+
+
+def test_flag_prefix_is_not_a_match(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    write(repo, "README.md", "# Readme\n\n```bash\nscripts/sync-ai-prompts --targ\n```\n")
+    code, out = run(repo, capsys)
+    assert code == 1
+    assert "does not define flag '--targ'" in out
+
+
+def test_path_with_space_in_range_does_not_crash(tmp_path, capsys):
+    repo, base = make_repo(tmp_path)
+    write(repo, "docs/my notes.md", "# Notes\n")
+    commit(repo, "notes")
+    code, out = run(repo, capsys, "--base", base)
+    assert code in (0, 1), out
+    assert "Traceback" not in out

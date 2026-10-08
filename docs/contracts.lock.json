@@ -15,11 +15,14 @@
       "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
     },
     "maintenance": {
-      "baseline": true,
       "breaking": "none",
-      "docs": [],
-      "fingerprint": "3f0ba1e4180a5e73d8f67b3a0ba479935077834eb1d95b3dbe9279e31fc5c297",
-      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+      "docs": [
+        "CHANGELOG.md",
+        "README.md",
+        "docs/MAINTENANCE.md"
+      ],
+      "fingerprint": "d3be4f4a2f2fa88030162d8a77dfbac8f29d9bd112738acd30c2e554e35941c8",
+      "note": "Document the docs-impact guard, its receipts, range and release checks, and its limits."
     },
     "models-agents": {
       "baseline": true,

@@ -24,7 +24,10 @@ jobs:
 
       - name: Check documentation impact for the release range
         run: |
-          previous="$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)"
+          previous=""
+          if [ -n "$(git tag -l 'v*' --merged "${GITHUB_REF_NAME}^")" ]; then
+            previous="$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^")"
+          fi
           if [ -n "$previous" ]; then
             python3 scripts/check_docs_impact.py --release-tag "$GITHUB_REF_NAME" --base "$previous"
           else
