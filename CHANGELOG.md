@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [Unreleased]
+
+### Changed
+
+- Link, anchor, and doc-command checks move from `check_docs_impact.py` into `scripts/check_docs_links.py`,
+  a separate CI step; the receipt guard keeps domains, receipts, and range and release checks. Behavior is
+  unchanged.
+
 ## [3.6.0] - 2026-10-08
 
 ### Added

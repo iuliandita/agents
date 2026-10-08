@@ -104,7 +104,8 @@ scripts/
   scan_prompt_sources.py  # prompt-injection scanner
   check_harness_docs.py   # README/INSTALL harness-table drift check
   check_harness_contract.py  # harness receipt completeness check
-  check_docs_impact.py    # docs-impact receipts, local links, and doc command checks
+  check_docs_impact.py    # docs-impact receipts and range/release checks
+  check_docs_links.py     # local links, anchors, and documented script commands
 skills/consolidate-agents-md/  # portable project context workflow
 templates/project/        # opt-in shared and private instruction examples
 tests/                    # render, deploy, installer, lint, and CI regression tests
@@ -280,9 +281,10 @@ python scripts/scan_prompt_sources.py
 python scripts/check_harness_docs.py
 python scripts/check_harness_contract.py
 python scripts/check_docs_impact.py
+python scripts/check_docs_links.py
 python -m pytest -q
 bash -n scripts/sync-ai-prompts scripts/render-invariants scripts/render-agents scripts/render-hermes scripts/update scripts/python-runtime.sh
-python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/render_agents.py scripts/install_workflow.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py scripts/check_docs_impact.py scripts/render_hermes.py scripts/update.py
+python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/render_agents.py scripts/install_workflow.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py scripts/check_docs_impact.py scripts/check_docs_links.py scripts/render_hermes.py scripts/update.py
 scripts/sync-ai-prompts --check
 scripts/sync-ai-prompts --dry-run
 scripts/sync-ai-prompts --target claude,codex --status
@@ -293,7 +295,7 @@ When a change touches prompt sources, renderers, deployment, overlays, or the wo
 
 ## GitHub Actions
 
-- `.github/workflows/ci.yml` runs the repo's prompt lint, harness-doc and contract checks, the docs-impact guard against the PR base, prompt-injection scan, workflow lint, tests, shell syntax checks, Python compile checks, and dry-run render on a Python 3.11/3.13 matrix, plus macOS and Windows setup smoke tests on Python 3.11 (the Windows job runs the PowerShell launchers).
+- `.github/workflows/ci.yml` runs the repo's prompt lint, harness-doc and contract checks, the docs-impact guard against the PR base, the docs link and command check, prompt-injection scan, workflow lint, tests, shell syntax checks, Python compile checks, and dry-run render on a Python 3.11/3.13 matrix, plus macOS and Windows setup smoke tests on Python 3.11 (the Windows job runs the PowerShell launchers).
 - `.github/workflows/security.yml` runs CodeQL, zizmor, and Gitleaks.
 - Every checkout sets `persist-credentials: false`, and Dependabot groups action and pip updates and waits seven days before proposing a release.
 - `.github/workflows/release.yml` checks the docs-impact receipts for the range since the previous tag and the dated CHANGELOG section, then creates or updates a GitHub release from generated notes when a `v*` tag is pushed.

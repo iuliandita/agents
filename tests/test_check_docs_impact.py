@@ -1,25 +1,22 @@
 import json
 import subprocess
-from pathlib import Path
 
 import check_docs_impact as cdi
 
 NOTE = "Describe the new prompt rule in the README"
 MIGRATION = "Back up the config, upgrade by rerunning deploy, roll back by restoring the backup"
+# The "--target" literal gives the docs links check a defined flag for scripts/sync-ai-prompts.
 REGISTRY = 'HARNESSES = (\n    Harness(\n        "claude",\n    ),\n    Harness(\n        "codex",\n    ),\n)\n"--target"\n'
 FILES = {
     "README.md": "# Readme\n",
-    "INSTALL.md": "# Install\n\n## Setup steps\n",
-    "SECURITY.md": "# Security\n",
+    "INSTALL.md": "# Install\n",
     "CHANGELOG.md": "# Changelog\n\n## [1.0.0] - 2026-01-01\n",
     "docs/surfaces.md": "# Surfaces\n",
     "docs/harness-contract.md": "# Contract\n",
     "docs/legacy-harnesses.md": "# Legacy\n",
-    "docs/MAINTENANCE.md": "# Maintenance\n",
     "prompts/core.md": "core v1\n",
     "scripts/render_prompts.py": REGISTRY,
     "scripts/sync-ai-prompts": "#!/bin/sh\nexec python scripts/render_prompts.py\n",
-    "scripts/check_x.py": "print('x')\n",
 }
 
 
@@ -195,31 +192,6 @@ def test_unmapped_tracked_file_fails_but_untracked_is_ignored(tmp_path, capsys):
     assert "not covered by any docs domain" in out
 
 
-def test_broken_links_and_anchors(tmp_path, capsys):
-    repo, _ = make_repo(tmp_path)
-    write(repo, "README.md", "# Readme\n\n[ok](INSTALL.md#setup-steps)\n")
-    assert run(repo, capsys)[0] == 0
-    write(repo, "README.md", "# Readme\n\n[x](docs/nope.md)\n")
-    code, out = run(repo, capsys)
-    assert code == 1
-    assert "docs/nope.md" in out
-    write(repo, "README.md", "# Readme\n\n[x](INSTALL.md#missing)\n")
-    code, out = run(repo, capsys)
-    assert code == 1
-    assert "anchor '#missing' not found" in out
-
-
-def test_doc_command_flags_are_checked(tmp_path, capsys):
-    repo, _ = make_repo(tmp_path)
-    write(repo, "README.md", "# Readme\n\n```bash\nscripts/sync-ai-prompts --bogus\n```\n")
-    code, out = run(repo, capsys)
-    assert code == 1
-    assert "does not define flag '--bogus'" in out
-    write(repo, "README.md", "# Readme\n\n```bash\nscripts/sync-ai-prompts --target claude\n```\n")
-    code, out = run(repo, capsys)
-    assert code == 0, out
-
-
 def test_release_tag_needs_dated_changelog_section(tmp_path, capsys):
     repo, _ = make_repo(tmp_path)
     assert run(repo, capsys, "--release-tag", "v1.0.0")[0] == 0
@@ -386,31 +358,6 @@ def test_explain_lists_domains(tmp_path, capsys):
     assert "prompts:" in out
 
 
-def test_underscore_slug_anchor_passes(tmp_path, capsys):
-    repo, _ = make_repo(tmp_path)
-    write(repo, "INSTALL.md", "# Install\n\n## render_prompts.py usage\n")
-    write(repo, "README.md", "# Readme\n\n[x](INSTALL.md#render_promptspy-usage)\n")
-    code, out = run(repo, capsys)
-    assert code == 0, out
-
-
-def test_backslash_continuation_flags_are_checked(tmp_path, capsys):
-    repo, _ = make_repo(tmp_path)
-    write(repo, "README.md", "# Readme\n\n```bash\nscripts/sync-ai-prompts \\\n  --bogus\n```\n")
-    code, out = run(repo, capsys)
-    assert code == 1
-    assert "README.md:4:" in out
-    assert "does not define flag '--bogus'" in out
-
-
-def test_flag_prefix_is_not_a_match(tmp_path, capsys):
-    repo, _ = make_repo(tmp_path)
-    write(repo, "README.md", "# Readme\n\n```bash\nscripts/sync-ai-prompts --targ\n```\n")
-    code, out = run(repo, capsys)
-    assert code == 1
-    assert "does not define flag '--targ'" in out
-
-
 def test_path_with_space_in_range_does_not_crash(tmp_path, capsys):
     repo, base = make_repo(tmp_path)
     write(repo, "docs/my notes.md", "# Notes\n")
@@ -418,3 +365,39 @@ def test_path_with_space_in_range_does_not_crash(tmp_path, capsys):
     code, out = run(repo, capsys, "--base", base)
     assert code in (0, 1), out
     assert "Traceback" not in out
+
+
+def test_file_owned_by_several_domains_fails(tmp_path, capsys, monkeypatch):
+    repo, _ = make_repo(tmp_path)
+    monkeypatch.setattr(cdi, "DOMAINS", {**cdi.DOMAINS, "dup": {"sources": ("prompts/core.md",), "docs": ("README.md",)}})
+    code, out = run(repo, capsys)
+    assert code == 1
+    assert "matched by several domains" in out
+
+
+def test_lock_with_invalid_json_is_tool_error(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    lock_file(repo).write_text("{not json", encoding="utf-8")
+    code, out = run(repo, capsys)
+    assert code == 2
+    assert "invalid JSON" in out
+
+
+def test_lock_with_wrong_schema_is_tool_error(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    data = json.loads(lock_file(repo).read_text(encoding="utf-8"))
+    data["schema"] = 2
+    lock_file(repo).write_text(json.dumps(data), encoding="utf-8")
+    code, out = run(repo, capsys)
+    assert code == 2
+    assert "expected schema" in out
+
+
+def test_lock_missing_a_domain_fails(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    data = json.loads(lock_file(repo).read_text(encoding="utf-8"))
+    del data["domains"]["maintenance"]
+    lock_file(repo).write_text(json.dumps(data), encoding="utf-8")
+    code, out = run(repo, capsys)
+    assert code == 1
+    assert "differ from DOMAINS" in out

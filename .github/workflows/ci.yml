@@ -55,6 +55,9 @@ jobs:
             python scripts/check_docs_impact.py
           fi
 
+      - name: Check documentation links and commands
+        run: python scripts/check_docs_links.py
+
       - name: Scan prompt sources for malicious instructions
         run: python scripts/scan_prompt_sources.py
 
@@ -73,7 +76,7 @@ jobs:
         run: bash -n scripts/sync-ai-prompts scripts/render-invariants scripts/render-agents scripts/render-hermes scripts/update scripts/python-runtime.sh
 
       - name: Syntax-check Python scripts
-        run: python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py scripts/check_docs_impact.py scripts/render_agents.py scripts/render_hermes.py scripts/update.py scripts/install_workflow.py
+        run: python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py scripts/check_docs_impact.py scripts/check_docs_links.py scripts/render_agents.py scripts/render_hermes.py scripts/update.py scripts/install_workflow.py
 
       - name: Check render output shape
         run: scripts/sync-ai-prompts --check

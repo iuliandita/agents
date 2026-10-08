@@ -22,8 +22,8 @@
         "README.md",
         "docs/MAINTENANCE.md"
       ],
-      "fingerprint": "d3be4f4a2f2fa88030162d8a77dfbac8f29d9bd112738acd30c2e554e35941c8",
-      "note": "Document the docs-impact guard, its receipts, range and release checks, and its limits."
+      "fingerprint": "8ac112c93f0fa6d0831aecead7d8623d9c0dbd7fa3d9bbb0bcec66a636c55bab",
+      "note": "Document the separate docs link and command check and how CI runs both scripts."
     },
     "models-agents": {
       "baseline": true,
