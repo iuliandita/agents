@@ -228,10 +228,12 @@ def test_resolve_applies_tier_and_agent_overrides():
     assert resolved.effort == "medium"
 
 
-def test_resolve_claude_cheap_tier_forces_low_effort():
-    resolved = ra.resolve(spec(tier="cheap", effort="medium"), "claude", {}, DEFAULTS)
-    assert resolved.model == "sonnet"
-    assert resolved.effort == "low"
+@pytest.mark.parametrize("effort", ["low", "medium"])
+def test_resolve_claude_cheap_tier_uses_haiku_with_role_effort(effort):
+    resolved = ra.resolve(spec(tier="cheap", effort=effort), "claude", {}, DEFAULTS)
+    assert resolved.model == "haiku"
+    assert resolved.effort == effort
+    assert resolved.notices == []
 
 
 FLASH = "opencode-go/deepseek-v4.1-flash"
@@ -294,9 +296,9 @@ def test_resolve_explicit_null_apex_inherits_without_fallback():
 
 
 def test_resolve_string_override_replaces_whole_tier_object():
-    overrides = {"claude": {"tiers": {"cheap": "haiku"}}}
-    resolved = ra.resolve(spec(tier="cheap", effort="medium"), "claude", overrides, DEFAULTS)
-    assert resolved.model == "haiku"
+    overrides = {"opencode": {"tiers": {"cheap": "custom-flash"}}}
+    resolved = ra.resolve(spec(tier="cheap", effort="medium"), "opencode", overrides, SINGLE_MODEL)
+    assert resolved.model == "custom-flash"
     assert resolved.effort == "medium"
 
 
@@ -370,7 +372,7 @@ def test_render_claude_frontmatter_and_body():
         "name": "sample",
         "description": "Sample.",
         "tools": "Read, Grep, Glob",
-        "model": "sonnet",
+        "model": "haiku",
         "effort": "low",
         "maxTurns": "30",
     }
