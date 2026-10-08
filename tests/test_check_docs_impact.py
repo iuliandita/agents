@@ -5,8 +5,7 @@ import check_docs_impact as cdi
 
 NOTE = "Describe the new prompt rule in the README"
 MIGRATION = "Back up the config, upgrade by rerunning deploy, roll back by restoring the backup"
-# The "--target" literal gives the docs links check a defined flag for scripts/sync-ai-prompts.
-REGISTRY = 'HARNESSES = (\n    Harness(\n        "claude",\n    ),\n    Harness(\n        "codex",\n    ),\n)\n"--target"\n'
+REGISTRY = 'HARNESSES = (\n    Harness(\n        "claude",\n    ),\n    Harness(\n        "codex",\n    ),\n)\n'
 FILES = {
     "README.md": "# Readme\n",
     "INSTALL.md": "# Install\n",

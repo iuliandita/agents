@@ -83,10 +83,12 @@ def link_failure(repo: Path, doc: str, target: str, tracked: set[str], cache: di
         return None
     path_part, _, anchor = target.partition("#")
     resolved = doc if not path_part else posixpath.normpath(posixpath.join(posixpath.dirname(doc), path_part))
-    is_dir = any(p.startswith(resolved.rstrip("/") + "/") for p in tracked)
+    is_dir = resolved == "." or any(p.startswith(resolved.rstrip("/") + "/") for p in tracked)
     if resolved not in tracked and not is_dir:
         return f"link target '{target}' is not a tracked file"
     if anchor and resolved.endswith(".md"):
+        if not (repo / resolved).is_file():
+            return f"link target '{target}' is tracked but missing from the work tree"
         if resolved not in cache:
             cache[resolved] = anchors_for((repo / resolved).read_text(encoding="utf-8"))
         if anchor not in cache[resolved]:
@@ -99,6 +101,9 @@ def check_links(repo: Path, files: list[str]) -> list[str]:
     cache: dict[str, set[str]] = {}
     failures = []
     for doc in doc_files(files, current_only=False):
+        if not (repo / doc).is_file():
+            failures.append(f"{doc}: tracked but missing from the work tree")
+            continue
         for number, line, in_fence, _ in markdown_lines((repo / doc).read_text(encoding="utf-8")):
             if in_fence:
                 continue
@@ -112,6 +117,12 @@ def check_links(repo: Path, files: list[str]) -> list[str]:
 def command_snippets(text: str) -> Iterator[tuple[int, str]]:
     pending: tuple[int, str] | None = None
     for number, line, in_fence, lang in markdown_lines(text):
+        if in_fence and lang is None:
+            # A fence delimiter ends any continuation, so an unterminated one is still checked.
+            if pending:
+                yield pending[0], pending[1].strip()
+            pending = None
+            continue
         if in_fence and lang in COMMAND_LANGS:
             start, joined = pending or (number, "")
             joined += " " + line.strip()
@@ -139,6 +150,8 @@ def check_commands(repo: Path, files: list[str]) -> list[str]:
     tracked = set(files)
     failures = []
     for doc in doc_files(files, current_only=True):
+        if not (repo / doc).is_file():
+            continue  # check_links reports the missing file
         text = (repo / doc).read_text(encoding="utf-8")
         for number, snippet in command_snippets(text):
             if "scripts/" not in snippet or snippet.startswith("#"):

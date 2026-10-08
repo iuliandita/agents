@@ -22,8 +22,8 @@
         "README.md",
         "docs/MAINTENANCE.md"
       ],
-      "fingerprint": "8ac112c93f0fa6d0831aecead7d8623d9c0dbd7fa3d9bbb0bcec66a636c55bab",
-      "note": "Document the separate docs link and command check and how CI runs both scripts."
+      "fingerprint": "9b1f83717bef6eb2d7e9398f49793ccc6f34b4b641457e62cc05617527a2ef40",
+      "note": "Document the separate docs link and command check and that CI and releases run both scripts."
     },
     "models-agents": {
       "baseline": true,

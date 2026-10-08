@@ -1,3 +1,4 @@
+import os
 import subprocess
 
 import check_docs_links as cdl
@@ -125,3 +126,88 @@ def test_commands_in_changelog_are_ignored_but_not_in_readme(tmp_path, capsys):
     code, out = run(repo, capsys)
     assert code == 1
     assert "README.md:" in out
+
+
+def test_commands_in_prompts_fences_are_ignored(tmp_path, capsys):
+    repo = make_repo(tmp_path)
+    write(repo, "prompts/core.md", "core\n\n```bash\nscripts/sync-ai-prompts --bogus\n```\n")
+    code, out = run(repo, capsys)
+    assert code == 0, out
+
+
+def test_url_scheme_links_are_skipped(tmp_path, capsys):
+    repo = make_repo(tmp_path)
+    write(repo, "README.md", "# Readme\n\n[a](https://example.com/x) [b](mailto:a@example.com)\n")
+    code, out = run(repo, capsys)
+    assert code == 0, out
+
+
+def test_directory_links_pass(tmp_path, capsys):
+    repo = make_repo(tmp_path)
+    write(repo, "docs/x.md", "# X\n\n[up](../README.md)\n")
+    write(repo, "README.md", "# Readme\n\n[s](scripts/) [root](./)\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "docs")
+    code, out = run(repo, capsys)
+    assert code == 0, out
+
+
+def test_duplicate_heading_anchors(tmp_path, capsys):
+    repo = make_repo(tmp_path)
+    write(repo, "INSTALL.md", "# Install\n\n## Setup\n\n## Setup\n")
+    write(repo, "README.md", "# Readme\n\n[a](INSTALL.md#setup) [b](INSTALL.md#setup-1)\n")
+    code, out = run(repo, capsys)
+    assert code == 0, out
+    write(repo, "README.md", "# Readme\n\n[c](INSTALL.md#setup-2)\n")
+    code, out = run(repo, capsys)
+    assert code == 1
+    assert "anchor '#setup-2' not found" in out
+
+
+def test_html_anchor_tag_works(tmp_path, capsys):
+    repo = make_repo(tmp_path)
+    write(repo, "INSTALL.md", '# Install\n\n<a id="custom"></a>\n')
+    write(repo, "README.md", "# Readme\n\n[x](INSTALL.md#custom)\n")
+    code, out = run(repo, capsys)
+    assert code == 0, out
+
+
+def test_command_naming_missing_script_fails(tmp_path, capsys):
+    repo = make_repo(tmp_path)
+    write(repo, "README.md", "# Readme\n\n```bash\nscripts/nope --x\n```\n")
+    code, out = run(repo, capsys)
+    assert code == 1
+    assert "missing script 'scripts/nope'" in out
+
+
+def test_flag_check_resets_after_and(tmp_path, capsys):
+    repo = make_repo(tmp_path)
+    write(repo, "README.md", "# Readme\n\n```bash\nscripts/sync-ai-prompts --target x && echo --bogus\n```\n")
+    code, out = run(repo, capsys)
+    assert code == 0, out
+
+
+def test_unbalanced_quote_fails(tmp_path, capsys):
+    repo = make_repo(tmp_path)
+    write(repo, "README.md", '# Readme\n\n```bash\nscripts/sync-ai-prompts --target "x\n```\n')
+    code, out = run(repo, capsys)
+    assert code == 1
+    assert "cannot parse script command" in out
+
+
+def test_continuation_at_end_of_fence_is_checked(tmp_path, capsys):
+    repo = make_repo(tmp_path)
+    write(repo, "README.md", "# Readme\n\n```bash\nscripts/sync-ai-prompts --bogus \\\n```\n")
+    code, out = run(repo, capsys)
+    assert code == 1
+    assert "README.md:4:" in out
+    assert "does not define flag '--bogus'" in out
+
+
+def test_tracked_doc_missing_from_work_tree_is_reported(tmp_path, capsys):
+    repo = make_repo(tmp_path)
+    os.remove(repo / "INSTALL.md")
+    code, out = run(repo, capsys)
+    assert code == 1
+    assert "INSTALL.md: tracked but missing from the work tree" in out
+    assert "Traceback" not in out

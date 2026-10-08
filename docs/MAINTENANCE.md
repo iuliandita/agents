@@ -13,7 +13,7 @@ python scripts/check_docs_links.py
 
 The plain check verifies that every domain's receipt matches its current sources and still meets the `--accept` rules (so a hand-edited lock fails), that every tracked file under `agents/`, `prompts/`, `scripts/`, `skills/`, and `templates/` belongs to exactly one domain.
 
-`check_docs_links.py` is a separate, stateless check: local Markdown links and anchors in every tracked doc must resolve to tracked files, and script commands in the current docs must name tracked scripts and flags those scripts define. Changelog entries are history and `prompts/` fragments are agent context, so the command check skips them; their links are still checked. CI runs both scripts.
+`check_docs_links.py` is a separate, stateless check: local Markdown links and anchors in every tracked doc must resolve to tracked files, and script commands in the current docs must name tracked scripts and flags those scripts define. Changelog entries are history and `prompts/` fragments are agent context, so the command check skips them; their links are still checked. CI and the release workflow run both scripts.
 
 `--base` adds the range checks: docs a receipt cites must change in the range, a breaking receipt recorded earlier in the range cannot be replaced by a `breaking: none` one, and removing a harness from `scripts/render_prompts.py` needs a breaking receipt that cites `docs/legacy-harnesses.md`. CI runs it against the PR base, or the previous tip on pushes to `main`, with full history. Exit codes: 0 pass, 1 findings, 2 missing tooling or invalid usage. The check needs Git and Python 3.11 and runs offline.
 
