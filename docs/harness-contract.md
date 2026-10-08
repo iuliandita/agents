@@ -111,6 +111,31 @@ pattern (`medium`), or it is not vendored (`n/a`).
 - Linux/macOS `~/.omp/`; Windows native unverified (inferred `%USERPROFILE%\.omp\`); WSL reads the WSL
   home. Plain `pi` (the upstream project omp forks) stays in `docs/legacy-harnesses.md`.
 
+## OpenCode effort variants (2026-10-09)
+
+Read from the OpenCode v2.0.25 source and the models.dev catalog it loads. Rendered OpenCode agents now
+carry effort as `variant`, not `reasoningEffort`.
+
+- A v1-style agent's unknown frontmatter keys are collected into `options` (`packages/core/src/v1/config/agent.ts`),
+  and `migrateAgent` sends `options` verbatim as `request.body` (`packages/core/src/v1/config/migrate.ts`). A
+  `reasoningEffort` key therefore reached the provider as a raw camelCase body field, not as its effort setting.
+- The known `variant` field joins the model as `provider/model#variant`. For OpenAI-compatible providers,
+  including `opencode-go`, the variant ID is the effort value and sets the provider's `reasoningEffort`
+  setting (`packages/core/src/variant.ts`).
+- Variants come from each model's catalog `reasoning_options`: DeepSeek V4.1 Flash, GLM-5.3, and GLM-5.3
+  Flash declare `low`, `high`, and `max`; Kimi K3 declares only `max`. An undeclared variant fails with
+  `VariantUnavailableError` (`packages/core/src/model-resolver.ts`).
+
+The default effort map renders `low` as `low`, `medium` and `high` as `high`, and `xhigh` and `max` as
+`max`; the flagship tier (Kimi K3) pins `max`. `variants` in `prompts/models.json` lists each model's
+declared names, and rendering fails when a mapped variant is missing from it. A tier left to inherit the
+session model renders no variant, since the session model may not declare it. Changes that need care in
+`models.local.json`: a tier pointing at another model (add its `variants` entry and a matching
+`effort_map`), a per-agent effort override on a Kimi K3 role, and replacing the flagship object with a
+plain model string (both drop the pinned `max`). The old behavior needs `"effort_key": "reasoningEffort"`
+and the previous map (`medium` to `medium`, `xhigh` and `max` to `high`). That the provider ignores the
+raw body key is inferred, not observed.
+
 ## Claude Haiku 5.5 (2026-10-08)
 
 The API model ID is `claude-haiku-5-5`, released 2026-10-07. Current Claude Code resolves `haiku` to

@@ -2,6 +2,8 @@ import subprocess
 import tomllib
 from pathlib import Path
 
+import json
+
 import pytest
 import yaml
 
@@ -211,9 +213,9 @@ def test_resolve_opencode_uses_tracked_defaults():
     assert resolved.effort == "low"
 
 
-def test_resolve_short_effort_map_clamps_xhigh():
+def test_resolve_opencode_xhigh_maps_to_max_variant():
     resolved = ra.resolve(spec(tier="mid", effort="xhigh"), "opencode", {}, DEFAULTS)
-    assert resolved.effort == "high"
+    assert resolved.effort == "max"
 
 
 def test_resolve_applies_tier_and_agent_overrides():
@@ -225,7 +227,8 @@ def test_resolve_applies_tier_and_agent_overrides():
     }
     resolved = ra.resolve(spec(tier="flagship", effort="high"), "opencode", overrides, DEFAULTS)
     assert resolved.model == "opencode-go/glm-5.3-flash"
-    assert resolved.effort == "medium"
+    # OpenCode has no medium variant on these models, so medium renders as high.
+    assert resolved.effort == "high"
 
 
 @pytest.mark.parametrize("effort", ["low", "medium"])
@@ -258,7 +261,7 @@ def test_resolve_tier_effort_overrides_role_effort():
 def test_resolve_tier_object_without_effort_keeps_role_effort():
     resolved = ra.resolve(spec(tier="mid", effort="medium"), "opencode", SINGLE_MODEL, DEFAULTS)
     assert resolved.model == FLASH
-    assert resolved.effort == "medium"
+    assert resolved.effort == "high"
 
 
 def test_resolve_agent_effort_beats_tier_effort():
@@ -291,7 +294,7 @@ def test_resolve_explicit_null_apex_inherits_without_fallback():
     overrides = {"opencode": {"tiers": dict(SINGLE_MODEL["opencode"]["tiers"], apex=None)}}
     resolved = ra.resolve(spec(tier="apex", effort="medium"), "opencode", overrides, DEFAULTS)
     assert resolved.model is None
-    assert resolved.effort == "medium"
+    assert resolved.effort == "high"
     assert resolved.notices == []
 
 
@@ -302,7 +305,7 @@ def test_resolve_string_override_replaces_whole_tier_object():
     assert resolved.effort == "medium"
 
 
-@pytest.mark.parametrize(("harness", "expected"), [("claude", "max"), ("codex", "max"), ("opencode", "high")])
+@pytest.mark.parametrize(("harness", "expected"), [("claude", "max"), ("codex", "max"), ("opencode", "max")])
 def test_resolve_maps_max_effort(harness, expected):
     resolved = ra.resolve(spec(tier="mid", effort="max"), harness, {}, DEFAULTS)
     assert resolved.effort == expected
@@ -422,7 +425,8 @@ def test_render_opencode_permission_map_for_shell_ro():
     head = text.split("---")[1]
     assert "mode: subagent" in head
     assert 'model: "opencode-go/glm-5.3-flash"' in head
-    assert "reasoningEffort: low" in head
+    assert "variant: low" in head
+    assert "reasoningEffort" not in head
     assert "steps: 30" in head
     assert "  read: allow" in head
     assert "  grep: allow" in head
@@ -833,7 +837,7 @@ DOCUMENTED_KEYS = {
         "sandbox_mode",
         "developer_instructions",
     },
-    "opencode": {"description", "mode", "model", "reasoningEffort", "steps", "permission"},
+    "opencode": {"description", "mode", "model", "variant", "steps", "permission"},
     "commandcode": {"name", "description", "tools", "model", "reasoningEffort", "maxTurns"},
     "antigravity": {
         "name",
@@ -1002,3 +1006,54 @@ def test_dry_run_flags_unmanaged_files(tmp_path, capsys):
     out = capsys.readouterr().out
     assert f"would replace claude: {managed}" in out
     assert f"would replace unmanaged claude: {unmanaged}" in out
+
+
+EXAMPLE = json.loads((REPO / "prompts" / "models.local.example.json").read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("overrides", [{}, {"opencode": EXAMPLE["opencode"]}], ids=["defaults", "example"])
+@pytest.mark.parametrize("role", ra.load_agents(REPO), ids=lambda role: role.name)
+def test_opencode_roles_render_declared_variants(role, overrides):
+    # OpenCode rejects a variant the model does not declare, so every shipped role must map to one.
+    resolved = ra.resolve(role, "opencode", overrides, DEFAULTS)
+    head = ra.render_opencode(role, resolved, INVARIANTS).split("---")[1]
+    assert resolved.effort in DEFAULTS["opencode"]["variants"][resolved.model]
+    assert f"variant: {resolved.effort}" in head
+
+
+def test_opencode_apex_on_defaults_uses_kimi_at_max():
+    resolved = ra.resolve(spec(tier="apex", effort="medium"), "opencode", {}, DEFAULTS)
+    assert (resolved.model, resolved.effort) == ("opencode-go/kimi-k3", "max")
+
+
+def test_opencode_inherited_model_renders_no_variant():
+    overrides = {"opencode": {"tiers": {"cheap": None}}}
+    resolved = ra.resolve(spec(tier="cheap", effort="low"), "opencode", overrides, DEFAULTS)
+    head = ra.render_opencode(spec(), resolved, INVARIANTS).split("---")[1]
+    assert "model:" not in head
+    assert "variant:" not in head
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"opencode": {"agents": {"sample": {"effort": "high"}}}},
+        {"opencode": {"tiers": {"flagship": "opencode-go/kimi-k3"}}},
+    ],
+    ids=["agent-override", "plain-string-flagship"],
+)
+def test_opencode_undeclared_variant_fails_loud(overrides):
+    with pytest.raises(SystemExit, match="'high' is not declared for opencode-go/kimi-k3"):
+        ra.resolve(spec(tier="flagship", effort="high"), "opencode", overrides, DEFAULTS)
+
+
+def test_opencode_unlisted_model_is_not_checked():
+    overrides = {"opencode": {"tiers": {"cheap": "opencode-go/other-model"}}}
+    resolved = ra.resolve(spec(tier="cheap", effort="medium"), "opencode", overrides, DEFAULTS)
+    assert resolved.effort == "high"
+
+
+@pytest.mark.parametrize("bad", [[], "low", [""], {"x": 1}])
+def test_validate_overrides_rejects_bad_variants(bad):
+    with pytest.raises(SystemExit, match="variants"):
+        ra.validate_overrides({"opencode": {"variants": {"opencode-go/x": bad}}}, Path("models.local.json"))

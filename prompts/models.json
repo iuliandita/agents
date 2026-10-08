@@ -32,18 +32,27 @@
     }
   },
   "opencode": {
-    "effort_key": "reasoningEffort",
+    "effort_key": "variant",
     "effort_map": {
       "low": "low",
-      "medium": "medium",
+      "medium": "high",
       "high": "high",
-      "xhigh": "high",
-      "max": "high"
+      "xhigh": "max",
+      "max": "max"
     },
     "tiers": {
       "cheap": "opencode-go/deepseek-v4.1-flash",
       "mid": "opencode-go/glm-5.3",
-      "flagship": "opencode-go/kimi-k3"
+      "flagship": {
+        "model": "opencode-go/kimi-k3",
+        "effort": "max"
+      }
+    },
+    "variants": {
+      "opencode-go/deepseek-v4.1-flash": ["low", "high", "max"],
+      "opencode-go/glm-5.3": ["low", "high", "max"],
+      "opencode-go/glm-5.3-flash": ["low", "high", "max"],
+      "opencode-go/kimi-k3": ["max"]
     }
   },
   "commandcode": {

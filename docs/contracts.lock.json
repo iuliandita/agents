@@ -26,11 +26,15 @@
       "note": "Document the separate docs link and command check and that CI and releases run both scripts."
     },
     "models-agents": {
-      "baseline": true,
-      "breaking": "none",
-      "docs": [],
-      "fingerprint": "486c8edbaa674427e8a8b7e6659761427bd6529cc8a23ae26cbff5286c7658ca",
-      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+      "breaking": "OpenCode tiers or agent overrides that map to undeclared variants now fail to render.",
+      "docs": [
+        "CHANGELOG.md",
+        "README.md",
+        "docs/harness-contract.md"
+      ],
+      "fingerprint": "9a5392973d91b0f4c853062f0db57aec15d49ec31c811044cc2ed4ff074728a5",
+      "migration": "Back up prompts/models.local.json, upgrade by removing a copied effort_key, adding variants and a matching effort_map, then redeploy; roll back by checking out v3.6.0 and redeploying.",
+      "note": "Document OpenCode variant rendering, the variants list, inherit handling, and override steps."
     },
     "overlays-trust": {
       "baseline": true,
@@ -40,11 +44,13 @@
       "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
     },
     "prompts": {
-      "baseline": true,
       "breaking": "none",
-      "docs": [],
-      "fingerprint": "fb87cdef107c050b37b9004f60d48a7ffc9bc3756c63847bac8a666456b8eeb1",
-      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+      "docs": [
+        "CHANGELOG.md",
+        "README.md"
+      ],
+      "fingerprint": "112206b557348bcaa9096ff14f6a08617ab917720eba27cb7336adc56494ff3e",
+      "note": "Record that OpenCode effort renders as declared model variants and is checked at render time."
     },
     "workflow-templates": {
       "baseline": true,

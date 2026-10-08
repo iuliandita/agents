@@ -173,7 +173,7 @@ def load_agents(repo_root: Path) -> list[AgentSpec]:
 
 MODELS_PATH = ("prompts", "models.json")
 MODELS_LOCAL_PATH = ("prompts", "models.local.json")
-OVERRIDE_KEYS = frozenset({"tiers", "agents", "effort_key", "effort_map", "shell_ro_wrappers"})
+OVERRIDE_KEYS = frozenset({"tiers", "agents", "effort_key", "effort_map", "shell_ro_wrappers", "variants"})
 AGENT_OVERRIDE_KEYS = frozenset({"tier", "effort"})
 # A tier maps to a model string, null (inherit), or {"model": ..., "effort": ...}. The object
 # form lets a single-model harness vary effort by tier instead of by model.
@@ -256,6 +256,13 @@ def validate_overrides(data: object, source: Path) -> dict:
                 raise SystemExit(f"{label}: '{harness}.effort_map.{level}' is not an effort level")
             if not isinstance(mapped, str) or not mapped:
                 raise SystemExit(f"{label}: '{harness}.effort_map.{level}' must be a non-empty string")
+        # Declared effort names per model, for harnesses that reject undeclared ones (OpenCode variants).
+        variants = entry.get("variants", {})
+        if not isinstance(variants, dict):
+            raise SystemExit(f"{label}: '{harness}.variants' must map model IDs to lists of names")
+        for model, names in variants.items():
+            if not isinstance(names, list) or not names or not all(isinstance(n, str) and n for n in names):
+                raise SystemExit(f"{label}: '{harness}.variants.{model}' must be a non-empty list of strings")
     return data
 
 
@@ -334,6 +341,12 @@ def resolve(spec: AgentSpec, harness: str, overrides: dict, defaults: dict) -> R
     if "effort" not in per_agent and isinstance(entry_value, dict) and "effort" in entry_value:
         effort_level = entry_value["effort"]
     effort = effort_map.get(effort_level, effort_level)
+    declared = {**default_entry.get("variants", {}), **entry.get("variants", {})}.get(model or "")
+    if effort_key and declared is not None and effort not in declared:
+        raise SystemExit(
+            f"{harness}/{spec.name}: {effort_key} '{effort}' is not declared for {model} "
+            f"(declared: {', '.join(declared)}); fix effort_map, the tier effort, or the agent override"
+        )
     if spec.name in SHADOWED_NAMES.get(harness, frozenset()):
         notices.append(f"{harness}/{spec.name}: shadows the built-in agent of the same name")
     return Resolved(
@@ -484,8 +497,9 @@ def render_opencode(spec: AgentSpec, resolved: Resolved, invariants: str) -> str
     ]
     if resolved.model is not None:
         lines.append(f"model: {yaml_string(resolved.model)}")
-    if resolved.effort_key:
-        lines.append(f"{resolved.effort_key}: {resolved.effort}")
+        # A variant without a model would join the session model, which may not declare it.
+        if resolved.effort_key:
+            lines.append(f"{resolved.effort_key}: {resolved.effort}")
     if spec.max_turns is not None:
         lines.append(f"steps: {spec.max_turns}")
     lines.append("permission:")

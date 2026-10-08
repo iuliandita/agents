@@ -7,6 +7,18 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
 ### Changed
 
+- OpenCode agents render effort as `variant` instead of `reasoningEffort`. OpenCode sent the old key as a
+  raw request-body field rather than the provider's effort setting. The default effort map uses only
+  variants the `opencode-go` models declare (`low`/`high`/`max`, Kimi K3 `max`), and the flagship tier
+  pins `max`. A `variants` list per model makes rendering fail on an undeclared variant, and a tier that
+  inherits the session model renders no variant. Breaking for local overrides: a tier pointing at another
+  model, a per-agent effort override on a Kimi K3 role, or a plain-string flagship tier now fails to
+  render (or, unchecked, fails model resolution) unless the variant is declared. Back up
+  `prompts/models.local.json` (deploys back up the agent files into `.backups/`). To upgrade, remove any
+  copied `"effort_key": "reasoningEffort"` from the OpenCode entry, add `variants` for other models from
+  `opencode models`, align `effort_map`, and redeploy. To keep the old behavior instead, set
+  `"effort_key": "reasoningEffort"` with the previous map (`medium` to `medium`, `xhigh` and `max` to
+  `high`). Roll back by checking out v3.6.0 and redeploying.
 - Link, anchor, and doc-command checks move from `check_docs_impact.py` into `scripts/check_docs_links.py`,
   a separate CI step; the receipt guard keeps domains, receipts, and range and release checks. Behavior is
   unchanged.
