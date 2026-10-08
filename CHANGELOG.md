@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [Unreleased]
+
+### Added
+
+- Docs-impact guard (`scripts/check_docs_impact.py`, `docs/contracts.lock.json`): changed prompt sources,
+  renderers, deployment code, overlays, or workflow files need a review receipt that cites updated docs or
+  gives a specific no-impact reason. Breaking receipts need backup, upgrade, and rollback steps, survive
+  the release range, and are required when a harness is removed. Local Markdown links, anchors, and doc
+  command flags are checked. CI runs it against the PR base and the release workflow against the previous
+  tag; see `docs/MAINTENANCE.md`.
+
 ## [3.5.0] - 2026-10-08
 
 ### Changed

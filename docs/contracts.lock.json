@@ -1,0 +1,57 @@
+{
+  "domains": {
+    "deployment": {
+      "baseline": true,
+      "breaking": "none",
+      "docs": [],
+      "fingerprint": "89b23e43c79244037b5af2ba17dc021a237ac3da37b40a59f86576c6db125d95",
+      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+    },
+    "harnesses": {
+      "baseline": true,
+      "breaking": "none",
+      "docs": [],
+      "fingerprint": "af5edcad45030ce4e76be2f6c053ae24feb257784219ee6c522ded60a8448bd7",
+      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+    },
+    "maintenance": {
+      "breaking": "none",
+      "docs": [
+        "CHANGELOG.md",
+        "README.md",
+        "docs/MAINTENANCE.md"
+      ],
+      "fingerprint": "d3be4f4a2f2fa88030162d8a77dfbac8f29d9bd112738acd30c2e554e35941c8",
+      "note": "Document the docs-impact guard, its receipts, range and release checks, and its limits."
+    },
+    "models-agents": {
+      "baseline": true,
+      "breaking": "none",
+      "docs": [],
+      "fingerprint": "486c8edbaa674427e8a8b7e6659761427bd6529cc8a23ae26cbff5286c7658ca",
+      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+    },
+    "overlays-trust": {
+      "baseline": true,
+      "breaking": "none",
+      "docs": [],
+      "fingerprint": "382a29cc29072b1fca16d196683f4c7eea45d40ea318df797dfc513ef280098e",
+      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+    },
+    "prompts": {
+      "baseline": true,
+      "breaking": "none",
+      "docs": [],
+      "fingerprint": "fb87cdef107c050b37b9004f60d48a7ffc9bc3756c63847bac8a666456b8eeb1",
+      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+    },
+    "workflow-templates": {
+      "baseline": true,
+      "breaking": "none",
+      "docs": [],
+      "fingerprint": "aba0b21a75c06a3808af72828ab46a498411f7c78033aacdad66a053b4cc46bd",
+      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+    }
+  },
+  "schema": 1
+}

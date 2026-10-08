@@ -104,10 +104,11 @@ scripts/
   scan_prompt_sources.py  # prompt-injection scanner
   check_harness_docs.py   # README/INSTALL harness-table drift check
   check_harness_contract.py  # harness receipt completeness check
+  check_docs_impact.py    # docs-impact receipts, local links, and doc command checks
 skills/consolidate-agents-md/  # portable project context workflow
 templates/project/        # opt-in shared and private instruction examples
 tests/                    # render, deploy, installer, lint, and CI regression tests
-docs/                     # harness contract, surfaces, legacy harnesses, design specs
+docs/                     # harness contract, surfaces, legacy harnesses, maintenance, docs-impact lock
 ```
 
 ## Local and Private Overlays
@@ -278,20 +279,23 @@ python scripts/lint_prompts.py
 python scripts/scan_prompt_sources.py
 python scripts/check_harness_docs.py
 python scripts/check_harness_contract.py
+python scripts/check_docs_impact.py
 python -m pytest -q
 bash -n scripts/sync-ai-prompts scripts/render-invariants scripts/render-agents scripts/render-hermes scripts/update scripts/python-runtime.sh
-python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/render_agents.py scripts/install_workflow.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py scripts/render_hermes.py scripts/update.py
+python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/render_agents.py scripts/install_workflow.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py scripts/check_docs_impact.py scripts/render_hermes.py scripts/update.py
 scripts/sync-ai-prompts --check
 scripts/sync-ai-prompts --dry-run
 scripts/sync-ai-prompts --target claude,codex --status
 scripts/render-agents --check
 ```
 
+When a change touches prompt sources, renderers, deployment, overlays, or the workflow skill, update the affected docs and record a review receipt; see [docs/MAINTENANCE.md](docs/MAINTENANCE.md).
+
 ## GitHub Actions
 
-- `.github/workflows/ci.yml` runs the repo's prompt lint, harness-doc and contract checks, prompt-injection scan, workflow lint, tests, shell syntax checks, Python compile checks, and dry-run render on a Python 3.11/3.13 matrix, plus a macOS setup smoke test on Python 3.11.
+- `.github/workflows/ci.yml` runs the repo's prompt lint, harness-doc and contract checks, the docs-impact guard against the PR base, prompt-injection scan, workflow lint, tests, shell syntax checks, Python compile checks, and dry-run render on a Python 3.11/3.13 matrix, plus a macOS setup smoke test on Python 3.11.
 - `.github/workflows/security.yml` runs CodeQL and Gitleaks.
-- `.github/workflows/release.yml` creates or updates a GitHub release from generated notes when a `v*` tag is pushed.
+- `.github/workflows/release.yml` checks the docs-impact receipts for the range since the previous tag and the dated CHANGELOG section, then creates or updates a GitHub release from generated notes when a `v*` tag is pushed.
 - `.github/workflows/promptfoo-code-scan.yml` wires in Promptfoo's LLM security scanner for prompt-sensitive PRs when `PROMPTFOO_API_KEY` is configured. The Promptfoo GitHub App is the cleaner no-key setup if you want hosted PR comments without storing a token.
 
 ## License
