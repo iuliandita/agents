@@ -156,7 +156,7 @@ new APIs or beta features.
 
 The API model ID is `claude-sonnet-5-5`. Current Claude Code resolves `sonnet` to Sonnet 5.5 on the
 Anthropic API; other providers can resolve an older version, and environment overrides can pin it.
-Keep the portable alias and cheap-tier `low` effort. Start bounded coding at `medium`, harder work at
+Keep the portable alias; the Haiku 5.5 notes above replace the cheap tier. Start bounded coding at `medium`, harder work at
 `high`, and routine lookup at `low`; recalibrate on representative tasks. The adaptive API default of
 `high` is not a coding-effort recommendation. See [Claude Code model configuration](https://code.claude.com/docs/en/model-config)
 and the [Sonnet 5.5 prompting guide](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5).
