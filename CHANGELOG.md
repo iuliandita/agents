@@ -20,6 +20,11 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
   release for both ecosystems and groups pip updates, the security workflow runs zizmor pinned by SHA,
   and CI adds a Windows smoke test for the PowerShell launchers.
 
+### Fixed
+
+- `sync-ai-prompts --dry-run` reports `unchanged` for targets whose deployed content already matches,
+  like a real deploy and `--status`, instead of `would update` for every managed target.
+
 ## [3.5.0] - 2026-10-08
 
 ### Changed
