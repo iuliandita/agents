@@ -9,10 +9,7 @@
       "max": "max"
     },
     "tiers": {
-      "cheap": {
-        "model": "sonnet",
-        "effort": "low"
-      },
+      "cheap": "haiku",
       "mid": "sonnet",
       "flagship": "opus",
       "apex": "fable"

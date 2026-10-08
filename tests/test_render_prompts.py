@@ -279,7 +279,9 @@ def test_vendor_harnesses_define_model_ladders():
     claude = (repo / "prompts" / "harnesses" / "claude.md").read_text(encoding="utf-8")
     codex = (repo / "prompts" / "harnesses" / "codex.md").read_text(encoding="utf-8")
 
-    assert "Sonnet 5.5 at `low` = cheap tier" in claude
+    assert "Haiku 5.5 = cheap, fast tier" in claude
+    assert "at `low` it skips searches, stops early, and skips checks more often" in claude
+    assert "Sonnet 5.5 = balanced tier" in claude
     assert "`medium` as its default effort" in claude
     assert "Fable 5.1 = apex" in claude
     assert "Haiku 4.5 has no effort control" in claude
@@ -287,11 +289,11 @@ def test_vendor_harnesses_define_model_ladders():
     assert "GPT-6.1 Sol = balanced and flagship" in codex
     assert "GPT-6 Astra = apex" in codex
     assert "do not freeze stale names" in codex
-    assert "use `medium` for bounded coding and `high` for hard reasoning or long work" in claude
+    assert "`medium` for bounded coding and `high` for hard reasoning or long work" in claude
     assert "recalibrate effort after model changes" in claude
     assert "check the resolved model and provider" in claude
     assert "aliases may be overridden" in claude
-    assert "`sonnet` selects 5.5 only on the Anthropic API" in claude
+    assert "`haiku` and `sonnet` select 5.5 only on the Anthropic API" in claude
     assert "other providers may resolve older models" in claude
     assert "GPT-6.1 Sol accepts `low`, `medium` (default), `high`, `xhigh`, and `max`" in codex
     assert "with no `none` or `minimal`" in codex

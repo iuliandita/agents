@@ -111,6 +111,40 @@ pattern (`medium`), or it is not vendored (`n/a`).
 - Linux/macOS `~/.omp/`; Windows native unverified (inferred `%USERPROFILE%\.omp\`); WSL reads the WSL
   home. Plain `pi` (the upstream project omp forks) stays in `docs/legacy-harnesses.md`.
 
+## Claude Haiku 5.5 (2026-10-08)
+
+The API model ID is `claude-haiku-5-5`, released 2026-10-07. Current Claude Code resolves `haiku` to
+Haiku 5.5 on the Anthropic API; Bedrock, Google Cloud, Microsoft Foundry, and Claude Platform on AWS
+resolve it to Haiku 4.5, which has no effort control. The Claude `cheap` tier is now the plain `haiku`
+alias, so each role keeps its own effort: explorer at `low`, researcher at `medium`. See
+[Claude Code model configuration](https://code.claude.com/docs/en/model-config).
+
+Haiku 5.5 is the first Haiku with adaptive thinking and effort (`medium` default, `low` through
+`max`), a 1M-token context, and 128k output. Pricing starts at $0.10 / $0.50 per MTok below 100k
+input tokens. The [Haiku 5.5 prompting guide](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5)
+reports that at `low` it is more likely to skip a search, stop early in long agent prompts, or report
+a code change without checking it; `medium` roughly halves early stopping at about twice the output
+tokens. Search tasks should carry the current date. For `xhigh` and `max`, compare against Sonnet 5.5
+on cost and speed.
+
+API integrations must account for these changes from Haiku 4.5, per
+[What's new in Haiku 5.5](https://platform.claude.com/docs/en/models/haiku-5-5/whats-new-haiku-5-5):
+
+- Manual `budget_tokens`, non-default `temperature`/`top_p`/`top_k`, and assistant prefill return
+  errors. Thinking is adaptive and on by default, counts toward `max_tokens`, and can be disabled only
+  at `high` effort or below.
+- Responses can begin with `thinking` blocks; select blocks by `type`. Thinking text is omitted unless
+  `thinking.display` is `"summarized"`.
+- Changing earlier turns invalidates thinking blocks, and thinking blocks replay only in the producing
+  or a linked account.
+- The newer tokenizer counts the same text as about 30% more tokens than Haiku 4.5.
+- Safety classifiers can return `stop_reason: "refusal"`, with no server-side fallback.
+- Computer use on the Claude API and Google Cloud needs `computer_toolset_20260801`.
+
+On 2026-10-08, installed Command Code returned exit 0 from `commandcode --no-auto-update --list-models`
+and listed `claude-haiku-5-5`. Its tracked cheap tier is unchanged; set it in `models.local.json` to
+use Haiku there.
+
 ## Model migration compatibility (2026-09-29)
 
 These model-specific receipts cover the Sonnet 5.5 and GPT-6.1 Sol migration, not a fresh verification
@@ -122,7 +156,7 @@ new APIs or beta features.
 
 The API model ID is `claude-sonnet-5-5`. Current Claude Code resolves `sonnet` to Sonnet 5.5 on the
 Anthropic API; other providers can resolve an older version, and environment overrides can pin it.
-Keep the portable alias and cheap-tier `low` effort. Start bounded coding at `medium`, harder work at
+Keep the portable alias; the Haiku 5.5 notes above replace the cheap tier. Start bounded coding at `medium`, harder work at
 `high`, and routine lookup at `low`; recalibrate on representative tasks. The adaptive API default of
 `high` is not a coding-effort recommendation. See [Claude Code model configuration](https://code.claude.com/docs/en/model-config)
 and the [Sonnet 5.5 prompting guide](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5).

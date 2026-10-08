@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [3.5.0] - 2026-10-08
+
+### Changed
+
+- Claude Code cheap tier moves to the portable `haiku` alias (Haiku 5.5 on the Anthropic API) and keeps
+  each role's effort, so the explorer runs at `low` and the researcher at `medium`. The Claude model
+  ladder names Haiku 5.5 as the fast tier and Sonnet 5.5 as the balanced tier.
+- Dated Haiku 5.5 notes cover provider alias resolution, effort guidance, and API changes from Haiku 4.5.
+
 ## [3.4.1] - 2026-10-03
 
 ### Fixed
