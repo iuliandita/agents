@@ -19,6 +19,17 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check documentation impact for the release range
+        run: |
+          previous="$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)"
+          if [ -n "$previous" ]; then
+            python3 scripts/check_docs_impact.py --release-tag "$GITHUB_REF_NAME" --base "$previous"
+          else
+            python3 scripts/check_docs_impact.py --release-tag "$GITHUB_REF_NAME"
+          fi
 
       - name: Create or update the release
         env:

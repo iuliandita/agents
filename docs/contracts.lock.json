@@ -1,0 +1,54 @@
+{
+  "domains": {
+    "deployment": {
+      "baseline": true,
+      "breaking": "none",
+      "docs": [],
+      "fingerprint": "89b23e43c79244037b5af2ba17dc021a237ac3da37b40a59f86576c6db125d95",
+      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+    },
+    "harnesses": {
+      "baseline": true,
+      "breaking": "none",
+      "docs": [],
+      "fingerprint": "af5edcad45030ce4e76be2f6c053ae24feb257784219ee6c522ded60a8448bd7",
+      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+    },
+    "maintenance": {
+      "baseline": true,
+      "breaking": "none",
+      "docs": [],
+      "fingerprint": "3f0ba1e4180a5e73d8f67b3a0ba479935077834eb1d95b3dbe9279e31fc5c297",
+      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+    },
+    "models-agents": {
+      "baseline": true,
+      "breaking": "none",
+      "docs": [],
+      "fingerprint": "486c8edbaa674427e8a8b7e6659761427bd6529cc8a23ae26cbff5286c7658ca",
+      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+    },
+    "overlays-trust": {
+      "baseline": true,
+      "breaking": "none",
+      "docs": [],
+      "fingerprint": "382a29cc29072b1fca16d196683f4c7eea45d40ea318df797dfc513ef280098e",
+      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+    },
+    "prompts": {
+      "baseline": true,
+      "breaking": "none",
+      "docs": [],
+      "fingerprint": "fb87cdef107c050b37b9004f60d48a7ffc9bc3756c63847bac8a666456b8eeb1",
+      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+    },
+    "workflow-templates": {
+      "baseline": true,
+      "breaking": "none",
+      "docs": [],
+      "fingerprint": "aba0b21a75c06a3808af72828ab46a498411f7c78033aacdad66a053b4cc46bd",
+      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+    }
+  },
+  "schema": 1
+}

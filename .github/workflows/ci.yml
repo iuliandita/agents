@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -40,6 +42,16 @@ jobs:
 
       - name: Check harness contract receipts
         run: python scripts/check_harness_contract.py
+
+      - name: Check documentation impact
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ]; then
+            python scripts/check_docs_impact.py --base "$BASE_SHA"
+          else
+            python scripts/check_docs_impact.py
+          fi
 
       - name: Scan prompt sources for malicious instructions
         run: python scripts/scan_prompt_sources.py
@@ -59,7 +71,7 @@ jobs:
         run: bash -n scripts/sync-ai-prompts scripts/render-invariants scripts/render-agents scripts/render-hermes scripts/update scripts/python-runtime.sh
 
       - name: Syntax-check Python scripts
-        run: python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py scripts/render_agents.py scripts/render_hermes.py scripts/update.py
+        run: python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py scripts/check_docs_impact.py scripts/render_agents.py scripts/render_hermes.py scripts/update.py
 
       - name: Check render output shape
         run: scripts/sync-ai-prompts --check
