@@ -4,6 +4,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Wait a week before proposing a release so a compromised one has time to be pulled.
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns:
@@ -12,3 +15,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      python:
+        patterns:
+          - "*"
