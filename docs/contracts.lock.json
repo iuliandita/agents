@@ -26,15 +26,15 @@
       "note": "Document the separate docs link and command check and that CI and releases run both scripts."
     },
     "models-agents": {
-      "breaking": "OpenCode tiers overridden to models without the mapped variants now fail model resolution.",
+      "breaking": "OpenCode tiers or agent overrides that map to undeclared variants now fail to render.",
       "docs": [
         "CHANGELOG.md",
         "README.md",
         "docs/harness-contract.md"
       ],
-      "fingerprint": "64b37a827b09235ed41a5e3951de39d89415899dbbe9f700475d0ff158b63c8b",
-      "migration": "Back up prompts/models.local.json, upgrade by setting effort_map to the variants opencode models lists (or effort_key reasoningEffort), redeploy; roll back by checking out v3.6.0 and redeploying.",
-      "note": "Document OpenCode variant rendering, declared variants per model, and override steps."
+      "fingerprint": "9a5392973d91b0f4c853062f0db57aec15d49ec31c811044cc2ed4ff074728a5",
+      "migration": "Back up prompts/models.local.json, upgrade by removing a copied effort_key, adding variants and a matching effort_map, then redeploy; roll back by checking out v3.6.0 and redeploying.",
+      "note": "Document OpenCode variant rendering, the variants list, inherit handling, and override steps."
     },
     "overlays-trust": {
       "baseline": true,
@@ -49,8 +49,8 @@
         "CHANGELOG.md",
         "README.md"
       ],
-      "fingerprint": "905f9940f997d074d51a91cbbb48acf74d237e3e9961bd51f3205e53ca7af1f0",
-      "note": "Record that OpenCode effort renders as declared model variants and why."
+      "fingerprint": "112206b557348bcaa9096ff14f6a08617ab917720eba27cb7336adc56494ff3e",
+      "note": "Record that OpenCode effort renders as declared model variants and is checked at render time."
     },
     "workflow-templates": {
       "baseline": true,

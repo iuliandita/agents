@@ -127,9 +127,14 @@ carry effort as `variant`, not `reasoningEffort`.
   `VariantUnavailableError` (`packages/core/src/model-resolver.ts`).
 
 The default effort map renders `low` as `low`, `medium` and `high` as `high`, and `xhigh` and `max` as
-`max`; the flagship tier (Kimi K3) pins `max`. A local tier that points at another model needs an
-`effort_map` of that model's declared variants (`opencode models`), or `"effort_key": "reasoningEffort"`
-to keep the old, unenforced behavior. That the provider ignores the raw body key is inferred, not observed.
+`max`; the flagship tier (Kimi K3) pins `max`. `variants` in `prompts/models.json` lists each model's
+declared names, and rendering fails when a mapped variant is missing from it. A tier left to inherit the
+session model renders no variant, since the session model may not declare it. Changes that need care in
+`models.local.json`: a tier pointing at another model (add its `variants` entry and a matching
+`effort_map`), a per-agent effort override on a Kimi K3 role, and replacing the flagship object with a
+plain model string (both drop the pinned `max`). The old behavior needs `"effort_key": "reasoningEffort"`
+and the previous map (`medium` to `medium`, `xhigh` and `max` to `high`). That the provider ignores the
+raw body key is inferred, not observed.
 
 ## Claude Haiku 5.5 (2026-10-08)
 

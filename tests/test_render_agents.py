@@ -2,6 +2,8 @@ import subprocess
 import tomllib
 from pathlib import Path
 
+import json
+
 import pytest
 import yaml
 
@@ -1006,19 +1008,52 @@ def test_dry_run_flags_unmanaged_files(tmp_path, capsys):
     assert f"would replace unmanaged claude: {unmanaged}" in out
 
 
+EXAMPLE = json.loads((REPO / "prompts" / "models.local.example.json").read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("overrides", [{}, {"opencode": EXAMPLE["opencode"]}], ids=["defaults", "example"])
+@pytest.mark.parametrize("role", ra.load_agents(REPO), ids=lambda role: role.name)
+def test_opencode_roles_render_declared_variants(role, overrides):
+    # OpenCode rejects a variant the model does not declare, so every shipped role must map to one.
+    resolved = ra.resolve(role, "opencode", overrides, DEFAULTS)
+    head = ra.render_opencode(role, resolved, INVARIANTS).split("---")[1]
+    assert resolved.effort in DEFAULTS["opencode"]["variants"][resolved.model]
+    assert f"variant: {resolved.effort}" in head
+
+
+def test_opencode_apex_on_defaults_uses_kimi_at_max():
+    resolved = ra.resolve(spec(tier="apex", effort="medium"), "opencode", {}, DEFAULTS)
+    assert (resolved.model, resolved.effort) == ("opencode-go/kimi-k3", "max")
+
+
+def test_opencode_inherited_model_renders_no_variant():
+    overrides = {"opencode": {"tiers": {"cheap": None}}}
+    resolved = ra.resolve(spec(tier="cheap", effort="low"), "opencode", overrides, DEFAULTS)
+    head = ra.render_opencode(spec(), resolved, INVARIANTS).split("---")[1]
+    assert "model:" not in head
+    assert "variant:" not in head
+
+
 @pytest.mark.parametrize(
-    ("tier", "effort", "model", "variant"),
+    "overrides",
     [
-        ("cheap", "low", "opencode-go/deepseek-v4.1-flash", "low"),
-        ("cheap", "medium", "opencode-go/deepseek-v4.1-flash", "high"),
-        ("mid", "low", "opencode-go/glm-5.3", "low"),
-        ("mid", "medium", "opencode-go/glm-5.3", "high"),
-        ("flagship", "high", "opencode-go/kimi-k3", "max"),
+        {"opencode": {"agents": {"sample": {"effort": "high"}}}},
+        {"opencode": {"tiers": {"flagship": "opencode-go/kimi-k3"}}},
     ],
+    ids=["agent-override", "plain-string-flagship"],
 )
-def test_opencode_defaults_render_declared_variants(tier, effort, model, variant):
-    # Only catalog-declared variants resolve; OpenCode rejects any other name.
-    resolved = ra.resolve(spec(tier=tier, effort=effort), "opencode", {}, DEFAULTS)
-    head = ra.render_opencode(spec(tier=tier, effort=effort), resolved, INVARIANTS).split("---")[1]
-    assert f'model: "{model}"' in head
-    assert f"variant: {variant}" in head
+def test_opencode_undeclared_variant_fails_loud(overrides):
+    with pytest.raises(SystemExit, match="'high' is not declared for opencode-go/kimi-k3"):
+        ra.resolve(spec(tier="flagship", effort="high"), "opencode", overrides, DEFAULTS)
+
+
+def test_opencode_unlisted_model_is_not_checked():
+    overrides = {"opencode": {"tiers": {"cheap": "opencode-go/other-model"}}}
+    resolved = ra.resolve(spec(tier="cheap", effort="medium"), "opencode", overrides, DEFAULTS)
+    assert resolved.effort == "high"
+
+
+@pytest.mark.parametrize("bad", [[], "low", [""], {"x": 1}])
+def test_validate_overrides_rejects_bad_variants(bad):
+    with pytest.raises(SystemExit, match="variants"):
+        ra.validate_overrides({"opencode": {"variants": {"opencode-go/x": bad}}}, Path("models.local.json"))
