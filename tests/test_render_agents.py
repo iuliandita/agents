@@ -211,9 +211,9 @@ def test_resolve_opencode_uses_tracked_defaults():
     assert resolved.effort == "low"
 
 
-def test_resolve_short_effort_map_clamps_xhigh():
+def test_resolve_opencode_xhigh_maps_to_max_variant():
     resolved = ra.resolve(spec(tier="mid", effort="xhigh"), "opencode", {}, DEFAULTS)
-    assert resolved.effort == "high"
+    assert resolved.effort == "max"
 
 
 def test_resolve_applies_tier_and_agent_overrides():
@@ -225,7 +225,8 @@ def test_resolve_applies_tier_and_agent_overrides():
     }
     resolved = ra.resolve(spec(tier="flagship", effort="high"), "opencode", overrides, DEFAULTS)
     assert resolved.model == "opencode-go/glm-5.3-flash"
-    assert resolved.effort == "medium"
+    # OpenCode has no medium variant on these models, so medium renders as high.
+    assert resolved.effort == "high"
 
 
 @pytest.mark.parametrize("effort", ["low", "medium"])
@@ -258,7 +259,7 @@ def test_resolve_tier_effort_overrides_role_effort():
 def test_resolve_tier_object_without_effort_keeps_role_effort():
     resolved = ra.resolve(spec(tier="mid", effort="medium"), "opencode", SINGLE_MODEL, DEFAULTS)
     assert resolved.model == FLASH
-    assert resolved.effort == "medium"
+    assert resolved.effort == "high"
 
 
 def test_resolve_agent_effort_beats_tier_effort():
@@ -291,7 +292,7 @@ def test_resolve_explicit_null_apex_inherits_without_fallback():
     overrides = {"opencode": {"tiers": dict(SINGLE_MODEL["opencode"]["tiers"], apex=None)}}
     resolved = ra.resolve(spec(tier="apex", effort="medium"), "opencode", overrides, DEFAULTS)
     assert resolved.model is None
-    assert resolved.effort == "medium"
+    assert resolved.effort == "high"
     assert resolved.notices == []
 
 
@@ -302,7 +303,7 @@ def test_resolve_string_override_replaces_whole_tier_object():
     assert resolved.effort == "medium"
 
 
-@pytest.mark.parametrize(("harness", "expected"), [("claude", "max"), ("codex", "max"), ("opencode", "high")])
+@pytest.mark.parametrize(("harness", "expected"), [("claude", "max"), ("codex", "max"), ("opencode", "max")])
 def test_resolve_maps_max_effort(harness, expected):
     resolved = ra.resolve(spec(tier="mid", effort="max"), harness, {}, DEFAULTS)
     assert resolved.effort == expected
@@ -422,7 +423,8 @@ def test_render_opencode_permission_map_for_shell_ro():
     head = text.split("---")[1]
     assert "mode: subagent" in head
     assert 'model: "opencode-go/glm-5.3-flash"' in head
-    assert "reasoningEffort: low" in head
+    assert "variant: low" in head
+    assert "reasoningEffort" not in head
     assert "steps: 30" in head
     assert "  read: allow" in head
     assert "  grep: allow" in head
@@ -833,7 +835,7 @@ DOCUMENTED_KEYS = {
         "sandbox_mode",
         "developer_instructions",
     },
-    "opencode": {"description", "mode", "model", "reasoningEffort", "steps", "permission"},
+    "opencode": {"description", "mode", "model", "variant", "steps", "permission"},
     "commandcode": {"name", "description", "tools", "model", "reasoningEffort", "maxTurns"},
     "antigravity": {
         "name",
@@ -1002,3 +1004,21 @@ def test_dry_run_flags_unmanaged_files(tmp_path, capsys):
     out = capsys.readouterr().out
     assert f"would replace claude: {managed}" in out
     assert f"would replace unmanaged claude: {unmanaged}" in out
+
+
+@pytest.mark.parametrize(
+    ("tier", "effort", "model", "variant"),
+    [
+        ("cheap", "low", "opencode-go/deepseek-v4.1-flash", "low"),
+        ("cheap", "medium", "opencode-go/deepseek-v4.1-flash", "high"),
+        ("mid", "low", "opencode-go/glm-5.3", "low"),
+        ("mid", "medium", "opencode-go/glm-5.3", "high"),
+        ("flagship", "high", "opencode-go/kimi-k3", "max"),
+    ],
+)
+def test_opencode_defaults_render_declared_variants(tier, effort, model, variant):
+    # Only catalog-declared variants resolve; OpenCode rejects any other name.
+    resolved = ra.resolve(spec(tier=tier, effort=effort), "opencode", {}, DEFAULTS)
+    head = ra.render_opencode(spec(tier=tier, effort=effort), resolved, INVARIANTS).split("---")[1]
+    assert f'model: "{model}"' in head
+    assert f"variant: {variant}" in head

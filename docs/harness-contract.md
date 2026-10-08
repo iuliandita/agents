@@ -111,6 +111,26 @@ pattern (`medium`), or it is not vendored (`n/a`).
 - Linux/macOS `~/.omp/`; Windows native unverified (inferred `%USERPROFILE%\.omp\`); WSL reads the WSL
   home. Plain `pi` (the upstream project omp forks) stays in `docs/legacy-harnesses.md`.
 
+## OpenCode effort variants (2026-10-09)
+
+Read from the OpenCode v2.0.25 source and the models.dev catalog it loads. Rendered OpenCode agents now
+carry effort as `variant`, not `reasoningEffort`.
+
+- A v1-style agent's unknown frontmatter keys are collected into `options` (`packages/core/src/v1/config/agent.ts`),
+  and `migrateAgent` sends `options` verbatim as `request.body` (`packages/core/src/v1/config/migrate.ts`). A
+  `reasoningEffort` key therefore reached the provider as a raw camelCase body field, not as its effort setting.
+- The known `variant` field joins the model as `provider/model#variant`. For OpenAI-compatible providers,
+  including `opencode-go`, the variant ID is the effort value and sets the provider's `reasoningEffort`
+  setting (`packages/core/src/variant.ts`).
+- Variants come from each model's catalog `reasoning_options`: DeepSeek V4.1 Flash, GLM-5.3, and GLM-5.3
+  Flash declare `low`, `high`, and `max`; Kimi K3 declares only `max`. An undeclared variant fails with
+  `VariantUnavailableError` (`packages/core/src/model-resolver.ts`).
+
+The default effort map renders `low` as `low`, `medium` and `high` as `high`, and `xhigh` and `max` as
+`max`; the flagship tier (Kimi K3) pins `max`. A local tier that points at another model needs an
+`effort_map` of that model's declared variants (`opencode models`), or `"effort_key": "reasoningEffort"`
+to keep the old, unenforced behavior. That the provider ignores the raw body key is inferred, not observed.
+
 ## Claude Haiku 5.5 (2026-10-08)
 
 The API model ID is `claude-haiku-5-5`, released 2026-10-07. Current Claude Code resolves `haiku` to
