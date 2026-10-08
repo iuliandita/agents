@@ -11,13 +11,10 @@ import argparse
 import fnmatch
 import hashlib
 import json
-import posixpath
 import re
-import shlex
 import shutil
 import subprocess
 import sys
-from collections.abc import Iterator
 from pathlib import Path
 
 
@@ -94,15 +91,7 @@ DOMAINS: dict[str, dict[str, tuple[str, ...]]] = {
     },
 }
 GENERIC_REASONS = {"docs reviewed", "no impact", "no docs impact", "n/a", "none", "not needed", "nothing to update"}
-LINK_RE = re.compile(r"(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
-HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
-ANCHOR_TAG_RE = re.compile(r"<a\s+(?:id|name)=\"([^\"]+)\"")
-INLINE_CODE_RE = re.compile(r"`([^`\n]+)`")
 HARNESS_NAME_RE = re.compile(r"Harness\(\s*\"([a-z0-9_-]+)\"")
-WRAPPED_PY_RE = re.compile(r"scripts/([a-z0-9_]+\.py)")
-SCRIPT_TOKEN_RE = re.compile(r"scripts/[A-Za-z0-9_.-]+")
-URL_SCHEME_RE = re.compile(r"[a-z][a-z0-9+.-]*:")
-COMMAND_LANGS = ("", "bash", "sh", "shell", "zsh", "powershell", "pwsh")
 MISSING_LOCK = f"{LOCK_PATH} is missing; create it once with --init --note"
 
 
@@ -262,140 +251,59 @@ def check_receipts(repo: Path, lock: dict | None, members: dict[str, list[str]])
     return failures
 
 
-def github_slug(text: str) -> str:
-    text = re.sub(r"<[^>]+>", "", text)
-    # GitHub keeps word-internal underscores, so only backticks, asterisks, and tildes are stripped.
-    text = re.sub(r"[`*~]|\[([^\]]*)\]\([^)]*\)", lambda m: m.group(1) or "", text)
-    text = re.sub(r"[^\w\- ]", "", text.strip().lower())
-    return text.replace(" ", "-")
-
-
-def markdown_lines(text: str) -> Iterator[tuple[int, str, bool, str | None]]:
-    """Yield (number, line, in_fence, fence_lang); fence delimiter lines count as fenced with no language."""
-    fence: str | None = None
-    lang = ""
-    for number, line in enumerate(text.splitlines(), start=1):
-        stripped = line.lstrip()
-        if stripped.startswith(("```", "~~~")):
-            marker = stripped[:3]
-            if fence is None:
-                fence, lang = marker, stripped[3:].strip().lower()
-                yield number, line, True, None
-                continue
-            if marker == fence:
-                fence, lang = None, ""
-                yield number, line, True, None
-                continue
-        yield number, line, fence is not None, lang
-
-
-def anchors_for(text: str) -> set[str]:
-    seen: dict[str, int] = {}
-    anchors: set[str] = set()
-    for _, line, in_fence, _ in markdown_lines(text):
-        if in_fence:
-            continue
-        anchors.update(ANCHOR_TAG_RE.findall(line))
-        match = HEADING_RE.match(line)
-        if not match:
-            continue
-        slug = github_slug(match.group(2))
-        count = seen.get(slug, 0)
-        anchors.add(slug if count == 0 else f"{slug}-{count}")
-        seen[slug] = count + 1
-    return anchors
-
-
-def check_links(repo: Path, files: list[str]) -> list[str]:
-    tracked = set(files)
-    docs = [p for p in files if p.endswith(".md")]
-    cache: dict[str, set[str]] = {}
-    failures = []
-    for doc in docs:
-        text = (repo / doc).read_text(encoding="utf-8")
-        for number, line, in_fence, _ in markdown_lines(text):
-            if in_fence:
-                continue
-            for target in LINK_RE.findall(INLINE_CODE_RE.sub("", line)):
-                if URL_SCHEME_RE.match(target):
-                    continue
-                path_part, _, anchor = target.partition("#")
-                resolved = doc if not path_part else posixpath.normpath(posixpath.join(posixpath.dirname(doc), path_part))
-                is_dir = any(p.startswith(resolved.rstrip("/") + "/") for p in tracked)
-                if resolved not in tracked and not is_dir:
-                    failures.append(f"{doc}:{number}: link target '{target}' is not a tracked file")
-                    continue
-                if anchor and resolved.endswith(".md"):
-                    if resolved not in cache:
-                        cache[resolved] = anchors_for((repo / resolved).read_text(encoding="utf-8"))
-                    if anchor not in cache[resolved]:
-                        failures.append(f"{doc}:{number}: anchor '#{anchor}' not found in {resolved}")
-    return failures
-
-
-def command_snippets(text: str) -> Iterator[tuple[int, str]]:
-    pending: tuple[int, str] | None = None
-    for number, line, in_fence, lang in markdown_lines(text):
-        if in_fence and lang in COMMAND_LANGS:
-            start, joined = pending or (number, "")
-            joined += " " + line.strip()
-            # Join backslash continuations so their flags are checked with the command.
-            if joined.endswith("\\"):
-                pending = (start, joined[:-1])
-                continue
-            pending = None
-            yield start, joined.strip()
-        elif not in_fence:
-            for span in INLINE_CODE_RE.findall(line):
-                yield number, span.strip()
-
-
-def script_flag_sources(repo: Path, script: str) -> str:
-    text = (repo / script).read_text(encoding="utf-8", errors="replace")
-    sources = [text]
-    for name in WRAPPED_PY_RE.findall(text):
-        if (repo / "scripts" / name).is_file():
-            sources.append((repo / "scripts" / name).read_text(encoding="utf-8"))
-    return "\n".join(sources)
-
-
-def check_commands(repo: Path, files: list[str]) -> list[str]:
-    tracked = set(files)
-    failures = []
-    # Changelog entries are history: they may name scripts and flags that were later removed.
-    for doc in (p for p in files if p.endswith(".md") and p != CHANGELOG and not p.startswith("prompts/")):
-        text = (repo / doc).read_text(encoding="utf-8")
-        for number, snippet in command_snippets(text):
-            if "scripts/" not in snippet or snippet.startswith("#"):
-                continue
-            try:
-                tokens = shlex.split(snippet, comments=True, posix=True)
-            except ValueError as exc:
-                failures.append(f"{doc}:{number}: cannot parse script command ({exc}): {snippet}")
-                continue
-            script = None
-            for token in tokens:
-                if token in ("|", "&&", "||", ";"):
-                    script = None
-                    continue
-                candidate = token.removeprefix("./")
-                if SCRIPT_TOKEN_RE.fullmatch(candidate):
-                    if candidate not in tracked:
-                        failures.append(f"{doc}:{number}: command references missing script '{candidate}'")
-                        script = None
-                    else:
-                        script = candidate
-                    continue
-                if script and token.startswith("--") and len(token) > 2:
-                    flag = token.split("=", 1)[0]
-                    if not re.search(rf"{re.escape(flag)}(?![\w-])", script_flag_sources(repo, script)):
-                        failures.append(f"{doc}:{number}: '{script}' does not define flag '{flag}'")
-    return failures
-
-
 def changed_since(repo: Path, base: str) -> set[str]:
     # Diffing a commit against the work tree includes staged and unstaged changes.
     return {p for p in git(repo, "diff", "--name-only", "-z", base).split("\0") if p}
+
+
+def cited_doc_failures(lock: dict, base_lock: dict | None, changed: set[str], base_rev: str) -> list[str]:
+    failures = []
+    base_domains = base_lock["domains"] if base_lock else {}
+    for name, receipt in lock["domains"].items():
+        if receipt == base_domains.get(name):
+            continue
+        if receipt.get("baseline") and base_lock is not None:
+            failures.append(f"{name}: baseline receipts cannot replace an existing lock; use --accept")
+        for doc in receipt.get("docs", []):
+            if doc not in changed:
+                failures.append(f"{name}: receipt cites {doc}, but {doc} did not change since {base_rev}")
+    return failures
+
+
+def breaking_carry_failures(repo: Path, merge_base: str, lock: dict, base_domains: dict) -> list[str]:
+    """A later receipt must not drop a breaking assessment recorded earlier in the range."""
+    failures = []
+    for commit in git(repo, "rev-list", f"{merge_base}..HEAD", "--", LOCK_PATH).split():
+        text = git(repo, "show", f"{commit}:{LOCK_PATH}", check=False)
+        if not text:
+            continue
+        for name, receipt in load_lock_text(text, f"{commit[:12]}:{LOCK_PATH}")["domains"].items():
+            # A breaking receipt carried over unchanged from the base was reviewed in an earlier range.
+            if receipt == base_domains.get(name):
+                continue
+            if is_breaking(receipt) and not is_breaking(lock["domains"].get(name, {})):
+                failures.append(
+                    f"{name}: commit {commit[:12]} recorded a breaking change, but the final receipt says none; "
+                    "re-accept with the combined breaking and migration assessment for this range"
+                )
+    return failures
+
+
+def removed_harness_failures(repo: Path, merge_base: str, lock: dict) -> list[str]:
+    base_registry = git(repo, "show", f"{merge_base}:scripts/render_prompts.py", check=False)
+    head_registry = repo / "scripts/render_prompts.py"
+    if not base_registry or not head_registry.is_file():
+        return []
+    removed = set(HARNESS_NAME_RE.findall(base_registry)) - set(
+        HARNESS_NAME_RE.findall(head_registry.read_text(encoding="utf-8"))
+    )
+    receipt = lock["domains"].get("harnesses", {})
+    if removed and (not is_breaking(receipt) or "docs/legacy-harnesses.md" not in receipt.get("docs", [])):
+        return [
+            f"harnesses: removed {', '.join(sorted(removed))}; accept with --breaking, --migration, "
+            "and docs/legacy-harnesses.md"
+        ]
+    return []
 
 
 def check_range(repo: Path, base_rev: str, lock: dict | None) -> list[str]:
@@ -404,50 +312,14 @@ def check_range(repo: Path, base_rev: str, lock: dict | None) -> list[str]:
     merge_base = git(repo, "merge-base", base_rev, "HEAD").strip()
     if not merge_base:
         raise ToolError(f"no merge base between {base_rev} and HEAD; fetch full history (fetch-depth: 0)")
-    changed = changed_since(repo, merge_base)
     base_text = git(repo, "show", f"{merge_base}:{LOCK_PATH}", check=False)
     base_lock = load_lock_text(base_text, f"{merge_base[:12]}:{LOCK_PATH}") if base_text else None
-    failures = []
     base_domains = base_lock["domains"] if base_lock else {}
-    for name, receipt in lock["domains"].items():
-        previous = base_domains.get(name)
-        if receipt == previous:
-            continue
-        if receipt.get("baseline") and base_lock is not None:
-            failures.append(f"{name}: baseline receipts cannot replace an existing lock; use --accept")
-        for doc in receipt.get("docs", []):
-            if doc not in changed:
-                failures.append(f"{name}: receipt cites {doc}, but {doc} did not change since {base_rev}")
-
-    # A later receipt must not drop a breaking assessment recorded earlier in the range.
-    commits = git(repo, "rev-list", f"{merge_base}..HEAD", "--", LOCK_PATH).split()
-    snapshots = [(c[:12], git(repo, "show", f"{c}:{LOCK_PATH}", check=False)) for c in commits]
-    for commit, text in snapshots:
-        if not text:
-            continue
-        for name, receipt in load_lock_text(text, f"{commit}:{LOCK_PATH}")["domains"].items():
-            # A breaking receipt carried over unchanged from the base was reviewed in an earlier range.
-            if receipt == base_domains.get(name):
-                continue
-            if is_breaking(receipt) and not is_breaking(lock["domains"].get(name, {})):
-                failures.append(
-                    f"{name}: commit {commit} recorded a breaking change, but the final receipt says none; "
-                    "re-accept with the combined breaking and migration assessment for this range"
-                )
-
-    base_registry = git(repo, "show", f"{merge_base}:scripts/render_prompts.py", check=False)
-    head_registry = repo / "scripts/render_prompts.py"
-    if base_registry and head_registry.is_file():
-        removed = set(HARNESS_NAME_RE.findall(base_registry)) - set(
-            HARNESS_NAME_RE.findall(head_registry.read_text(encoding="utf-8"))
-        )
-        receipt = lock["domains"].get("harnesses", {})
-        if removed and (not is_breaking(receipt) or "docs/legacy-harnesses.md" not in receipt.get("docs", [])):
-            failures.append(
-                f"harnesses: removed {', '.join(sorted(removed))}; accept with --breaking, --migration, "
-                "and docs/legacy-harnesses.md"
-            )
-    return failures
+    return (
+        cited_doc_failures(lock, base_lock, changed_since(repo, merge_base), base_rev)
+        + breaking_carry_failures(repo, merge_base, lock, base_domains)
+        + removed_harness_failures(repo, merge_base, lock)
+    )
 
 
 def check_release(repo: Path, tag: str) -> list[str]:
@@ -550,7 +422,6 @@ def main(argv: list[str] | None = None) -> int:
             explain(lock, members)
             return 0
         failures = check_mapping(files) + check_receipts(repo, lock, members)
-        failures += check_links(repo, files) + check_commands(repo, files)
         if args.base:
             failures += check_range(repo, args.base, lock)
         if args.release_tag:

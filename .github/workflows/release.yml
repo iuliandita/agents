@@ -35,6 +35,9 @@ jobs:
             python3 scripts/check_docs_impact.py --release-tag "$GITHUB_REF_NAME"
           fi
 
+      - name: Check documentation links and commands
+        run: python3 scripts/check_docs_links.py
+
       - name: Create or update the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
