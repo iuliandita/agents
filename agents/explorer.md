@@ -2,7 +2,7 @@
 name: explorer
 description: Read-only code locator. Use for where is X defined, what calls Y, list uses of Z, map this directory. Returns path:line rows. Never edits.
 tier: cheap
-effort: low
+effort: medium
 tools: read, search, shell-ro
 max_turns: 30
 ---

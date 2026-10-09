@@ -198,10 +198,10 @@ Specialized subagents beat general-purpose ones for two reasons: a clean context
 
 | agent | tier | effort | tools | returns |
 |---|---|---|---|---|
-| explorer | cheap | low | read, search, shell-ro | `path:line` rows with symbol and anchor line |
+| explorer | cheap | medium | read, search, shell-ro | `path:line` rows with symbol and anchor line |
 | researcher | cheap | medium | read, search, web | cited brief, facts separated from inference |
 | builder | mid | medium | read, search, edit, write, shell | diff receipt for named files and named checks |
-| verifier | mid | low | read, shell | per-command exit, classification, redacted excerpt |
+| verifier | cheap | medium | read, shell | per-command exit, classification, redacted excerpt |
 | reviewer | flagship | high | read, search, shell-ro | one severity-tagged line per finding |
 | planner | flagship | high | read, search, web | numbered `action -> verify: command` steps |
 
@@ -213,7 +213,7 @@ When a configured Jev/TypeSafe API key and a relevant installed skill such as `t
 
 Tiers map to models per harness: Claude Code `haiku` for `cheap` (at the role's own effort), `sonnet`, `opus`, and `fable` for `apex`; Codex `gpt-6-luna`, `gpt-6.1-sol` for both `mid` and `flagship` (split by role effort), and `gpt-6-astra` for `apex`; Antigravity `flash` and `pro`; Oh My Pi its `@smol`, `@default`, and `@slow` model roles. OpenCode and Command Code get working defaults from the tracked `prompts/models.json` (`opencode-go/...` and Command Code's own model IDs), so tiering is on out of the box. OpenCode effort renders as the agent's `variant`, limited to names each model declares (DeepSeek V4.1 Flash, GLM-5.3, and GLM-5.3 Flash `low`/`high`/`max`, Kimi K3 `max`), and rendering fails when a mapped variant is not in the model's `variants` list; see the [2026-10-09 OpenCode notes](docs/harness-contract.md#opencode-effort-variants-2026-10-09). A tier can carry an effort (`{"model": "...", "effort": "max"}`), so a harness that runs one model on every tier still varies depth by tier. Effort levels run `low`, `medium`, `high`, `xhigh`, `max`. `prompts/models.local.json` overrides any tier, effort map, or single agent without touching tracked files; copy `prompts/models.local.example.json` to start. A harness with no tier map fails loudly unless you pass `--allow-inherit`.
 
-The portable Claude `haiku` and `sonnet` aliases resolve to Haiku 5.5 and Sonnet 5.5 on current Claude Code with the Anthropic API; Bedrock, Google Cloud, Microsoft Foundry, and Claude Platform on AWS resolve `haiku` to Haiku 4.5, which has no effort control, and local pins can resolve either differently. The cheap tier keeps each role's effort: the explorer runs Haiku at `low`, and the researcher at `medium`, because Haiku 5.5 at `low` skips searches more often. Start bounded coding at `medium` and use `high` for harder work. Check resolved models and API compatibility before deployment; see the [2026-10-08 Haiku 5.5 notes](docs/harness-contract.md#claude-haiku-55-2026-10-08) and the [2026-09-29 model migration notes](docs/harness-contract.md#model-migration-compatibility-2026-09-29).
+The portable Claude `haiku` and `sonnet` aliases resolve to Haiku 5.5 and Sonnet 5.5 on current Claude Code with the Anthropic API; Bedrock, Google Cloud, Microsoft Foundry, and Claude Platform on AWS resolve `haiku` to Haiku 4.5, which has no effort control, and local pins can resolve either differently. The cheap tier keeps each role's effort: the explorer, researcher, and verifier run Haiku at `medium`, because Haiku 5.5 at `low` skips searches and checks more often. Start bounded coding at `medium` and use `high` for harder work. Check resolved models and API compatibility before deployment; see the [2026-10-08 Haiku 5.5 notes](docs/harness-contract.md#claude-haiku-55-2026-10-08) and the [2026-09-29 model migration notes](docs/harness-contract.md#model-migration-compatibility-2026-09-29).
 
 ```bash
 scripts/render-agents                # build/agents/<harness>/
