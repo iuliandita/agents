@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [Unreleased]
+
+### Changed
+
+- The explorer runs at `medium` effort instead of `low`, and the verifier moves from the mid tier at `low`
+  to the cheap tier at `medium` (Haiku 5.5, GPT-6 Luna, DeepSeek V4.1 Flash, or `@smol`, by harness).
+  Haiku 5.5 at `low` skips searches and checks more often, and running named commands does not need a
+  mid-tier model. Redeploy subagents to apply.
+- The Claude prompt notes that Haiku 5.5 rates rise 5x above 100k-token prompts, and the core delegation
+  rules say when cheap-tier fan-out pays off.
+
 ## [4.0.0] - 2026-10-09
 
 ### Changed

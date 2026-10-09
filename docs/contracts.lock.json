@@ -26,15 +26,14 @@
       "note": "Document the separate docs link and command check and that CI and releases run both scripts."
     },
     "models-agents": {
-      "breaking": "OpenCode tiers or agent overrides that map to undeclared variants now fail to render.",
+      "breaking": "none",
       "docs": [
         "CHANGELOG.md",
         "README.md",
         "docs/harness-contract.md"
       ],
-      "fingerprint": "9a5392973d91b0f4c853062f0db57aec15d49ec31c811044cc2ed4ff074728a5",
-      "migration": "Back up prompts/models.local.json, upgrade by removing a copied effort_key, adding variants and a matching effort_map, then redeploy; roll back by checking out v3.6.0 and redeploying.",
-      "note": "Document OpenCode variant rendering, the variants list, inherit handling, and override steps."
+      "fingerprint": "d12c2a0723c3cee10dee757b5ce176af625e6c095fddea16606191af6b0d772d",
+      "note": "Document explorer at medium effort, verifier moved to the cheap tier at medium, and Haiku 5.5 short- and long-prompt pricing."
     },
     "overlays-trust": {
       "baseline": true,
@@ -46,11 +45,10 @@
     "prompts": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
-        "README.md"
+        "CHANGELOG.md"
       ],
-      "fingerprint": "112206b557348bcaa9096ff14f6a08617ab917720eba27cb7336adc56494ff3e",
-      "note": "Record that OpenCode effort renders as declared model variants and is checked at render time."
+      "fingerprint": "1bbded7443c7cce69067ab8b1c700b01fda5060335e7ae045625c137d6f01c9d",
+      "note": "Record the Haiku 5.5 100k-token price tier in the Claude fragment and when cheap-tier fan-out pays off in core delegation."
     },
     "workflow-templates": {
       "baseline": true,

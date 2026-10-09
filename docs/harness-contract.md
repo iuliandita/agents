@@ -141,12 +141,13 @@ raw body key is inferred, not observed.
 The API model ID is `claude-haiku-5-5`, released 2026-10-07. Current Claude Code resolves `haiku` to
 Haiku 5.5 on the Anthropic API; Bedrock, Google Cloud, Microsoft Foundry, and Claude Platform on AWS
 resolve it to Haiku 4.5, which has no effort control. The Claude `cheap` tier is now the plain `haiku`
-alias, so each role keeps its own effort: explorer at `low`, researcher at `medium`. See
+alias, so each role keeps its own effort: explorer, researcher, and verifier at `medium`. See
 [Claude Code model configuration](https://code.claude.com/docs/en/model-config).
 
 Haiku 5.5 is the first Haiku with adaptive thinking and effort (`medium` default, `low` through
-`max`), a 1M-token context, and 128k output. Pricing starts at $0.10 / $0.50 per MTok below 100k
-input tokens. The [Haiku 5.5 prompting guide](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5)
+`max`), a 1M-token context, and 128k output. Pricing is $0.10 / $0.50 per MTok (cache read $0.01) for
+prompts up to 100k tokens and $0.50 / $2.50 (cache read $0.05) above, so its edge over Opus 5.5
+($4 / $20) drops from about 40x to 8x once a worker's context passes 100k. The [Haiku 5.5 prompting guide](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5)
 reports that at `low` it is more likely to skip a search, stop early in long agent prompts, or report
 a code change without checking it; `medium` roughly halves early stopping at about twice the output
 tokens. Search tasks should carry the current date. For `xhigh` and `max`, compare against Sonnet 5.5

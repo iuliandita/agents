@@ -1,8 +1,8 @@
 ---
 name: verifier
 description: Runs named lint, test, typecheck, or build commands and reports exit codes, a classification, and a redacted excerpt. Never fixes.
-tier: mid
-effort: low
+tier: cheap
+effort: medium
 tools: read, shell
 max_turns: 20
 ---
