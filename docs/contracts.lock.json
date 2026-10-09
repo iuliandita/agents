@@ -32,8 +32,8 @@
         "README.md",
         "docs/harness-contract.md"
       ],
-      "fingerprint": "d12c2a0723c3cee10dee757b5ce176af625e6c095fddea16606191af6b0d772d",
-      "note": "Document explorer at medium effort, verifier moved to the cheap tier at medium, and Haiku 5.5 short- and long-prompt pricing."
+      "fingerprint": "c7aef2c002a4ce4adf4150ff0dd90a5280abecb38f5dcaead38538e2aad722d4",
+      "note": "Document explorer at medium, verifier on the cheap tier at medium, the Command Code verifier provider change with its pin-back override, and Haiku 5.5 pricing tiers."
     },
     "overlays-trust": {
       "baseline": true,
@@ -47,7 +47,7 @@
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "1bbded7443c7cce69067ab8b1c700b01fda5060335e7ae045625c137d6f01c9d",
+      "fingerprint": "d650ff9f451a7c27142935e88018e90fbb3f41eb6342a6e7259aaaa82120b5a3",
       "note": "Record the Haiku 5.5 100k-token price tier in the Claude fragment and when cheap-tier fan-out pays off in core delegation."
     },
     "workflow-templates": {

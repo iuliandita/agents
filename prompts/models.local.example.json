@@ -14,9 +14,6 @@
       "cheap": {"model": "opencode-go/deepseek-v4.1-flash", "effort": "low"},
       "mid": {"model": "opencode-go/deepseek-v4.1-flash", "effort": "high"},
       "flagship": {"model": "opencode-go/deepseek-v4.1-flash", "effort": "max"}
-    },
-    "agents": {
-      "verifier": {"effort": "low"}
     }
   },
   "commandcode": {

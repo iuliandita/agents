@@ -141,8 +141,10 @@ raw body key is inferred, not observed.
 The API model ID is `claude-haiku-5-5`, released 2026-10-07. Current Claude Code resolves `haiku` to
 Haiku 5.5 on the Anthropic API; Bedrock, Google Cloud, Microsoft Foundry, and Claude Platform on AWS
 resolve it to Haiku 4.5, which has no effort control. The Claude `cheap` tier is now the plain `haiku`
-alias, so each role keeps its own effort: explorer, researcher, and verifier at `medium`. See
-[Claude Code model configuration](https://code.claude.com/docs/en/model-config).
+alias, so each role keeps its own effort: explorer at `low`, researcher at `medium`. See
+[Claude Code model configuration](https://code.claude.com/docs/en/model-config). Since 2026-10-09 the
+explorer runs at `medium` and the verifier moved to the cheap tier at `medium`; the README roster has
+current values.
 
 Haiku 5.5 is the first Haiku with adaptive thinking and effort (`medium` default, `low` through
 `max`), a 1M-token context, and 128k output. Pricing is $0.10 / $0.50 per MTok (cache read $0.01) for

@@ -8,9 +8,14 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 ### Changed
 
 - The explorer runs at `medium` effort instead of `low`, and the verifier moves from the mid tier at `low`
-  to the cheap tier at `medium` (Haiku 5.5, GPT-6 Luna, DeepSeek V4.1 Flash, or `@smol`, by harness).
-  Haiku 5.5 at `low` skips searches and checks more often, and running named commands does not need a
-  mid-tier model. Redeploy subagents to apply.
+  to the cheap tier at `medium`: Haiku 5.5, GPT-6 Luna, DeepSeek V4.1 Flash, or `@smol` by harness
+  (OpenCode renders `medium` as the `high` variant; Antigravity stays on `flash`). Haiku 5.5 at `low`
+  skips searches and checks more often, and running, classifying, and redacting named commands fits the
+  cheap tier. On Command Code the default verifier model changes provider, from `claude-sonnet-5-5` to
+  `deepseek/deepseek-v4.1-flash`, and it sees raw command output before redaction; to keep it on Claude,
+  set `"agents": {"verifier": {"tier": "mid"}}` under `commandcode` in `prompts/models.local.json`. A tier
+  that pins its own effort still wins over the role's effort. The example override file drops its now
+  redundant verifier effort override. Redeploy subagents to apply.
 - The Claude prompt notes that Haiku 5.5 rates rise 5x above 100k-token prompts, and the core delegation
   rules say when cheap-tier fan-out pays off.
 
