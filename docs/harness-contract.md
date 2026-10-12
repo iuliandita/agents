@@ -224,6 +224,28 @@ Cache-preserving effort changes through `configuration_update` apply only to sta
 mode, not native multi-agent. Verify harness support before relying on this API control; see the
 [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning#change-reasoning-mid-conversation).
 
+### OpenAI Codex CLI reference
+
+Moved out of the rendered prompt on 2026-10-12 to keep the Codex global file within its byte budget;
+the prompt keeps the behavior rules and points here for the facts. Verify against current CLI help
+and the [Codex docs](https://developers.openai.com/codex) before scripting.
+
+- Models: GPT-5.6 Luna, Terra, and Sol remain available but cost more than their GPT-6 counterparts;
+  there is no GPT-6 Terra. Astra rollout and account availability vary, so retain Sol as the fallback.
+- Effort: GPT-6.1 Sol accepts `low`, `medium` (default), `high`, `xhigh`, and `max`,
+  with no `none` or `minimal`; Luna accepts `none` and `low` through `max` but rejects `minimal`;
+  Astra accepts `low` through `max` and has no `none`. An `ultra` level is unconfirmed. Do not assume
+  API and app effort ranges match.
+- Multi-agent: Native Responses multi-agent uses the same request model and tools across agents;
+  custom Codex roles can select per-role models and tools.
+- Automation: `codex exec` accepts a prompt plus stdin for pipelines. Use explicit flags such as `--json`,
+  `-o`, `--ephemeral`, and `--skip-git-repo-check` when they improve determinism, and prefer structured
+  output. Approval policy is `on-request` or `never`; `--approve-for-me` routes approvals through
+  automatic Guardian review under `workspace-write`. `codex mcp-server` is deprecated; expose Codex
+  through the app server.
+- Sessions: `codex agents` lists and controls tasks and `codex queue` sends messages to existing local
+  or remote sessions.
+
 ### Deployment receipt
 
 On 2026-09-29, installed Command Code v1.70.0 returned exit 0 from

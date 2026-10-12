@@ -8,6 +8,11 @@ import pytest
 import render_prompts as renderer
 
 
+def codex_reference() -> str:
+    repo = Path(__file__).resolve().parents[1]
+    return (repo / "docs" / "harness-contract.md").read_text(encoding="utf-8")
+
+
 def test_render_document_places_harness_fragment_before_core():
     rendered = renderer.render_document(
         fragment="## Codex\ncodex body\n",
@@ -295,11 +300,11 @@ def test_vendor_harnesses_define_model_ladders():
     assert "aliases may be overridden" in claude
     assert "`haiku` and `sonnet` select 5.5 only on the Anthropic API" in claude
     assert "other providers may resolve older models" in claude
-    assert "GPT-6.1 Sol accepts `low`, `medium` (default), `high`, `xhigh`, and `max`" in codex
-    assert "with no `none` or `minimal`" in codex
-    assert "Luna accepts `none`" in codex
-    assert "Native Responses multi-agent uses the same request model and tools" in codex
-    assert "custom Codex roles can select per-role models and tools" in codex
+    assert "GPT-6.1 Sol accepts `low`, `medium` (default), `high`, `xhigh`, and `max`" in codex_reference()
+    assert "with no `none` or `minimal`" in codex_reference()
+    assert "Luna accepts `none`" in codex_reference()
+    assert "Native Responses multi-agent uses the same request model and tools" in codex_reference()
+    assert "custom Codex roles can select per-role models and tools" in codex_reference()
     assert "Prompt text does not enable API features" in codex
 
 
@@ -332,7 +337,7 @@ def test_harness_fragments_track_current_agent_behavior():
     assert "Auto mode is the default permission mode" in claude
     assert "run in the background by default" in claude
     assert "Untrusted projects do not contribute project-level" in codex
-    assert "codex queue" in codex
+    assert "codex queue" in codex_reference()
     assert "Skills are native, no plugin required" in opencode
     assert "opencode.jsonc" in opencode
 
@@ -352,15 +357,15 @@ def test_fragments_track_fable_5_1_and_current_cli_defaults():
     assert "`xhigh` and `max` earn their cost only on measured quality gains" in claude
     assert '"attribution": false' in claude
     assert "safeguard false positives" in claude
-    assert "Astra accepts `low` through `max`" in codex
+    assert "Astra accepts `low` through `max`" in codex_reference()
     assert "do not assume API and app effort ranges match" in codex
     assert "/effort xhigh" not in claude
     assert "--restricted" in claude
     assert "CLAUDE_CODE_SUBAGENT_MODEL" in claude
 
-    assert "`ultra`" in codex
-    assert "--approve-for-me" in codex
-    assert "`codex mcp-server` is deprecated" in codex
+    assert "`ultra`" in codex_reference()
+    assert "--approve-for-me" in codex_reference()
+    assert "`codex mcp-server` is deprecated" in codex_reference()
     assert "AGENTS.override.md" in codex
 
 

@@ -17,6 +17,10 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
   counts the global and project `AGENTS.md` files against one `project_doc_max_bytes` cap (32 KiB by
   default) and recommend `project_doc_max_bytes = 40960` in `~/.codex/config.toml`, so project
   instructions are not truncated beside the 32 KiB global file.
+- The Codex notes are shorter: model-effort ranges, `codex exec` flags, session commands, and the multi-agent
+  note moved to the new "OpenAI Codex CLI reference" section of `docs/harness-contract.md`, and the prompt
+  keeps the behavior rules. The rendered Codex file went from 32,612 to 31,510 bytes. The first Model
+  Selection rule moved into the core Delegation rules. Redeploy prompts to apply.
 
 ## [4.1.0] - 2026-10-09
 

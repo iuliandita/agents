@@ -16,7 +16,7 @@
         "docs/harness-contract.md"
       ],
       "fingerprint": "9c1d4d22b37a3401b37bfd550b334b9c3a306f6c48da7fa7544dfc254e6d66c3",
-      "note": "Budget error lists bytes per section, warns at 90%, and docs recommend project_doc_max_bytes 40960 for Codex."
+      "note": "Codex CLI reference section added to the contract doc; budget reporting unchanged."
     },
     "maintenance": {
       "breaking": "none",
@@ -52,8 +52,8 @@
         "INSTALL.md",
         "README.md"
       ],
-      "fingerprint": "404182373ca4f1f0e14cd4848d74544b0fa45b69a73120ec1eda8d98feb02e86",
-      "note": "Tests-proportional rule, shorter Jev bullet, and the Codex cap note in the Codex fragment."
+      "fingerprint": "e720d955944acc20f47ab5cb6091e403e7c9e92cc432525e8756ea369d54cdb7",
+      "note": "Codex notes shortened with reference facts moved to the contract doc, and the first Model Selection rule merged into Delegation."
     },
     "workflow-templates": {
       "baseline": true,
