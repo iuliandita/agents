@@ -8,9 +8,9 @@ import pytest
 import render_prompts as renderer
 
 
-def codex_reference() -> str:
-    repo = Path(__file__).resolve().parents[1]
-    return (repo / "docs" / "harness-contract.md").read_text(encoding="utf-8")
+CODEX_REFERENCE = (Path(__file__).resolve().parents[1] / "docs" / "harness-contract.md").read_text(
+    encoding="utf-8"
+)
 
 
 def test_render_document_places_harness_fragment_before_core():
@@ -300,11 +300,11 @@ def test_vendor_harnesses_define_model_ladders():
     assert "aliases may be overridden" in claude
     assert "`haiku` and `sonnet` select 5.5 only on the Anthropic API" in claude
     assert "other providers may resolve older models" in claude
-    assert "GPT-6.1 Sol accepts `low`, `medium` (default), `high`, `xhigh`, and `max`" in codex_reference()
-    assert "with no `none` or `minimal`" in codex_reference()
-    assert "Luna accepts `none`" in codex_reference()
-    assert "Native Responses multi-agent uses the same request model and tools" in codex_reference()
-    assert "custom Codex roles can select per-role models and tools" in codex_reference()
+    assert "GPT-6.1 Sol accepts `low`, `medium` (default), `high`, `xhigh`, and `max`" in CODEX_REFERENCE
+    assert "with no `none` or `minimal`" in CODEX_REFERENCE
+    assert "Luna accepts `none`" in CODEX_REFERENCE
+    assert "Native Responses multi-agent uses the same request model and tools" in CODEX_REFERENCE
+    assert "custom Codex roles can select per-role models and tools" in CODEX_REFERENCE
     assert "Prompt text does not enable API features" in codex
 
 
@@ -337,7 +337,7 @@ def test_harness_fragments_track_current_agent_behavior():
     assert "Auto mode is the default permission mode" in claude
     assert "run in the background by default" in claude
     assert "Untrusted projects do not contribute project-level" in codex
-    assert "codex queue" in codex_reference()
+    assert "codex queue" in CODEX_REFERENCE
     assert "Skills are native, no plugin required" in opencode
     assert "opencode.jsonc" in opencode
 
@@ -357,15 +357,15 @@ def test_fragments_track_fable_5_1_and_current_cli_defaults():
     assert "`xhigh` and `max` earn their cost only on measured quality gains" in claude
     assert '"attribution": false' in claude
     assert "safeguard false positives" in claude
-    assert "Astra accepts `low` through `max`" in codex_reference()
+    assert "Astra accepts `low` through `max`" in CODEX_REFERENCE
     assert "do not assume API and app effort ranges match" in codex
     assert "/effort xhigh" not in claude
     assert "--restricted" in claude
     assert "CLAUDE_CODE_SUBAGENT_MODEL" in claude
 
-    assert "`ultra`" in codex_reference()
-    assert "--approve-for-me" in codex_reference()
-    assert "`codex mcp-server` is deprecated" in codex_reference()
+    assert "`ultra`" in CODEX_REFERENCE
+    assert "--approve-for-me" in CODEX_REFERENCE
+    assert "`codex mcp-server` is deprecated" in CODEX_REFERENCE
     assert "AGENTS.override.md" in codex
 
 
@@ -746,11 +746,10 @@ def test_enforce_budget_rejects_oversized_render():
 
 def test_enforce_budget_reports_sections_and_warns_near_limit(capsys):
     harness = renderer.Harness("x", "X", "x.md", "X.md", None, "X_PATH", max_bytes=100)
+    tight = renderer.Harness("x", "X", "x.md", "X.md", None, "X_PATH", max_bytes=40)
     rendered = "notes\n# Core\n" + "a" * 20 + "\n# Local\n" + "b" * 10 + "\n"
     with pytest.raises(SystemExit, match=r"harness notes 6, Core 28, Local 19"):
-        renderer.enforce_budget(
-            renderer.Harness("x", "X", "x.md", "X.md", None, "X_PATH", max_bytes=40), rendered
-        )
+        renderer.enforce_budget(tight, rendered)
     renderer.enforce_budget(harness, "a" * 95)
     assert "95 of 100" in capsys.readouterr().err
     renderer.enforce_budget(harness, "a" * 50)
