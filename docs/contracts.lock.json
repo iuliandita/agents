@@ -10,10 +10,13 @@
     "harnesses": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "INSTALL.md",
+        "README.md",
+        "docs/harness-contract.md"
       ],
-      "fingerprint": "00f9001539e737a95e70396310020ac269fc5365d212d3bbf9910f796721cd20",
-      "note": "Record that dry-run now reports unchanged targets like a real deploy."
+      "fingerprint": "9c1d4d22b37a3401b37bfd550b334b9c3a306f6c48da7fa7544dfc254e6d66c3",
+      "note": "Codex CLI reference section added to the contract doc; budget reporting unchanged."
     },
     "maintenance": {
       "breaking": "none",
@@ -45,10 +48,12 @@
     "prompts": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "INSTALL.md",
+        "README.md"
       ],
-      "fingerprint": "d650ff9f451a7c27142935e88018e90fbb3f41eb6342a6e7259aaaa82120b5a3",
-      "note": "Record the Haiku 5.5 100k-token price tier in the Claude fragment and when cheap-tier fan-out pays off in core delegation."
+      "fingerprint": "eaf7d65c928cd48890d49c21d37e95fcb28169a6ea9dd9c96873f608f503c875",
+      "note": "Add the branch and worktree cleanup rule to core Git rules alongside the earlier prompt changes."
     },
     "workflow-templates": {
       "baseline": true,

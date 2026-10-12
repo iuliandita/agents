@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import sys
 from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -63,6 +64,9 @@ HARNESSES: tuple[Harness, ...] = (
         notes="Global path follows $CODEX_HOME (default ~/.codex); set CODEX_AGENTS_PATH when CODEX_HOME is customized.",
         source_url="https://developers.openai.com/codex/agent-configuration/agents-md",
         verified_on="2026-09-17",
+        # Codex reads the global file and project AGENTS.md under one `project_doc_max_bytes` cap
+        # (32 KiB default). Keep the global file at 32 KiB and raise the cap to 40 KiB so project
+        # docs still fit beside it.
         max_bytes=32768,
         native_env_var="CODEX_HOME",
         native_filename="AGENTS.md",
@@ -408,14 +412,37 @@ def output_path(out_dir: Path, harness: Harness, collisions: set[str]) -> Path:
     return out_dir / harness.output_name
 
 
+BUDGET_WARN_RATIO = 0.9
+
+
+def section_sizes(rendered: str) -> list[tuple[str, int]]:
+    """Byte size per top-level `# ` section; text before the first one is the harness notes."""
+    sizes: list[tuple[str, int]] = []
+    name, size = "harness notes", 0
+    for line in rendered.splitlines(keepends=True):
+        if line.startswith("# "):
+            sizes.append((name, size))
+            name, size = line[2:].strip(), 0
+        size += len(line.encode("utf-8"))
+    sizes.append((name, size))
+    return [(label, count) for label, count in sizes if count]
+
+
 def enforce_budget(harness: Harness, rendered: str) -> None:
     if harness.max_bytes is None:
         return
     size = len(rendered.encode("utf-8"))
     if size > harness.max_bytes:
+        parts = ", ".join(f"{label} {count}" for label, count in section_sizes(rendered))
         raise SystemExit(
-            f"{harness.name}: rendered {size} bytes exceeds its {harness.max_bytes}-byte budget; "
-            "trim the fragment or the local/private overlays"
+            f"{harness.name}: rendered {size} bytes exceeds its {harness.max_bytes}-byte budget "
+            f"({parts}); trim the fragment or the local/private overlays"
+        )
+    if size >= harness.max_bytes * BUDGET_WARN_RATIO:
+        print(
+            f"warning: {harness.name} render is {size} of {harness.max_bytes} budget bytes "
+            f"({size * 100 // harness.max_bytes}%)",
+            file=sys.stderr,
         )
 
 

@@ -33,7 +33,6 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 - Name any remaining problem plainly and say whose it is.
 
 ## Model Selection
-- Where delegation is available, use the main model as coordinator and decision maker and delegate execution to the cheapest capable model. Otherwise work directly with available controls. Reserve stronger workers for ambiguity, high-impact decisions, hard debugging, or evidence that a cheaper worker is insufficient; skip predictably unsuitable cheap attempts.
 - Choose model and reasoning effort per subtask: fast/low-cost for lookup and routine checks, balanced for bounded implementation, stronger for difficult reasoning and review. Use supported per-agent controls rather than inheriting expensive parent settings; verify IDs and effort levels before scripting. Effort names are vendor-specific and do not map to the same depth across models: start from the selected model's default, lower it for routine work when quality holds, and raise it for difficulty or observed failures. Re-tune after model changes; optimize total cost and time, including context, retries, dispatch, and verification.
 - Respect explicit user model and effort overrides.
 
@@ -46,7 +45,7 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 - Python: modern syntax, type hints where useful, f-strings, `pathlib`. Avoid unnecessary classes.
 - JavaScript/TypeScript: prefer the repo package manager. Avoid `any` unless there is no reasonable alternative.
 - Every changed line should trace to the user's request. Edit surgically rather than rewriting whole files, match existing style, and do not refactor adjacent code unless it serves the task.
-- Pre-existing bugs, performance concerns, or behavior outside the task are reported as follow-ups, not fixed in the same change. Add tests only where the task asks or the repo already keeps tests for that kind of change; do not promote scratch checks to permanent test files.
+- Pre-existing bugs, performance concerns, or behavior outside the task are reported as follow-ups, not fixed in the same change. Proportional tests: only where the task asks or the repo already tests that kind of change. One per behavior parametrized, plus failure modes; none for glue, config, getters, or type/framework guarantees. Over ~5 new tests, or tests longer than source, justify; do not promote scratch checks to permanent test files. Beats skill rules like "test every function".
 - Remove unused code created by your own change; leave unrelated dead code alone and mention it. Do not hand-edit generated artifacts: change sources and rerun the generator.
 
 ## DevOps and GitOps
@@ -63,6 +62,7 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 - Never add AI attribution to git artifacts. No AI trailers, generated-by lines, robot markers, or hidden commit-template attribution.
 - Keep project instruction files aligned when a repo intentionally tracks multiple agent formats.
 - Treat local changes you did not make as user work. Do not revert them without explicit permission.
+- Keep branches and worktrees tidy. When a task finishes, check for merged or abandoned branches and worktrees, local and remote (`git worktree list`, `git branch --merged`, `git fetch --prune`), recommend what to delete, and delete only after the user confirms.
 
 ## Skills
 - Check available skills before non-trivial work; load requested skills or those that materially help the task. Topical overlap alone does not require a skill or a chain of workflows.
@@ -73,7 +73,7 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 
 ## Verification
 - Plan steps as `1. action -> verify: check`.
-- Complete required repo checks and select additional lint, tests, and type checks according to the change's risk. Executable changes need a check that exercises the changed behavior; syntax-only checks and checks that fail to start do not verify behavior. Once appropriate checks pass, broaden or repeat them only for new changes, failures, or unresolved concerns. Report what was verified with tool evidence from this session; when blocked, name the exact check and reason without relaxing permissions.
+- Complete required repo checks. Executable changes need a check that exercises the changed behavior, the narrowest that fails if it is wrong; syntax-only checks and checks that fail to start do not verify behavior. Once appropriate checks pass, broaden or repeat them only for new changes, failures, or unresolved concerns. Report what was verified with tool evidence from this session; when blocked, name the exact check and reason without relaxing permissions.
 - Search or verify first for versions, features, pricing, APIs, docs, laws, security advisories, model names, and other facts that might be stale. Recognizing a name is not knowing its current state: for models and developer tools, search the name as the user wrote it before answering.
 - Verify generated changes from the host repo or shell, not only from IDE/chat state.
 - For IaC, `terraform plan`, `ansible --check`, and `kubectl diff` count as verification.
@@ -89,7 +89,7 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 
 <!-- optional:subagents -->
 ## Delegation
-- Delegate by default whenever a bounded task can be handed off usefully. Actively look for research, investigation, implementation, testing, and review to assign; use specialized roles when available: `explorer`, `researcher`, `builder`, `verifier`, `reviewer`, and `planner`. The main model owns decomposition, priorities, architecture, tradeoffs, integration, and the final answer.
+- Delegate by default whenever a bounded task can be handed off usefully, to the cheapest capable model; reserve stronger workers for ambiguity, high-impact decisions, hard debugging, or evidence that a cheaper worker is insufficient, and skip predictably unsuitable cheap attempts. Actively look for research, investigation, implementation, testing, and review to assign; use specialized roles when available: `explorer`, `researcher`, `builder`, `verifier`, `reviewer`, and `planner`. The main model owns decomposition, priorities, architecture, tradeoffs, integration, and the final answer.
 - Maximize useful delegation, not agent count. Batch related small tasks into one assignment; keep trivial actions inline when dispatch and context transfer would cost more than doing them. Parallelize independent work within concurrency and budget limits; avoid duplicate investigations, speculative fan-out, and competing edits. Cheap fan-out suits independent breadth work with small worker contexts, not coupled or deep work. Keep useful coordination or independent work moving while workers run.
 - Give each worker scope, owned files, relevant context, expected output, and verification commands. Prefer fresh minimal context over full-history forks when supported; never assume inherited history. Request concise findings and check evidence. Workers share the workspace and must preserve others' edits. The root owns write allocation: never two builders on overlapping files, and subagents do not spawn subagents. Reuse workers for related follow-ups when supported; redirect or stop work that drifts.
 - Check worker evidence and integrate results without redoing their entire task. Escalate model or effort when needed, and retain responsibility for correctness and completion. When delegation is unavailable, perform the work directly and report material limits honestly.

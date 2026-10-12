@@ -264,6 +264,10 @@ ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/GEMINI.md" scripts/sync-ai-prompts --targ
 | Generic AGENTS.md | manual | `manual override via GENERIC_AGENTS_PATH` | Project-level AGENTS.md for tools with no verified global rules path; deploy with GENERIC_AGENTS_PATH pointing at a project file. |
 <!-- harness-targets:end -->
 
+Codex reads the global `AGENTS.md` and project `AGENTS.md` files under one combined cap
+(`project_doc_max_bytes`, 32 KiB by default). The rendered file is held to 32 KiB, so set
+`project_doc_max_bytes = 40960` in `~/.codex/config.toml` or project instructions get truncated.
+
 ## Agent Targets
 
 Select only the harnesses you use. Prompt deployment does not deploy these definitions:

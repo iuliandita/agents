@@ -3,6 +3,27 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [Unreleased]
+
+### Changed
+
+- The core Code rules now keep tests proportional: one test per behavior, none for glue, config, getters, or
+  type- and framework-guaranteed behavior, and a justification past about five new tests or when the tests
+  outgrow the source. The rule states that it overrides skill rules such as "test every function". The
+  Verification rule asks for the narrowest check that fails if the change is wrong instead of open-ended
+  extra checks. Redeploy prompts to apply.
+- The Codex render budget error now lists the bytes per section (harness notes, core, local, private), and
+  the render warns on stderr at 90% of the budget. The README, INSTALL, and Codex notes explain that Codex
+  counts the global and project `AGENTS.md` files against one `project_doc_max_bytes` cap (32 KiB by
+  default) and recommend `project_doc_max_bytes = 40960` in `~/.codex/config.toml`, so project
+  instructions are not truncated beside the 32 KiB global file.
+- The Codex notes are shorter: model-effort ranges, `codex exec` flags, session commands, and the multi-agent
+  note moved to the new "OpenAI Codex CLI reference" section of `docs/harness-contract.md`, and the prompt
+  keeps the behavior rules. The rendered Codex file went from 32,612 to 31,510 bytes. The first Model
+  Selection rule moved into the core Delegation rules. Redeploy prompts to apply.
+- The core Git rules now tell the agent to check for merged or abandoned branches and worktrees, local and
+  remote, when a task finishes, recommend what to delete, and delete only after confirmation.
+
 ## [4.1.0] - 2026-10-09
 
 ### Changed

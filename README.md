@@ -251,6 +251,11 @@ tools' coding surfaces, including Claude Desktop's Code tab, the Codex integrati
 desktop app, OpenCode desktop, Antigravity's desktop/IDE/CLI, and the Hermes desktop app, share the
 deployed file; the account-synced chat surfaces do not.
 
+Codex reads the global `AGENTS.md` and the project's `AGENTS.md` files under one combined cap,
+`project_doc_max_bytes`, which defaults to 32 KiB. The rendered Codex file is held to 32 KiB, so with
+the default cap it leaves no room for project instructions and Codex truncates them silently. Set
+`project_doc_max_bytes = 40960` in `~/.codex/config.toml` after deploying.
+
 List targets, support levels, and resolved paths:
 
 ```bash
