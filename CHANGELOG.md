@@ -21,6 +21,8 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
   note moved to the new "OpenAI Codex CLI reference" section of `docs/harness-contract.md`, and the prompt
   keeps the behavior rules. The rendered Codex file went from 32,612 to 31,510 bytes. The first Model
   Selection rule moved into the core Delegation rules. Redeploy prompts to apply.
+- The core Git rules now tell the agent to check for merged or abandoned branches and worktrees, local and
+  remote, when a task finishes, recommend what to delete, and delete only after confirmation.
 
 ## [4.1.0] - 2026-10-09
 

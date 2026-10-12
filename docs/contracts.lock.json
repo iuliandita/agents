@@ -52,8 +52,8 @@
         "INSTALL.md",
         "README.md"
       ],
-      "fingerprint": "e720d955944acc20f47ab5cb6091e403e7c9e92cc432525e8756ea369d54cdb7",
-      "note": "Codex notes shortened with reference facts moved to the contract doc, and the first Model Selection rule merged into Delegation."
+      "fingerprint": "eaf7d65c928cd48890d49c21d37e95fcb28169a6ea9dd9c96873f608f503c875",
+      "note": "Add the branch and worktree cleanup rule to core Git rules alongside the earlier prompt changes."
     },
     "workflow-templates": {
       "baseline": true,

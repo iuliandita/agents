@@ -62,6 +62,7 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 - Never add AI attribution to git artifacts. No AI trailers, generated-by lines, robot markers, or hidden commit-template attribution.
 - Keep project instruction files aligned when a repo intentionally tracks multiple agent formats.
 - Treat local changes you did not make as user work. Do not revert them without explicit permission.
+- Keep branches and worktrees tidy. When a task finishes, check for merged or abandoned branches and worktrees, local and remote (`git worktree list`, `git branch --merged`, `git fetch --prune`), recommend what to delete, and delete only after the user confirms.
 
 ## Skills
 - Check available skills before non-trivial work; load requested skills or those that materially help the task. Topical overlap alone does not require a skill or a chain of workflows.
