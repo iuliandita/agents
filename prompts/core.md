@@ -46,7 +46,7 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 - Python: modern syntax, type hints where useful, f-strings, `pathlib`. Avoid unnecessary classes.
 - JavaScript/TypeScript: prefer the repo package manager. Avoid `any` unless there is no reasonable alternative.
 - Every changed line should trace to the user's request. Edit surgically rather than rewriting whole files, match existing style, and do not refactor adjacent code unless it serves the task.
-- Pre-existing bugs, performance concerns, or behavior outside the task are reported as follow-ups, not fixed in the same change. Add tests only where the task asks or the repo already keeps tests for that kind of change; do not promote scratch checks to permanent test files.
+- Pre-existing bugs, performance concerns, or behavior outside the task are reported as follow-ups, not fixed in the same change. Proportional tests: only where the task asks or the repo already tests that kind of change. One per behavior parametrized, plus failure modes; none for glue, config, getters, or type/framework guarantees. Over ~5 new tests, or tests longer than source, justify; do not promote scratch checks to permanent test files. Beats skill rules like "test every function".
 - Remove unused code created by your own change; leave unrelated dead code alone and mention it. Do not hand-edit generated artifacts: change sources and rerun the generator.
 
 ## DevOps and GitOps
@@ -73,7 +73,7 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 
 ## Verification
 - Plan steps as `1. action -> verify: check`.
-- Complete required repo checks and select additional lint, tests, and type checks according to the change's risk. Executable changes need a check that exercises the changed behavior; syntax-only checks and checks that fail to start do not verify behavior. Once appropriate checks pass, broaden or repeat them only for new changes, failures, or unresolved concerns. Report what was verified with tool evidence from this session; when blocked, name the exact check and reason without relaxing permissions.
+- Complete required repo checks. Executable changes need a check that exercises the changed behavior, the narrowest that fails if it is wrong; syntax-only checks and checks that fail to start do not verify behavior. Once appropriate checks pass, broaden or repeat them only for new changes, failures, or unresolved concerns. Report what was verified with tool evidence from this session; when blocked, name the exact check and reason without relaxing permissions.
 - Search or verify first for versions, features, pricing, APIs, docs, laws, security advisories, model names, and other facts that might be stale. Recognizing a name is not knowing its current state: for models and developer tools, search the name as the user wrote it before answering.
 - Verify generated changes from the host repo or shell, not only from IDE/chat state.
 - For IaC, `terraform plan`, `ansible --check`, and `kubectl diff` count as verification.

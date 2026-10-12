@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [Unreleased]
+
+### Changed
+
+- The core Code rules now keep tests proportional: one test per behavior, none for glue, config, getters, or
+  type- and framework-guaranteed behavior, and a justification past about five new tests or when the tests
+  outgrow the source. The rule states that it overrides skill rules such as "test every function". The
+  Verification rule asks for the narrowest check that fails if the change is wrong instead of open-ended
+  extra checks. Redeploy prompts to apply.
+
 ## [4.1.0] - 2026-10-09
 
 ### Changed
