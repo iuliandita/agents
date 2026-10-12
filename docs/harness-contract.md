@@ -31,7 +31,7 @@ pattern (`medium`), or it is not vendored (`n/a`).
 
 ### OpenAI Codex
 - Global rules `$CODEX_HOME/AGENTS.md` (default `~/.codex/AGENTS.md`), read as `AGENTS.override.md` then
-  `AGENTS.md`; combined byte cap 32 KiB. Config `~/.codex/config.toml`.
+  `AGENTS.md`; combined byte cap 32 KiB by default (`project_doc_max_bytes`; 40 KiB recommended). Config `~/.codex/config.toml`.
 - Native Windows documented; the Windows spelling of `CODEX_HOME` is not explicitly documented, so it
   resolves like other tools (`%USERPROFILE%\.codex`).
 - Custom roles in `~/.codex/agents/*.toml`; a role applies only when `spawn_agent` passes its

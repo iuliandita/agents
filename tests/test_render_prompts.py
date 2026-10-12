@@ -739,6 +739,19 @@ def test_enforce_budget_rejects_oversized_render():
         renderer.enforce_budget(bounded, "abcdef")
 
 
+def test_enforce_budget_reports_sections_and_warns_near_limit(capsys):
+    harness = renderer.Harness("x", "X", "x.md", "X.md", None, "X_PATH", max_bytes=100)
+    rendered = "notes\n# Core\n" + "a" * 20 + "\n# Local\n" + "b" * 10 + "\n"
+    with pytest.raises(SystemExit, match=r"harness notes 6, Core 28, Local 19"):
+        renderer.enforce_budget(
+            renderer.Harness("x", "X", "x.md", "X.md", None, "X_PATH", max_bytes=40), rendered
+        )
+    renderer.enforce_budget(harness, "a" * 95)
+    assert "95 of 100" in capsys.readouterr().err
+    renderer.enforce_budget(harness, "a" * 50)
+    assert capsys.readouterr().err == ""
+
+
 def test_deploy_refuses_symlink_destination(tmp_path, monkeypatch):
     repo = Path(__file__).resolve().parents[1]
     target = tmp_path / "outside.md"

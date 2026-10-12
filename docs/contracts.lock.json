@@ -10,10 +10,13 @@
     "harnesses": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "INSTALL.md",
+        "README.md",
+        "docs/harness-contract.md"
       ],
-      "fingerprint": "00f9001539e737a95e70396310020ac269fc5365d212d3bbf9910f796721cd20",
-      "note": "Record that dry-run now reports unchanged targets like a real deploy."
+      "fingerprint": "9c1d4d22b37a3401b37bfd550b334b9c3a306f6c48da7fa7544dfc254e6d66c3",
+      "note": "Budget error lists bytes per section, warns at 90%, and docs recommend project_doc_max_bytes 40960 for Codex."
     },
     "maintenance": {
       "breaking": "none",
@@ -45,10 +48,12 @@
     "prompts": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "INSTALL.md",
+        "README.md"
       ],
-      "fingerprint": "13b788db9fb5b7de9180f0fc91ee92e4d9c79f9e7b936db3956f6dc61776da9b",
-      "note": "Keep tests proportional in the core Code and Verification rules and state that they override skill test rules."
+      "fingerprint": "404182373ca4f1f0e14cd4848d74544b0fa45b69a73120ec1eda8d98feb02e86",
+      "note": "Tests-proportional rule, shorter Jev bullet, and the Codex cap note in the Codex fragment."
     },
     "workflow-templates": {
       "baseline": true,
