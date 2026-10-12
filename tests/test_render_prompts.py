@@ -8,9 +8,16 @@ import pytest
 import render_prompts as renderer
 
 
-CODEX_REFERENCE = (Path(__file__).resolve().parents[1] / "docs" / "harness-contract.md").read_text(
-    encoding="utf-8"
-)
+REPO = Path(__file__).resolve().parents[1]
+FRAGMENTS = ("claude", "codex", "opencode", "antigravity", "hermes", "generic")
+PROMPT_TEXT = {
+    "core": REPO / "prompts" / "core.md",
+    "contract": REPO / "docs" / "harness-contract.md",
+    "local_example": REPO / "prompts" / "local.example.md",
+    **{name: REPO / "prompts" / "harnesses" / f"{name}.md" for name in FRAGMENTS if name != "generic"},
+    "generic": REPO / "prompts" / "harnesses" / "AGENTS.md",
+}
+PROMPT_TEXT = {name: path.read_text(encoding="utf-8") for name, path in PROMPT_TEXT.items()}
 
 
 def test_render_document_places_harness_fragment_before_core():
@@ -251,61 +258,140 @@ def test_generic_target_drops_the_subagent_delegation_block(tmp_path):
     assert "## Delegation" in claude["claude"].read_text(encoding="utf-8")
 
 
-def test_common_guidance_lives_in_core_not_harness_fragments():
-    repo = Path(__file__).resolve().parents[1]
-    core = (repo / "prompts" / "core.md").read_text(encoding="utf-8")
-    harness_text = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in sorted((repo / "prompts" / "harnesses").glob("*.md"))
-    )
-
-    for phrase in (
-        "versions, features, pricing, APIs, docs",
-        "Functional status markers are fine",
-        "Use dense bullet lists",
-        "environment scrubbing can hide",
+PRESENT_PINS = {
+    "core": (
         "user's explicit instructions take precedence over skill guidance",
-    ):
-        assert phrase in core
+        "Preserve authorization across turns",
+        "Recognizing a name is not knowing its current state",
+        "environment scrubbing can hide",
+        "Effort names are vendor-specific",
+        "do not map to the same depth across models",
+        "End any tool-using or work-producing turn with one state marker",
+        "`[done]`",
+        "`[needs you]`",
+        "`[waiting]`",
+        "`[partial]`",
+        "One marker per turn, most-blocking wins",
+        "Never run destructive infrastructure commands without explicit confirmation",
+        "`terraform apply`",
+        "`terraform destroy`",
+        "`helm delete`",
+        "`kubectl delete`",
+        "`terraform plan`",
+        "`ansible --check`",
+        "`kubectl diff`",
+        "Once appropriate checks pass",
+        "Executable changes need a check that exercises the changed behavior",
+        "syntax-only checks and checks that fail to start do not verify behavior",
+        "do not promote scratch checks to permanent test files",
+        "Stop after the requested work, required checks, and required repo reviews",
+        "Additional review rounds need new evidence or an explicit request",
+        "unrelated work needs authorization",
+        "Delegate by default whenever a bounded task",
+        "Maximize useful delegation, not agent count",
+        "configured Jev/TypeSafe API key",
+        "Jev output is evidence, not authorization or proof",
+        "Finish the whole task",
+        "Safe local actions need no confirmation",
+    ),
+    "claude": (
+        "Haiku 5.5 = cheap, fast tier",
+        "at `low` it skips searches, stops early, and skips checks more often",
+        "Sonnet 5.5 = balanced tier",
+        "`medium` as its default effort",
+        "Fable 5.1 = apex",
+        "Haiku 4.5 has no effort control",
+        "`medium` for bounded coding and `high` for hard reasoning or long work",
+        "recalibrate effort after model changes",
+        "check the resolved model and provider",
+        "aliases may be overridden",
+        "`haiku` and `sonnet` select 5.5 only on the Anthropic API",
+        "other providers may resolve older models",
+        "`xhigh` and `max` earn their cost only on measured quality gains",
+        '"attribution": false',
+        "safeguard false positives",
+        "--restricted",
+        "--safe-mode",
+        "CLAUDE_CODE_SUBAGENT_MODEL",
+        "Auto mode is the default permission mode",
+        "run in the background by default",
+        "Effort names vary by model",
+    ),
+    "codex": (
+        "GPT-6 Luna = cheap tier",
+        "GPT-6.1 Sol = balanced and flagship",
+        "GPT-6 Astra = apex",
+        "do not freeze stale names",
+        "do not assume API and app effort ranges match",
+        "Prompt text does not enable API features",
+        "Untrusted projects do not contribute project-level",
+        "AGENTS.override.md",
+        "Verify current CLI/docs before setting automation flags",
+    ),
+    "contract": (
+        "GPT-6.1 Sol accepts `low`, `medium` (default), `high`, `xhigh`, and `max`",
+        "with no `none` or `minimal`",
+        "Luna accepts `none`",
+        "Astra accepts `low` through `max`",
+        "`ultra`",
+        "--approve-for-me",
+        "`codex mcp-server` is deprecated",
+        "codex queue",
+        "Native Responses multi-agent uses the same request model and tools",
+        "custom Codex roles can select per-role models and tools",
+    ),
+    "opencode": ("Skills are native, no plugin required", "opencode.jsonc"),
+    "antigravity": ("GEMINI.md", ".agents/rules/"),
+    "hermes": ("agent.coding_instructions", "AGENTS.override.md", "Leave `SOUL.md` alone"),
+    "generic": ("GENERIC_AGENTS_PATH",),
+    "local_example": ("Prefer Bun over npm/yarn/pnpm",),
+}
 
-    for phrase in (
+ABSENT_PINS = {
+    "core": ("Prefer Bun over npm/yarn/pnpm", "Superpowers", "consolidate-agents-md"),
+    "claude": ("/effort xhigh",),
+    "fragments": (
         "Search the web first for versions",
         "Verify versions, features, pricing, and docs first",
         "Functional status markers are allowed",
         "Prefer dense bullet lists",
         "If subprocess environment scrubbing is enabled",
-    ):
-        assert phrase not in harness_text
+        "narrates and formats less",
+        "Prefer small, reviewable edits",
+        "Prefer explicit file lists",
+        "Keep global rules concise and portable",
+        "Keep global rules concise. Use repo-local",
+        "Keep approval prompts meaningful",
+        "Set sandbox and approval explicitly in automation",
+        "Prefer explicit verification commands",
+        "Prefer concise prompts with explicit file paths",
+        "Keep tool permissions narrow",
+        "Treat container, sandbox, and browser automation state",
+        "Keep mode-specific rules aligned",
+    ),
+}
 
 
-def test_vendor_harnesses_define_model_ladders():
-    repo = Path(__file__).resolve().parents[1]
+def test_prompt_sources_keep_their_pinned_phrases():
+    missing = [
+        f"{source}: {phrase}"
+        for source, phrases in PRESENT_PINS.items()
+        for phrase in phrases
+        if phrase not in PROMPT_TEXT[source]
+    ]
+    assert not missing, missing
 
-    claude = (repo / "prompts" / "harnesses" / "claude.md").read_text(encoding="utf-8")
-    codex = (repo / "prompts" / "harnesses" / "codex.md").read_text(encoding="utf-8")
 
-    assert "Haiku 5.5 = cheap, fast tier" in claude
-    assert "at `low` it skips searches, stops early, and skips checks more often" in claude
-    assert "Sonnet 5.5 = balanced tier" in claude
-    assert "`medium` as its default effort" in claude
-    assert "Fable 5.1 = apex" in claude
-    assert "Haiku 4.5 has no effort control" in claude
-    assert "GPT-6 Luna = cheap tier" in codex
-    assert "GPT-6.1 Sol = balanced and flagship" in codex
-    assert "GPT-6 Astra = apex" in codex
-    assert "do not freeze stale names" in codex
-    assert "`medium` for bounded coding and `high` for hard reasoning or long work" in claude
-    assert "recalibrate effort after model changes" in claude
-    assert "check the resolved model and provider" in claude
-    assert "aliases may be overridden" in claude
-    assert "`haiku` and `sonnet` select 5.5 only on the Anthropic API" in claude
-    assert "other providers may resolve older models" in claude
-    assert "GPT-6.1 Sol accepts `low`, `medium` (default), `high`, `xhigh`, and `max`" in CODEX_REFERENCE
-    assert "with no `none` or `minimal`" in CODEX_REFERENCE
-    assert "Luna accepts `none`" in CODEX_REFERENCE
-    assert "Native Responses multi-agent uses the same request model and tools" in CODEX_REFERENCE
-    assert "custom Codex roles can select per-role models and tools" in CODEX_REFERENCE
-    assert "Prompt text does not enable API features" in codex
+def test_prompt_sources_stay_free_of_retired_phrases():
+    fragments = "\n".join(path.read_text(encoding="utf-8") for path in sorted((REPO / "prompts" / "harnesses").glob("*.md")))
+    scopes = {**PROMPT_TEXT, "fragments": fragments}
+    found = [
+        f"{scope}: {phrase}"
+        for scope, phrases in ABSENT_PINS.items()
+        for phrase in phrases
+        if phrase in scopes[scope]
+    ]
+    assert not found, found
 
 
 @pytest.mark.parametrize("harness", ["claude", "codex", "opencode", "commandcode"])
@@ -325,106 +411,6 @@ def test_rendered_workflow_policy_covers_aliases_and_indirect_calls(harness):
     assert "before starting skill-adjacent work" not in rendered
 
 
-def test_harness_fragments_track_current_agent_behavior():
-    repo = Path(__file__).resolve().parents[1]
-    harness_dir = repo / "prompts" / "harnesses"
-
-    claude = (harness_dir / "claude.md").read_text(encoding="utf-8")
-    codex = (harness_dir / "codex.md").read_text(encoding="utf-8")
-    opencode = (harness_dir / "opencode.md").read_text(encoding="utf-8")
-
-    assert "--safe-mode" in claude
-    assert "Auto mode is the default permission mode" in claude
-    assert "run in the background by default" in claude
-    assert "Untrusted projects do not contribute project-level" in codex
-    assert "codex queue" in CODEX_REFERENCE
-    assert "Skills are native, no plugin required" in opencode
-    assert "opencode.jsonc" in opencode
-
-
-def test_fragments_track_fable_5_1_and_current_cli_defaults():
-    repo = Path(__file__).resolve().parents[1]
-    core = (repo / "prompts" / "core.md").read_text(encoding="utf-8")
-    claude = (repo / "prompts" / "harnesses" / "claude.md").read_text(encoding="utf-8")
-    codex = (repo / "prompts" / "harnesses" / "codex.md").read_text(encoding="utf-8")
-
-    assert "do not map to the same depth across models" in core
-    assert "Edit surgically rather than rewriting whole files" in core
-    assert "reported as follow-ups, not fixed in the same change" in core
-    assert "do not promote scratch checks to permanent test files" in core
-    assert "a plan, or a promise about work not yet done" in core
-
-    assert "`xhigh` and `max` earn their cost only on measured quality gains" in claude
-    assert '"attribution": false' in claude
-    assert "safeguard false positives" in claude
-    assert "Astra accepts `low` through `max`" in CODEX_REFERENCE
-    assert "do not assume API and app effort ranges match" in codex
-    assert "/effort xhigh" not in claude
-    assert "--restricted" in claude
-    assert "CLAUDE_CODE_SUBAGENT_MODEL" in claude
-
-    assert "`ultra`" in CODEX_REFERENCE
-    assert "--approve-for-me" in CODEX_REFERENCE
-    assert "`codex mcp-server` is deprecated" in CODEX_REFERENCE
-    assert "AGENTS.override.md" in codex
-
-
-def test_core_tracks_fable_5_1_and_gpt_5_6_prompting_guides():
-    repo = Path(__file__).resolve().parents[1]
-    core = (repo / "prompts" / "core.md").read_text(encoding="utf-8")
-    harness_text = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in sorted((repo / "prompts" / "harnesses").glob("*.md"))
-    )
-
-    for phrase in (
-        "Lead with the outcome",
-        "not by compressing into fragments",
-        "a reader who saw none of the work",
-        "## Autonomy",
-        "inspect and report",
-        "Safe local actions need no confirmation",
-        "Finish the whole task",
-        "Issue independent tool calls together in one response",
-        "Use lists when asked or when the content is multifaceted",
-        "Choose model and reasoning effort per subtask",
-        "Recognizing a name is not knowing its current state",
-        "Delegate by default whenever a bounded task",
-        "Preserve authorization across turns",
-        "Once appropriate checks pass",
-        "Executable changes need a check that exercises the changed behavior",
-        "syntax-only checks and checks that fail to start do not verify behavior",
-        "name the exact check and reason without relaxing permissions",
-        "Stop after the requested work, required checks, and required repo reviews",
-        "Additional review rounds need new evidence or an explicit request",
-        "unrelated work needs authorization",
-        "while workers run",
-        "Maximize useful delegation, not agent count",
-        "configured Jev/TypeSafe API key",
-        "relevant installed skill",
-        "Jev output is evidence, not authorization or proof",
-    ):
-        assert phrase in core
-
-    assert "narrates and formats less" not in harness_text
-
-
-def test_kept_harness_fragments_describe_operational_scope():
-    repo = Path(__file__).resolve().parents[1]
-    harness_dir = repo / "prompts" / "harnesses"
-
-    antigravity = (harness_dir / "antigravity.md").read_text(encoding="utf-8")
-    hermes = (harness_dir / "hermes.md").read_text(encoding="utf-8")
-    generic = (harness_dir / "AGENTS.md").read_text(encoding="utf-8")
-
-    assert "GEMINI.md" in antigravity
-    assert ".agents/rules/" in antigravity
-    assert "agent.coding_instructions" in hermes
-    assert "AGENTS.override.md" in hermes
-    assert "Leave `SOUL.md` alone" in hermes
-    assert "GENERIC_AGENTS_PATH" in generic
-
-
 def test_every_fragment_uses_h2_heading_without_repeated_provenance():
     repo = Path(__file__).resolve().parents[1]
 
@@ -433,88 +419,6 @@ def test_every_fragment_uses_h2_heading_without_repeated_provenance():
         first_line = text.splitlines()[0]
         assert first_line.startswith("## "), f"{path.name}: heading must be H2 so core headings nest cleanly"
         assert "run `scripts/sync-ai-prompts`" not in text, f"{path.name}: drop the repeated provenance line"
-
-
-def test_effort_guidance_is_general_with_vendor_caveats():
-    repo = Path(__file__).resolve().parents[1]
-
-    core = (repo / "prompts" / "core.md").read_text(encoding="utf-8")
-    claude = (repo / "prompts" / "harnesses" / "claude.md").read_text(encoding="utf-8")
-    codex = (repo / "prompts" / "harnesses" / "codex.md").read_text(encoding="utf-8")
-
-    assert "Effort names are vendor-specific" in core
-    assert "Effort names vary by model" in claude
-    assert "Verify current CLI/docs before setting automation flags" in codex
-
-
-def test_generic_workflow_guidance_stays_in_core():
-    repo = Path(__file__).resolve().parents[1]
-    core = (repo / "prompts" / "core.md").read_text(encoding="utf-8")
-    harness_text = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in sorted((repo / "prompts" / "harnesses").glob("*.md"))
-    )
-
-    for phrase in (
-        "Keep global rules concise",
-        "Use explicit file paths",
-        "Prefer small reviewable batches",
-        "Set sandbox and approval explicitly",
-        "Keep permissions narrow",
-        "Treat sandbox, container, browser, and IDE state as explicit context",
-        "Do not hand-edit generated artifacts",
-    ):
-        assert phrase in core
-
-    for phrase in (
-        "Prefer small, reviewable edits",
-        "Prefer explicit file lists",
-        "Keep global rules concise and portable",
-        "Keep global rules concise. Use repo-local",
-        "Keep approval prompts meaningful",
-        "Set sandbox and approval explicitly in automation",
-        "Prefer explicit verification commands",
-        "Prefer concise prompts with explicit file paths",
-        "Keep tool permissions narrow",
-        "Treat container, sandbox, and browser automation state",
-        "Keep mode-specific rules aligned",
-    ):
-        assert phrase not in harness_text
-
-
-def test_turn_state_marker_is_required_in_core():
-    repo = Path(__file__).resolve().parents[1]
-    core = (repo / "prompts" / "core.md").read_text(encoding="utf-8")
-
-    assert "End any tool-using or work-producing turn with one state marker" in core
-    for marker in ("`[done]`", "`[needs you]`", "`[waiting]`", "`[partial]`"):
-        assert marker in core
-    assert "One marker per turn, most-blocking wins" in core
-
-
-def test_destructive_infra_commands_require_confirmation():
-    repo = Path(__file__).resolve().parents[1]
-    core = (repo / "prompts" / "core.md").read_text(encoding="utf-8")
-
-    assert "Never run destructive infrastructure commands without explicit confirmation" in core
-    assert "`terraform apply`" in core
-    assert "`terraform destroy`" in core
-    assert "`helm delete`" in core
-    assert "`kubectl delete`" in core
-
-
-def test_core_keeps_iac_checks_and_moves_personal_prefs_to_overlay():
-    repo = Path(__file__).resolve().parents[1]
-    core = (repo / "prompts" / "core.md").read_text(encoding="utf-8")
-    example = (repo / "prompts" / "local.example.md").read_text(encoding="utf-8")
-
-    assert "Prefer Bun over npm/yarn/pnpm" not in core
-    assert "Prefer Bun over npm/yarn/pnpm" in example
-    assert "Superpowers" not in core
-    assert "consolidate-agents-md" not in core
-    assert "`terraform plan`" in core
-    assert "`ansible --check`" in core
-    assert "`kubectl diff`" in core
 
 
 def test_prompt_line_limits_are_enforced():

@@ -49,26 +49,20 @@ def test_parse_frontmatter_keeps_value_with_interior_matching_quote(tmp_path):
     assert fields["description"] == '"a" and "b"'
 
 
-def test_parse_frontmatter_rejects_missing_delimiters(tmp_path):
+@pytest.mark.parametrize(
+    ("content", "message"),
+    [
+        ("name: x\nbody\n", "frontmatter"),
+        ("---\nname: x\n", "closing"),
+        ("---\nname: x\nname: y\n---\nbody\n", "duplicate"),
+    ],
+    ids=["missing-delimiters", "missing-closing-delimiter", "duplicate-key"],
+)
+def test_parse_frontmatter_rejects_bad_input(tmp_path, content, message):
     path = tmp_path / "broken.md"
-    path.write_text("name: x\nbody\n", encoding="utf-8")
-    with pytest.raises(SystemExit, match="frontmatter"):
+    path.write_text(content, encoding="utf-8")
+    with pytest.raises(SystemExit, match=message):
         ra.parse_frontmatter(path.read_text(encoding="utf-8"), path)
-
-
-def test_parse_frontmatter_rejects_missing_closing_delimiter(tmp_path):
-    path = tmp_path / "broken.md"
-    path.write_text("---\nname: x\n", encoding="utf-8")
-    with pytest.raises(SystemExit, match="closing"):
-        ra.parse_frontmatter(path.read_text(encoding="utf-8"), path)
-
-
-def test_parse_frontmatter_rejects_duplicate_key(tmp_path):
-    path = tmp_path / "dup.md"
-    path.write_text("---\nname: x\nname: y\n---\nbody\n", encoding="utf-8")
-    with pytest.raises(SystemExit, match="duplicate"):
-        ra.parse_frontmatter(path.read_text(encoding="utf-8"), path)
-
 
 def test_load_agent_builds_spec(tmp_path):
     path = write_agent(tmp_path / "sample.md")
@@ -82,45 +76,35 @@ def test_load_agent_builds_spec(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("field", "value", "message"),
+    ("filename", "fields", "message"),
     [
-        ("tier", "huge", "tier"),
-        ("effort", "ultra", "effort"),
-        ("tools", "read, laser", "tool"),
-        ("max_turns", "zero", "max_turns"),
-        ("name", "Sample", "name"),
+        ("sample.md", {"tier": "huge"}, "tier"),
+        ("sample.md", {"effort": "ultra"}, "effort"),
+        ("sample.md", {"tools": "read, laser"}, "tool"),
+        ("sample.md", {"max_turns": "zero"}, "max_turns"),
+        ("sample.md", {"name": "Sample"}, "name"),
+        ("other.md", {"name": "sample"}, "filename"),
+        ("sample.md", {"color": "red"}, "unknown key"),
+        ("sample.md", {"description": None}, "missing key"),
+        ("explore.md", {"name": "explore"}, "reserved"),
+        ("sample.md", {"description": "bad\x07bell"}, "control character"),
+    ],
+    ids=[
+        "bad-tier",
+        "bad-effort",
+        "bad-tool",
+        "bad-max-turns",
+        "bad-name",
+        "name-filename-mismatch",
+        "unknown-key",
+        "missing-key",
+        "reserved-commandcode-name",
+        "control-character-in-description",
     ],
 )
-def test_load_agent_rejects_bad_values(tmp_path, field, value, message):
-    path = write_agent(tmp_path / "sample.md", **{field: value})
+def test_load_agent_rejects_bad_input(tmp_path, filename, fields, message):
+    path = write_agent(tmp_path / filename, **fields)
     with pytest.raises(SystemExit, match=message):
-        ra.load_agent(path)
-
-
-def test_load_agent_rejects_name_filename_mismatch(tmp_path):
-    path = write_agent(tmp_path / "other.md", name="sample")
-    with pytest.raises(SystemExit, match="filename"):
-        ra.load_agent(path)
-
-
-def test_load_agent_rejects_unknown_and_missing_keys(tmp_path):
-    path = write_agent(tmp_path / "sample.md", color="red")
-    with pytest.raises(SystemExit, match="unknown key"):
-        ra.load_agent(path)
-    path = write_agent(tmp_path / "sample.md", description=None)
-    with pytest.raises(SystemExit, match="missing key"):
-        ra.load_agent(path)
-
-
-def test_load_agent_rejects_reserved_commandcode_name(tmp_path):
-    path = write_agent(tmp_path / "explore.md", name="explore")
-    with pytest.raises(SystemExit, match="reserved"):
-        ra.load_agent(path)
-
-
-def test_load_agent_rejects_control_character_in_description(tmp_path):
-    path = write_agent(tmp_path / "sample.md", description="bad\x07bell")
-    with pytest.raises(SystemExit, match="control character"):
         ra.load_agent(path)
 
 
@@ -156,13 +140,6 @@ def spec(**overrides):
     )
     fields.update(overrides)
     return ra.AgentSpec(**fields)
-
-
-def test_resolve_claude_defaults():
-    resolved = ra.resolve(spec(tier="flagship", effort="high"), "claude", {}, DEFAULTS)
-    assert resolved.model == "opus"
-    assert resolved.effort == "high"
-    assert resolved.notices == []
 
 
 @pytest.mark.parametrize("tier", ["mid", "flagship"])
@@ -201,43 +178,6 @@ def test_upgraded_model_tiers_keep_local_overrides(harness, model):
     assert resolved.effort == "high"
 
 
-def test_resolve_codex_apex_uses_astra():
-    resolved = ra.resolve(spec(tier="apex"), "codex", {}, DEFAULTS)
-    assert resolved.model == "gpt-6-astra"
-    assert resolved.notices == []
-
-
-def test_resolve_opencode_uses_tracked_defaults():
-    resolved = ra.resolve(spec(tier="mid"), "opencode", {}, DEFAULTS)
-    assert resolved.model == "opencode-go/glm-5.3"
-    assert resolved.effort == "low"
-
-
-def test_resolve_opencode_xhigh_maps_to_max_variant():
-    resolved = ra.resolve(spec(tier="mid", effort="xhigh"), "opencode", {}, DEFAULTS)
-    assert resolved.effort == "max"
-
-
-def test_resolve_applies_tier_and_agent_overrides():
-    overrides = {
-        "opencode": {
-            "tiers": {"cheap": "opencode-go/glm-5.3-flash"},
-            "agents": {"sample": {"tier": "cheap", "effort": "medium"}},
-        }
-    }
-    resolved = ra.resolve(spec(tier="flagship", effort="high"), "opencode", overrides, DEFAULTS)
-    assert resolved.model == "opencode-go/glm-5.3-flash"
-    # OpenCode has no medium variant on these models, so medium renders as high.
-    assert resolved.effort == "high"
-
-
-@pytest.mark.parametrize("effort", ["low", "medium"])
-def test_resolve_claude_cheap_tier_uses_haiku_with_role_effort(effort):
-    resolved = ra.resolve(spec(tier="cheap", effort=effort), "claude", {}, DEFAULTS)
-    assert resolved.model == "haiku"
-    assert resolved.effort == effort
-    assert resolved.notices == []
-
 
 FLASH = "opencode-go/deepseek-v4.1-flash"
 SINGLE_MODEL = {
@@ -251,29 +191,112 @@ SINGLE_MODEL = {
     }
 }
 
-
-def test_resolve_tier_effort_overrides_role_effort():
-    resolved = ra.resolve(spec(tier="flagship", effort="high"), "opencode", SINGLE_MODEL, DEFAULTS)
-    assert resolved.model == FLASH
-    assert resolved.effort == "max"
+ANY = object()
 
 
-def test_resolve_tier_object_without_effort_keeps_role_effort():
-    resolved = ra.resolve(spec(tier="mid", effort="medium"), "opencode", SINGLE_MODEL, DEFAULTS)
-    assert resolved.model == FLASH
-    assert resolved.effort == "high"
-
-
-def test_resolve_agent_effort_beats_tier_effort():
-    overrides = {"opencode": dict(SINGLE_MODEL["opencode"], agents={"sample": {"effort": "low"}})}
-    resolved = ra.resolve(spec(tier="flagship", effort="high"), "opencode", overrides, DEFAULTS)
-    assert resolved.effort == "low"
-
-
-def test_resolve_agent_tier_override_uses_destination_tier_effort():
-    overrides = {"opencode": dict(SINGLE_MODEL["opencode"], agents={"sample": {"tier": "cheap"}})}
-    resolved = ra.resolve(spec(tier="flagship", effort="high"), "opencode", overrides, DEFAULTS)
-    assert resolved.effort == "low"
+@pytest.mark.parametrize(
+    ("role", "harness", "overrides", "defaults", "model", "effort", "fallback"),
+    [
+        (dict(tier="flagship", effort="high"), "claude", {}, DEFAULTS, "opus", "high", False),
+        (dict(tier="cheap", effort="low"), "claude", {}, DEFAULTS, "haiku", "low", False),
+        (dict(tier="cheap", effort="medium"), "claude", {}, DEFAULTS, "haiku", "medium", False),
+        (dict(tier="apex"), "codex", {}, DEFAULTS, "gpt-6-astra", ANY, False),
+        (dict(tier="mid"), "opencode", {}, DEFAULTS, "opencode-go/glm-5.3", "low", False),
+        (dict(tier="mid", effort="xhigh"), "opencode", {}, DEFAULTS, ANY, "max", False),
+        (
+            dict(tier="flagship", effort="high"),
+            "opencode",
+            {
+                "opencode": {
+                    "tiers": {"cheap": "opencode-go/glm-5.3-flash"},
+                    "agents": {"sample": {"tier": "cheap", "effort": "medium"}},
+                }
+            },
+            DEFAULTS,
+            "opencode-go/glm-5.3-flash",
+            # OpenCode has no medium variant on these models, so medium renders as high.
+            "high",
+            False,
+        ),
+        (dict(tier="flagship", effort="high"), "opencode", SINGLE_MODEL, DEFAULTS, FLASH, "max", False),
+        (dict(tier="mid", effort="medium"), "opencode", SINGLE_MODEL, DEFAULTS, FLASH, "high", False),
+        (
+            dict(tier="flagship", effort="high"),
+            "opencode",
+            {"opencode": dict(SINGLE_MODEL["opencode"], agents={"sample": {"effort": "low"}})},
+            DEFAULTS,
+            ANY,
+            "low",
+            False,
+        ),
+        (
+            dict(tier="flagship", effort="high"),
+            "opencode",
+            {"opencode": dict(SINGLE_MODEL["opencode"], agents={"sample": {"tier": "cheap"}})},
+            DEFAULTS,
+            ANY,
+            "low",
+            False,
+        ),
+        (
+            dict(tier="apex", effort="medium"),
+            "opencode",
+            {"opencode": {"tiers": {"flagship": {"model": None, "effort": "max"}}, "effort_map": {"max": "max"}}},
+            DEFAULTS,
+            None,
+            "max",
+            True,
+        ),
+        (
+            dict(tier="apex", effort="medium"),
+            "opencode",
+            {"opencode": {"tiers": dict(SINGLE_MODEL["opencode"]["tiers"], apex=None)}},
+            DEFAULTS,
+            None,
+            "high",
+            False,
+        ),
+        (
+            dict(tier="cheap", effort="medium"),
+            "opencode",
+            {"opencode": {"tiers": {"cheap": "custom-flash"}}},
+            SINGLE_MODEL,
+            "custom-flash",
+            "medium",
+            False,
+        ),
+        (dict(tier="mid", effort="max"), "claude", {}, DEFAULTS, ANY, "max", False),
+        (dict(tier="mid", effort="max"), "codex", {}, DEFAULTS, ANY, "max", False),
+        (dict(tier="mid", effort="max"), "opencode", {}, DEFAULTS, ANY, "max", False),
+    ],
+    ids=[
+        "claude-flagship-defaults",
+        "claude-cheap-low-haiku",
+        "claude-cheap-medium-haiku",
+        "codex-apex-astra",
+        "opencode-tracked-defaults",
+        "opencode-xhigh-maps-to-max",
+        "tier-and-agent-overrides",
+        "tier-effort-overrides-role-effort",
+        "tier-object-without-effort-keeps-role-effort",
+        "agent-effort-beats-tier-effort",
+        "agent-tier-override-uses-destination-effort",
+        "apex-fallback-keeps-inheriting-flagship-effort",
+        "explicit-null-apex-inherits",
+        "string-override-replaces-tier-object",
+        "claude-maps-max",
+        "codex-maps-max",
+        "opencode-maps-max",
+    ],
+)
+def test_resolve_model_and_effort(role, harness, overrides, defaults, model, effort, fallback):
+    resolved = ra.resolve(spec(**role), harness, overrides, defaults)
+    if model is not ANY:
+        assert resolved.model == model
+    if effort is not ANY:
+        assert resolved.effort == effort
+    if not fallback:
+        assert resolved.notices == []
 
 
 def test_resolve_apex_fallback_carries_flagship_effort():
@@ -281,34 +304,6 @@ def test_resolve_apex_fallback_carries_flagship_effort():
     assert resolved.model == FLASH
     assert resolved.effort == "max"
     assert any("using flagship" in notice for notice in resolved.notices)
-
-
-def test_resolve_apex_fallback_keeps_effort_of_inheriting_flagship():
-    overrides = {"opencode": {"tiers": {"flagship": {"model": None, "effort": "max"}}, "effort_map": {"max": "max"}}}
-    resolved = ra.resolve(spec(tier="apex", effort="medium"), "opencode", overrides, DEFAULTS)
-    assert resolved.model is None
-    assert resolved.effort == "max"
-
-
-def test_resolve_explicit_null_apex_inherits_without_fallback():
-    overrides = {"opencode": {"tiers": dict(SINGLE_MODEL["opencode"]["tiers"], apex=None)}}
-    resolved = ra.resolve(spec(tier="apex", effort="medium"), "opencode", overrides, DEFAULTS)
-    assert resolved.model is None
-    assert resolved.effort == "high"
-    assert resolved.notices == []
-
-
-def test_resolve_string_override_replaces_whole_tier_object():
-    overrides = {"opencode": {"tiers": {"cheap": "custom-flash"}}}
-    resolved = ra.resolve(spec(tier="cheap", effort="medium"), "opencode", overrides, SINGLE_MODEL)
-    assert resolved.model == "custom-flash"
-    assert resolved.effort == "medium"
-
-
-@pytest.mark.parametrize(("harness", "expected"), [("claude", "max"), ("codex", "max"), ("opencode", "max")])
-def test_resolve_maps_max_effort(harness, expected):
-    resolved = ra.resolve(spec(tier="mid", effort="max"), harness, {}, DEFAULTS)
-    assert resolved.effort == expected
 
 
 def test_load_agent_accepts_max_effort(tmp_path):
@@ -768,14 +763,31 @@ def test_validate_overrides_accepts_legacy_wrappers():
     assert data["claude"]["shell_ro_wrappers"] == ["rtk", "/usr/bin/env"]
 
 
-def test_render_claude_omits_guard_hook():
+def test_removed_shell_guard_is_absent_from_render_and_deploy(tmp_path, monkeypatch, capsys):
     text = ra.render_claude(spec(tools=("read", "shell-ro")), ra.resolve(spec(), "claude", {}, DEFAULTS), INVARIANTS)
     assert "hooks:" not in text.split("---")[1]
 
+    ra.render_all(REPO, tmp_path / "render", selected=["claude"], overrides={})
+    assert not (tmp_path / "render" / "claude" / ra.GUARD_NAME).exists()
 
-def test_render_all_does_not_emit_a_shell_guard(tmp_path):
-    ra.render_all(REPO, tmp_path, selected=["claude"], overrides={})
-    assert not (tmp_path / "claude" / ra.GUARD_NAME).exists()
+    agents_dir = tmp_path / "claude-agents"
+    hooks_dir = tmp_path / "claude-hooks"
+    monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(agents_dir))
+    monkeypatch.setenv("CLAUDE_HOOKS_DIR", str(hooks_dir))
+    ra.deploy(REPO, selected=["claude"], overrides={}, dry_run=False, backup_dir=tmp_path / "b")
+    assert not hooks_dir.exists()
+    explorer = (agents_dir / "explorer.md").read_text(encoding="utf-8")
+    data = yaml.safe_load(explorer.split("---")[1])
+    assert "Bash" not in data["tools"]
+    assert "hooks" not in data
+
+    capsys.readouterr()
+    monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(tmp_path / "a"))
+    monkeypatch.setenv("CLAUDE_HOOKS_DIR", str(tmp_path / "h"))
+    ra.deploy(REPO, selected=["claude"], overrides={}, dry_run=True, backup_dir=tmp_path / "b")
+    out = capsys.readouterr().out
+    assert ra.GUARD_NAME not in out
+    assert not (tmp_path / "h").exists()
 
 
 def test_render_all_removes_a_stale_generated_shell_guard(tmp_path):
@@ -789,27 +801,6 @@ def test_render_all_removes_a_stale_generated_shell_guard(tmp_path):
     assert not guard.exists()
 
 
-def test_deploy_does_not_install_or_reference_a_guard(tmp_path, monkeypatch):
-    agents_dir = tmp_path / "claude-agents"
-    hooks_dir = tmp_path / "claude-hooks"
-    monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(agents_dir))
-    monkeypatch.setenv("CLAUDE_HOOKS_DIR", str(hooks_dir))
-
-    ra.deploy(REPO, selected=["claude"], overrides={}, dry_run=False, backup_dir=tmp_path / "b")
-    assert not hooks_dir.exists()
-    explorer = (agents_dir / "explorer.md").read_text(encoding="utf-8")
-    data = yaml.safe_load(explorer.split("---")[1])
-    assert "Bash" not in data["tools"]
-    assert "hooks" not in data
-
-
-def test_deploy_dry_run_does_not_report_guard(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(tmp_path / "a"))
-    monkeypatch.setenv("CLAUDE_HOOKS_DIR", str(tmp_path / "h"))
-    ra.deploy(REPO, selected=["claude"], overrides={}, dry_run=True, backup_dir=tmp_path / "b")
-    out = capsys.readouterr().out
-    assert ra.GUARD_NAME not in out
-    assert not (tmp_path / "h").exists()
 
 
 def test_readme_roster_table_matches_agent_sources():
