@@ -436,7 +436,8 @@ Stop only the updater schedule you configured before recovering files. For the d
 systemd setup, use `systemctl --user disable --now agents-update.timer`; for cron, launchd or
 Task Scheduler, remove only this checkout's job. Keep unrelated jobs and settings.
 
-Deployments back up overwritten files in `.backups/` beside the applicable destination.
+Deployments back up overwritten files in this checkout's `.backups/` directory by default.
+Use `--backup-dir` to select another backup directory.
 Match a backup to its original filename and deployment before restoring it; preserve the
 current file first. Restore only the affected prompt or role, then render/check the known-good
 checkout and preview its target paths before redeploying. `scripts/sync-ai-prompts --status`
