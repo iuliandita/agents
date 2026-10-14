@@ -309,3 +309,12 @@ When a change touches prompt sources, renderers, deployment, overlays, or the wo
 ## License
 
 MIT, unless a downstream fork says otherwise.
+
+## Project and support
+
+Made by [iuliandita](https://iuliandita.com). [Other projects](https://iuliandita.com/projects/).
+
+See [installation and recovery](INSTALL.md), [contributing](CONTRIBUTING.md),
+[documentation](docs/README.md), and [private security reporting](SECURITY.md).
+
+[skills](https://github.com/iuliandita/skills) provides individually installed task guidance; [mods](https://github.com/iuliandita/mods) provides Claude Code hooks. Installing one collection does not install the others.

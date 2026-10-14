@@ -39,7 +39,8 @@ pattern (`medium`), or it is not vendored (`n/a`).
 
 ### OpenCode
 - Global rules `~/.config/opencode/AGENTS.md`; config `opencode.json` or `opencode.jsonc`; agents in
-  `~/.config/opencode/agents/` (plural); skills in `~/.config/opencode/skills/`.
+  `~/.config/opencode/agents/` (plural); skills are recommended in shared `~/.agents/skills/`;
+  native `~/.config/opencode/skills/` remains a valid discovery root.
 - Same path on macOS. On Windows, run under WSL (recommended) or use
   `%USERPROFILE%\.config\opencode`. A WSL install reads the WSL home, separate from native Windows.
 - Permission keys include `read`, `edit` (gates `write`/`edit`/`apply_patch`), `bash`, `task`, `glob`,
@@ -48,7 +49,8 @@ pattern (`medium`), or it is not vendored (`n/a`).
 
 ### Command Code
 - Global rules `~/.commandcode/AGENTS.md`; project rules `./AGENTS.md`; settings and hooks in
-  `~/.commandcode/settings.json`; skills and agents in `~/.commandcode/skills/` and `agents/`.
+  `~/.commandcode/settings.json`; agents in `~/.commandcode/agents/`. Skills are recommended
+  in shared `~/.agents/skills/`; native `~/.commandcode/skills/` remains valid.
 - Home is resolved from `HOME`/`USERPROFILE`, so Windows native gives `%USERPROFILE%\.commandcode`.
   Binary aliases: `cmd`/`command-code`/`commandcode` (POSIX), `cmdc` (native Windows).
 - Confidence is medium because the memory path is documented but the per-OS spelling is inferred.
@@ -265,3 +267,7 @@ private deployment receipt rather than publishing local override values.
 - Antigravity native-Windows config spelling; upstream writes `~/` without a Windows variant.
 - Antigravity global skills path (docs contradict).
 - Oh My Pi native-Windows home spelling; inferred `%USERPROFILE%\.omp\`, not vendor-documented.
+
+Shared skills installation and managed migration follow the
+[skills install contract](https://github.com/iuliandita/skills/blob/main/INSTALL.md).
+Path discovery does not establish equivalent activation or runtime behavior.

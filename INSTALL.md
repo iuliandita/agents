@@ -405,8 +405,10 @@ Codex and OpenCode discover user skills in `~/.agents/skills`; Claude uses
 [Claude skills](https://code.claude.com/docs/en/skills).
 For another harness, either install into its verified skill directory or give it the
 absolute path to the installed `SKILL.md` and ask it to read and follow the workflow.
-Native Command Code skill discovery is not assumed; the explicit-file route works
-with a file-capable agent and can be recorded in the private overlay.
+Command Code also discovers `~/.agents/skills`; its native `~/.commandcode/skills` root
+and OpenCode's `~/.config/opencode/skills` remain valid discovery locations. Prefer one shared
+copy to avoid duplicate names. See the [skills install contract](https://github.com/iuliandita/skills/blob/main/INSTALL.md)
+for managed linking and migration; the explicit-file route remains available.
 
 Invoke with `/consolidate-agents-md [repo-path]` in Claude or
 `$consolidate-agents-md` in Codex, naming the target in your request. In other
@@ -427,3 +429,23 @@ The prompt renderer writes operational coding-agent rules, not persona, identity
 memory stores, provider credentials, model settings, MCP, plugins, or assistant profiles.
 The separately installed consolidation workflow can edit project instructions and
 clear verified project memory only when explicitly invoked.
+
+## Recovery and removal
+
+Stop only the updater schedule you configured before recovering files. For the documented
+systemd setup, use `systemctl --user disable --now agents-update.timer`; for cron, launchd or
+Task Scheduler, remove only this checkout's job. Keep unrelated jobs and settings.
+
+Deployments back up overwritten files in `.backups/` beside the applicable destination.
+Match a backup to its original filename and deployment before restoring it; preserve the
+current file first. Restore only the affected prompt or role, then render/check the known-good
+checkout and preview its target paths before redeploying. `scripts/sync-ai-prompts --status`
+compares deployed rules with a fresh render; `scripts/render-agents --verify` checks only that
+role files exist, not their content, discovery or model compatibility.
+
+There is no whole-suite uninstall command. To stop managing a hook, remove only its generated
+invariants entry from the relevant settings event and its corresponding hook file after keeping
+a backup; leave other hooks and settings intact. Hermes recovery must preserve unrelated YAML
+keys when restoring `agent.coding_instructions`. Do not replace an entire settings file with an
+old backup if other settings changed since that deployment. Restoring a backup does not undo
+unrelated harness or model changes. See [contributing](CONTRIBUTING.md) for checks.
