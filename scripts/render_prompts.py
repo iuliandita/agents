@@ -35,10 +35,12 @@ class Harness(NamedTuple):
     max_bytes: int | None = None
     native_env_var: str = ""
     native_filename: str = ""
+    # Core `## ` sections this harness does not carry; rendering fails if one is renamed or removed.
+    omit_sections: tuple[str, ...] = ()
 
 
-# Seven supported harnesses plus one generic project-level target. Paths, overrides,
-# and verification receipts live in docs/harness-contract.md. Only add a harness
+# Seven supported harnesses, one generic project-level target, and the Paperclip rules target. Paths,
+# overrides, and verification receipts live in docs/harness-contract.md. Only add a harness
 # here once its rules path is confirmed against upstream docs.
 HARNESSES: tuple[Harness, ...] = (
     Harness(
@@ -145,6 +147,21 @@ HARNESSES: tuple[Harness, ...] = (
         verified_on="2026-09-17",
         confidence="n/a",
         optional_blocks=(),
+    ),
+    Harness(
+        "paperclip",
+        "Paperclip",
+        "paperclip.md",
+        "PAPERCLIP.md",
+        None,
+        "PAPERCLIP_RULES_PATH",
+        MANUAL,
+        "House rules for Paperclip agents, rendered without overlays; a Paperclip sync consumes the file from build/generated/PAPERCLIP.md, so there is no global path.",
+        source_url="https://github.com/paperclipai/paperclip",
+        verified_on="2026-10-25",
+        confidence="n/a",
+        optional_blocks=(),
+        omit_sections=("Model Selection",),
     ),
 )
 
@@ -279,6 +296,19 @@ def apply_optional_blocks(text: str, enabled: frozenset[str]) -> str:
     return re.sub(r"\n{3,}", "\n\n", result)
 
 
+def drop_sections(core: str, names: tuple[str, ...], harness: str) -> str:
+    """Remove `## name` sections from core; a missing name fails the render instead of passing silently."""
+    lines = core.splitlines(keepends=True)
+    for name in names:
+        heading = f"## {name}"
+        starts = [i for i, line in enumerate(lines) if line.rstrip() == heading]
+        if not starts:
+            raise SystemExit(f"{harness}: omitted core section {name!r} not found in prompts/core.md")
+        end = next((i for i in range(starts[0] + 1, len(lines)) if lines[i].startswith(("## ", "# "))), len(lines))
+        del lines[starts[0] : end]
+    return "".join(lines)
+
+
 def render_document(
     fragment: str,
     core: str,
@@ -398,7 +428,7 @@ def render_for(
         with_overlays = global_target(harness)
     return render_document(
         read_fragment(repo_root, harness),
-        core,
+        drop_sections(core, harness.omit_sections, harness.name),
         private=overlays.private if with_overlays and harness.name in overlays.trusted else "",
         stamp=stamp,
         enabled_optional=frozenset(harness.optional_blocks),

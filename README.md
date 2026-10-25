@@ -20,7 +20,7 @@ first, and nothing outside the listed harnesses is touched.
 
 - Stores canonical prompt fragments in `prompts/`.
 - Merges two optional gitignored overlays: `prompts/local.md` for every harness and `prompts/private.md` for the harnesses you trust.
-- Renders public operational-rule variants for Claude Code, OpenAI Codex, OpenCode, Command Code, Antigravity, Oh My Pi, and Hermes Agent, plus a generic project-level `AGENTS.md` target for other tools.
+- Renders public operational-rule variants for Claude Code, OpenAI Codex, OpenCode, Command Code, Antigravity, Oh My Pi, and Hermes Agent, plus a generic project-level `AGENTS.md` target for other tools and a Paperclip target for agent teams run through Paperclip.
 - Separates deployable global targets from manual project-local targets when no verified global operational rules path is known.
 - Does not generate persona, identity, memory, provider credential, model settings, MCP, plugin, or assistant-profile files.
 - Deploys rendered files to resolved global paths with backups.
@@ -133,8 +133,9 @@ each harness uses. So there is no built-in trust list: `prompts/private.md` reac
 in `prompts/private-harnesses.txt` (one per line) or `AGENTS_PRIVATE_HARNESSES` (comma-separated), and `all`
 covers every supported harness. Unknown names fail the render. When the private overlay exists but is
 withheld from a selected harness, render and deploy print a notice naming it. Project-level targets
-(`generic`, and Hermes through `HERMES_AGENTS_PATH`) never receive either overlay, because those files can
-end up committed; Hermes' global `agent.coding_instructions` merge does.
+(`generic`, `paperclip`, and Hermes through `HERMES_AGENTS_PATH`) never receive either overlay, because those
+files can end up committed or reach agents on providers you did not vet; Hermes' global
+`agent.coding_instructions` merge does. Listing `paperclip` in the trust list changes nothing.
 
 Rendered output can contain overlay content. Do not publish generated files or copy them into tracked
 project instructions.
@@ -245,6 +246,7 @@ project-level target. Receipts, overrides, and per-surface behavior live in
 | Oh My Pi | deployable | `~/.omp/agent/AGENTS.md` |
 | Hermes Agent | manual | project `HERMES.md` / `$HERMES_HOME/config.yaml` |
 | Generic AGENTS.md | manual | project `AGENTS.md` only |
+| Paperclip | manual | none; rendered to `build/generated/PAPERCLIP.md` for a Paperclip sync |
 
 `docs/surfaces.md` explains which CLI, IDE, and desktop surfaces read these files. The supported
 tools' coding surfaces, including Claude Desktop's Code tab, the Codex integration in the ChatGPT
@@ -264,7 +266,7 @@ scripts/sync-ai-prompts --list-targets
 
 Each target can be overridden with its environment variable, such as `CLAUDE_AGENTS_PATH`,
 `CODEX_AGENTS_PATH`, `ANTIGRAVITY_AGENTS_PATH`, or `HERMES_AGENTS_PATH`. Manual targets
-(`hermes`, `generic`) require an explicit override before deploy writes anything. Harnesses removed
+(`hermes`, `generic`, `paperclip`) require an explicit override before deploy writes anything. Harnesses removed
 from the catalog are listed in [docs/legacy-harnesses.md](docs/legacy-harnesses.md) with a re-add recipe.
 
 Hermes has no global Markdown rules file. Its global operational rules live in `agent.coding_instructions`

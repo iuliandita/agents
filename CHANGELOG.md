@@ -3,6 +3,24 @@
 All notable changes to this project are documented here. The project uses semantic versioning once it
 reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
+## [Unreleased]
+
+### Added
+
+- A `paperclip` target renders house rules for Paperclip agents to `PAPERCLIP.md`. It is a manual target
+  with no global path: a Paperclip sync consumes the rendered file from `build/generated/`, and
+  `PAPERCLIP_RULES_PATH` deploys it elsewhere. It never carries `prompts/local.md` or `prompts/private.md`.
+  Its fragment holds the Paperclip-specific wording (the agents are not the owner, questions go on the
+  issue, work is handed off as Paperclip issues) and its own copy of the timer, issue-tracking, release, and
+  product rules and the anonymized new-repo defaults, so the render is the same from a clean clone.
+
+### Changed
+
+- A harness can now omit core sections by heading (`omit_sections` in `scripts/render_prompts.py`); the render
+  fails if an omitted heading no longer exists. Only the Paperclip target uses it, to drop Model Selection, so
+  the other renders are unchanged.
+- `scripts/lint_prompts.py` allows the Paperclip fragment more lines than the other harness fragments.
+
 ## [4.2.0] - 2026-10-12
 
 ### Changed

@@ -14,6 +14,7 @@ so there is no separate desktop deployment; the account-synced chat surfaces are
 | Antigravity | Desktop 2.0, IDE extensions, `agy` CLI | Yes for rules/MCP/workspace - all share `~/.gemini/GEMINI.md` and `.agents/` | antigravity.google/docs/rules-workflows |
 | Hermes | CLI and desktop | Yes - desktop shares `HERMES_HOME` (same config, sessions, skills, memory) | hermes-agent.nousresearch.com/docs/user-guide/desktop |
 | Oh My Pi | CLI/TUI, `omp acp` (editor server) | Yes - all surfaces read the same `~/.omp/agent/AGENTS.md`; no desktop app | installed omp 18.2.11 source (omp.sh) |
+| Paperclip | Agents run through other harnesses | No - nothing is deployed; an external sync reads `PAPERCLIP.md` | github.com/paperclipai/paperclip |
 
 ## Domain-specific extras (not deployed by this repo)
 

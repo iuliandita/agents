@@ -190,7 +190,7 @@ Existing files are backed up under `.backups/` before replacement. Deploy writes
 
 Real deploys refuse when two selected harnesses resolve to the same path, for example after overriding a path with its `*_AGENTS_PATH` env var. Use `--target` for routine deploys so only the harnesses you use are written.
 
-If `prompts/local.md` exists, it is merged into every rendered and deployed file after the shared core. If `prompts/private.md` exists, it follows `local.md`, but only for harnesses listed in `prompts/private-harnesses.txt` (one name per line) or `AGENTS_PRIVATE_HARNESSES` (comma-separated); `all` lists every supported harness, and there is no default. A withheld private overlay prints a notice. Project-level targets (`generic`, and `hermes` through `HERMES_AGENTS_PATH`) never receive either overlay; the global Hermes merge through `scripts/render-hermes` follows the same rules as the other harnesses. Start from `prompts/local.example.md` and `prompts/private.example.md`.
+If `prompts/local.md` exists, it is merged into every rendered and deployed file after the shared core. If `prompts/private.md` exists, it follows `local.md`, but only for harnesses listed in `prompts/private-harnesses.txt` (one name per line) or `AGENTS_PRIVATE_HARNESSES` (comma-separated); `all` lists every supported harness, and there is no default. A withheld private overlay prints a notice. Project-level targets (`generic`, `paperclip`, and `hermes` through `HERMES_AGENTS_PATH`) never receive either overlay; the global Hermes merge through `scripts/render-hermes` follows the same rules as the other harnesses. Start from `prompts/local.example.md` and `prompts/private.example.md`.
 
 ## Dry Run
 
@@ -216,6 +216,18 @@ Manual targets render by default, but deploy only with an explicit path:
 HERMES_AGENTS_PATH="$PWD/HERMES.md" scripts/sync-ai-prompts --target hermes --deploy
 GENERIC_AGENTS_PATH="$PWD/AGENTS.md" scripts/sync-ai-prompts --target generic --deploy
 ```
+
+### Paperclip Rules
+
+The `paperclip` target has no global path. Render it and let the Paperclip sync read the file:
+
+```bash
+scripts/sync-ai-prompts --target paperclip
+```
+
+The output is `build/generated/PAPERCLIP.md`. It is built from `prompts/core.md` and
+`prompts/harnesses/paperclip.md` only, so a clean clone renders the same file. Set `PAPERCLIP_RULES_PATH`
+to write it somewhere else with `--deploy`.
 
 ### Hermes Global Rules
 
@@ -262,6 +274,7 @@ ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/GEMINI.md" scripts/sync-ai-prompts --targ
 | Oh My Pi | deployable | `~/.omp/agent/AGENTS.md` | Global path follows PI_CODING_AGENT_DIR (default ~/.omp/agent); named profiles use ~/.omp/profiles/<name>/agent. |
 | Hermes Agent | manual | `manual override via HERMES_AGENTS_PATH` | Global rules merge into agent.coding_instructions in $HERMES_HOME/config.yaml; project rules deploy to HERMES.md or AGENTS.override.md via HERMES_AGENTS_PATH. |
 | Generic AGENTS.md | manual | `manual override via GENERIC_AGENTS_PATH` | Project-level AGENTS.md for tools with no verified global rules path; deploy with GENERIC_AGENTS_PATH pointing at a project file. |
+| Paperclip | manual | `manual override via PAPERCLIP_RULES_PATH` | House rules for Paperclip agents, rendered without overlays; a Paperclip sync consumes the file from build/generated/PAPERCLIP.md, so there is no global path. |
 <!-- harness-targets:end -->
 
 Codex reads the global `AGENTS.md` and project `AGENTS.md` files under one combined cap

@@ -32,6 +32,8 @@ CORE_WARN_LINES = 105
 CORE_MAX_LINES = 110
 HARNESS_WARN_LINES = 20
 HARNESS_MAX_LINES = 24
+# Paperclip's fragment carries the whole agent rule set that overlays supply on the other harnesses.
+HARNESS_LINE_LIMITS = {"paperclip": (45, 55)}
 PRIVATE_EXAMPLE_WARN_LINES = 30
 PRIVATE_EXAMPLE_MAX_LINES = 40
 # Tracked templates for the gitignored overlays; both are linted like public prompt sources.
@@ -172,7 +174,8 @@ def main() -> int:
             error(f"missing {harness.name} fragment: {fragment}")
             failures += 1
             continue
-        failures += lint_line_count(fragment, HARNESS_WARN_LINES, HARNESS_MAX_LINES)
+        warn_at, max_lines = HARNESS_LINE_LIMITS.get(harness.name, (HARNESS_WARN_LINES, HARNESS_MAX_LINES))
+        failures += lint_line_count(fragment, warn_at, max_lines)
         failures += lint_file(fragment, private_patterns=private_patterns)
 
     harness_dir = prompt_root / "harnesses"

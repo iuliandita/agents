@@ -13,10 +13,11 @@
         "CHANGELOG.md",
         "INSTALL.md",
         "README.md",
-        "docs/harness-contract.md"
+        "docs/harness-contract.md",
+        "docs/surfaces.md"
       ],
-      "fingerprint": "9c1d4d22b37a3401b37bfd550b334b9c3a306f6c48da7fa7544dfc254e6d66c3",
-      "note": "Codex CLI reference section added to the contract doc; budget reporting unchanged."
+      "fingerprint": "59620da8703d61f27b17b2954900aacc4d3ad9cc79b66b90b4775f4106fa92df",
+      "note": "Register the manual Paperclip target and the omit_sections option, with its contract receipt, table row, and surface entry."
     },
     "maintenance": {
       "breaking": "none",
@@ -39,11 +40,14 @@
       "note": "Document explorer at medium, verifier on the cheap tier at medium, the Command Code verifier provider change with its pin-back override, and Haiku 5.5 pricing tiers."
     },
     "overlays-trust": {
-      "baseline": true,
       "breaking": "none",
-      "docs": [],
-      "fingerprint": "382a29cc29072b1fca16d196683f4c7eea45d40ea318df797dfc513ef280098e",
-      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+      "docs": [
+        "CHANGELOG.md",
+        "INSTALL.md",
+        "README.md"
+      ],
+      "fingerprint": "08eb42c17f8d186c03a047ef5b7c0b1bbebc6504fa337580ffdddcd4f3aaf24f",
+      "note": "State that the Paperclip target never carries local or private overlays and that the lint line cap for its fragment is larger."
     },
     "prompts": {
       "breaking": "none",
@@ -52,8 +56,8 @@
         "INSTALL.md",
         "README.md"
       ],
-      "fingerprint": "eaf7d65c928cd48890d49c21d37e95fcb28169a6ea9dd9c96873f608f503c875",
-      "note": "Add the branch and worktree cleanup rule to core Git rules alongside the earlier prompt changes."
+      "fingerprint": "fad2b21ecec3afbb6c56bceeef1c66183f8344b7870e18bc4204b7f2abe5f6cc",
+      "note": "Add the Paperclip fragment and document that the Paperclip target renders without overlays."
     },
     "workflow-templates": {
       "baseline": true,

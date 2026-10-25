@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import lint_prompts as linter
 import render_prompts as renderer
 
 
@@ -66,6 +67,7 @@ def test_harness_catalog_is_the_seven_supported_plus_generic():
         "omp",
         "hermes",
         "generic",
+        "paperclip",
     }
     for removed in (
         "gemini",
@@ -102,6 +104,7 @@ def test_harness_displays_are_stable():
     assert harnesses["antigravity"].display == "Antigravity"
     assert harnesses["hermes"].display == "Hermes Agent"
     assert harnesses["generic"].display == "Generic AGENTS.md"
+    assert harnesses["paperclip"].display == "Paperclip"
 
 
 def test_harness_support_levels_are_exposed_in_registry():
@@ -118,6 +121,7 @@ def test_harness_support_levels_are_exposed_in_registry():
     assert levels["antigravity"] == "deployable"
     assert levels["hermes"] == "manual"
     assert levels["generic"] == "manual"
+    assert levels["paperclip"] == "manual"
 
 
 def test_target_path_uses_home_and_env_override(tmp_path):
@@ -256,6 +260,32 @@ def test_generic_target_drops_the_subagent_delegation_block(tmp_path):
 
     assert "## Delegation" not in generic["generic"].read_text(encoding="utf-8")
     assert "## Delegation" in claude["claude"].read_text(encoding="utf-8")
+
+
+def test_paperclip_target_drops_workstation_blocks_and_keeps_house_rules(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
+    repo = Path(__file__).resolve().parents[1]
+
+    written = renderer.render_all(repo_root=repo, out_dir=tmp_path, selected=["paperclip", "claude"], stamp="x")
+    paperclip = written["paperclip"].read_text(encoding="utf-8")
+    claude = written["claude"].read_text(encoding="utf-8")
+
+    assert written["paperclip"] == tmp_path / "PAPERCLIP.md"
+    for dropped in ("## Model Selection", "## Delegation"):
+        assert dropped not in paperclip
+        assert dropped in claude
+    for kept in ("## Writing Voice", "## Git", "## Issue Tracking", "## New Repo Defaults (public / GitHub)"):
+        assert kept in paperclip
+    for workstation in ("rtk", "T3 Code", "supermemory", "runtimeMode", "zsh"):
+        assert workstation not in paperclip
+
+
+def test_drop_sections_removes_only_the_named_section_and_fails_loud_when_missing():
+    core = "# Core\n\n## A\n- a\n\n## B\n- b\n\n## C\n- c\n"
+
+    assert renderer.drop_sections(core, ("B",), "x") == "# Core\n\n## A\n- a\n\n## C\n- c\n"
+    with pytest.raises(SystemExit, match="'Renamed' not found"):
+        renderer.drop_sections(core, ("Renamed",), "x")
 
 
 PRESENT_PINS = {
@@ -428,7 +458,8 @@ def test_prompt_line_limits_are_enforced():
 
     assert len(core_lines) <= 100
     for path in harness_paths:
-        assert len(path.read_text(encoding="utf-8").splitlines()) <= 20, path
+        limit = linter.HARNESS_LINE_LIMITS.get(path.stem, (20,))[0]
+        assert len(path.read_text(encoding="utf-8").splitlines()) <= limit, path
 
     result = subprocess.run(
         ["python", "scripts/lint_prompts.py"],
@@ -823,12 +854,13 @@ def test_private_harnesses_file_overrides_default(tmp_path):
 def overlay_repo(tmp_path):
     repo = tmp_path / "repo"
     (repo / "prompts" / "harnesses").mkdir(parents=True)
-    (repo / "prompts" / "core.md").write_text("# Core\nshared\n", encoding="utf-8")
+    (repo / "prompts" / "core.md").write_text("# Core\nshared\n\n## Model Selection\nmodels\n", encoding="utf-8")
     (repo / "prompts" / "local.md").write_text("## Local\nlocal layer\n", encoding="utf-8")
     (repo / "prompts" / "private.md").write_text("## Private\nprivate layer\n", encoding="utf-8")
     for name in ("claude", "codex", "opencode", "commandcode", "antigravity", "omp", "hermes"):
         (repo / "prompts" / "harnesses" / f"{name}.md").write_text(f"## {name}\nx\n", encoding="utf-8")
     (repo / "prompts" / "harnesses" / "AGENTS.md").write_text("## Generic\nx\n", encoding="utf-8")
+    (repo / "prompts" / "harnesses" / "paperclip.md").write_text("## Paperclip\nx\n", encoding="utf-8")
     return repo
 
 
@@ -877,7 +909,7 @@ def test_trust_all_reaches_every_global_target_without_notice(tmp_path, monkeypa
 def test_project_level_targets_never_carry_overlays(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
     repo = overlay_repo(tmp_path)
-    written = renderer.render_all(repo_root=repo, out_dir=tmp_path / "out", selected=["generic", "hermes"], stamp="x")
+    written = renderer.render_all(repo_root=repo, out_dir=tmp_path / "out", selected=["generic", "hermes", "paperclip"], stamp="x")
     for path in written.values():
         text = path.read_text(encoding="utf-8")
         assert "local layer" not in text and "private layer" not in text
