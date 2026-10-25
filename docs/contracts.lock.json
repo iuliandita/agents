@@ -17,8 +17,8 @@
         "docs/harness-contract.md",
         "docs/surfaces.md"
       ],
-      "fingerprint": "5b5e29df06a7db79d6de22493b2ac69ffcff8c39c38b8cd174fef4d0f375981f",
-      "note": "Paperclip fragment hardening (merge gate, CI checks per run, handoff deadlines, voice wording) and a bare status that does not fail over an unrendered Paperclip file."
+      "fingerprint": "fbe98cb0680025f894171f0e1d3edd5f82541f2f058389a2b29e576fb915d984",
+      "note": "Final Paperclip review fixes: CI-pass merge rule, parent-issue approval scope, identity wording, duplicate-heading guard."
     },
     "maintenance": {
       "breaking": "none",
@@ -57,8 +57,8 @@
         "INSTALL.md",
         "README.md"
       ],
-      "fingerprint": "fbd24a90b2e3a2c1f6922b24ed423e7c2593c1ab674420ca44841f2a54778576",
-      "note": "Paperclip fragment hardening (merge gate, CI checks per run, handoff deadlines, voice wording) and a bare status that does not fail over an unrendered Paperclip file."
+      "fingerprint": "54fc0c4f4a8eb53be56488b18fca858b9f2ac94e213b250775bf4dff86b91152",
+      "note": "Final Paperclip review fixes: CI-pass merge rule, parent-issue approval scope, identity wording, duplicate-heading guard."
     },
     "workflow-templates": {
       "baseline": true,

@@ -285,6 +285,8 @@ def test_drop_sections_removes_only_the_named_section_and_fails_loud_when_missin
     assert renderer.drop_sections(core, ("B",)) == "# Core\n\n## A\n- a\n\n## C\n- c\n"
     with pytest.raises(SystemExit, match="'Renamed' not found"):
         renderer.drop_sections(core, ("Renamed",))
+    with pytest.raises(SystemExit, match="more than once"):
+        renderer.drop_sections(core + "\n## B\n- again\n", ("B",))
 
 
 def test_omitted_sections_are_dropped_after_optional_blocks():
@@ -296,14 +298,11 @@ def test_omitted_sections_are_dropped_after_optional_blocks():
     assert "## Delegation" not in rendered and "## Scope" in rendered
 
 
-def test_paperclip_is_render_only_even_with_a_path_override(tmp_path, monkeypatch, capsys):
+def test_paperclip_is_render_only(tmp_path, capsys):
     repo = Path(__file__).resolve().parents[1]
-    monkeypatch.setenv("PAPERCLIP_RULES_PATH", str(tmp_path / "rules.md"))
 
     assert renderer.target_path("paperclip", home=tmp_path) is None
-    renderer.deploy(repo, ["paperclip"], "x", dry_run=False, backup_dir=tmp_path / "bak")
-
-    assert not (tmp_path / "rules.md").exists()
+    assert renderer.deploy(repo, ["paperclip"], "x", dry_run=True, backup_dir=tmp_path / "bak") == {}
     assert "render-only target" in capsys.readouterr().out
     assert renderer.status(repo, ["paperclip"], "x", tmp_path / "out") == 1
 

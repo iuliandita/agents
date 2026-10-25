@@ -311,6 +311,8 @@ def drop_sections(core: str, names: tuple[str, ...]) -> str:
         starts = [i for i, line in enumerate(lines) if line.rstrip() == heading]
         if not starts:
             raise SystemExit(f"omitted core section {name!r} not found in prompts/core.md")
+        if len(starts) > 1:
+            raise SystemExit(f"omitted core section {name!r} appears more than once in prompts/core.md")
         end = next((i for i in range(starts[0] + 1, len(lines)) if lines[i].startswith(("## ", "# "))), len(lines))
         del lines[starts[0] : end]
     return "".join(lines)
@@ -703,7 +705,7 @@ def status(repo_root: Path, selected: list[str] | None, stamp: str | None, out_d
     for harness in selected_harnesses(selected):
         dest = target_path(harness.name)
         rendered = render_for(repo_root, harness, core, overlays, stamp)
-        if dest is None and harness.consumed_from_build:
+        if harness.consumed_from_build:
             built = (out_dir or repo_root / "build" / "generated") / harness.output_name
             if not built.exists():
                 print(f"{harness.name}: not rendered ({built})")
