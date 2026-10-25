@@ -37,6 +37,8 @@ class Harness(NamedTuple):
     native_filename: str = ""
     # Core `## ` sections this harness does not carry; rendering fails if one is renamed or removed.
     omit_sections: tuple[str, ...] = ()
+    # No deploy path: an external tool reads the file rendered under build/generated/.
+    consumed_from_build: bool = False
 
 
 # Seven supported harnesses, one generic project-level target, and the Paperclip rules target. Paths,
@@ -162,6 +164,7 @@ HARNESSES: tuple[Harness, ...] = (
         confidence="n/a",
         optional_blocks=(),
         omit_sections=("Model Selection",),
+        consumed_from_build=True,
     ),
 )
 
@@ -296,14 +299,14 @@ def apply_optional_blocks(text: str, enabled: frozenset[str]) -> str:
     return re.sub(r"\n{3,}", "\n\n", result)
 
 
-def drop_sections(core: str, names: tuple[str, ...], harness: str) -> str:
+def drop_sections(core: str, names: tuple[str, ...]) -> str:
     """Remove `## name` sections from core; a missing name fails the render instead of passing silently."""
     lines = core.splitlines(keepends=True)
     for name in names:
         heading = f"## {name}"
         starts = [i for i, line in enumerate(lines) if line.rstrip() == heading]
         if not starts:
-            raise SystemExit(f"{harness}: omitted core section {name!r} not found in prompts/core.md")
+            raise SystemExit(f"omitted core section {name!r} not found in prompts/core.md")
         end = next((i for i in range(starts[0] + 1, len(lines)) if lines[i].startswith(("## ", "# "))), len(lines))
         del lines[starts[0] : end]
     return "".join(lines)
@@ -316,8 +319,9 @@ def render_document(
     stamp: str | None = None,
     enabled_optional: frozenset[str] = frozenset({"subagents"}),
     local: str = "",
+    omit_sections: tuple[str, ...] = (),
 ) -> str:
-    core = apply_optional_blocks(core, enabled_optional)
+    core = drop_sections(apply_optional_blocks(core, enabled_optional), omit_sections)
     if stamp is not None:
         provenance = f"on {stamp}"
     else:
@@ -428,11 +432,12 @@ def render_for(
         with_overlays = global_target(harness)
     return render_document(
         read_fragment(repo_root, harness),
-        drop_sections(core, harness.omit_sections, harness.name),
+        core,
         private=overlays.private if with_overlays and harness.name in overlays.trusted else "",
         stamp=stamp,
         enabled_optional=frozenset(harness.optional_blocks),
         local=overlays.local if with_overlays else "",
+        omit_sections=harness.omit_sections,
     )
 
 
@@ -682,7 +687,7 @@ def prune_backups(backup_dir: Path, keep: int, dry_run: bool) -> int:
     return 0
 
 
-def status(repo_root: Path, selected: list[str] | None, stamp: str | None) -> int:
+def status(repo_root: Path, selected: list[str] | None, stamp: str | None, out_dir: Path | None = None) -> int:
     """Report whether each deployed file matches a fresh render, or was edited locally."""
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
     overlays = load_overlays(repo_root)
@@ -690,10 +695,21 @@ def status(repo_root: Path, selected: list[str] | None, stamp: str | None) -> in
     drift = 0
     for harness in selected_harnesses(selected):
         dest = target_path(harness.name)
+        rendered = render_for(repo_root, harness, core, overlays, stamp)
+        if dest is None and harness.consumed_from_build:
+            built = (out_dir or repo_root / "build" / "generated") / harness.output_name
+            if not built.exists():
+                print(f"{harness.name}: not rendered ({built})")
+            elif built.read_text(encoding="utf-8", errors="replace") == rendered:
+                print(f"{harness.name}: rendered file in sync ({built})")
+                continue
+            else:
+                print(f"{harness.name}: rendered file differs from a fresh render ({built})")
+            drift += 1
+            continue
         if dest is None:
             print(f"{harness.name}: manual target ({harness.env_var})")
             continue
-        rendered = render_for(repo_root, harness, core, overlays, stamp)
         if not dest.exists():
             print(f"{harness.name}: not deployed ({dest})")
             drift += 1
@@ -755,7 +771,7 @@ def main(argv: list[str] | None = None) -> int:
         return check_render_shape(args.repo_root, args.target)
 
     if args.status:
-        return status(args.repo_root, args.target, args.stamp)
+        return status(args.repo_root, args.target, args.stamp, args.out_dir)
 
     if args.prune_backups is not None:
         return prune_backups(args.backup_dir, args.prune_backups, dry_run=args.dry_run)

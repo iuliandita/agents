@@ -33,7 +33,7 @@ def test_empty_cli_targets_do_not_fall_back(tmp_path):
         update.load_targets(tmp_path, "", env={"AGENTS_DEPLOY_TARGETS": "codex"})
 
 
-@pytest.mark.parametrize("names", ["claud", "generic", "claude,generic"])
+@pytest.mark.parametrize("names", ["claud", "generic", "claude,generic", "paperclip"])
 def test_targets_reject_unknown_and_project_level(tmp_path, names):
     with pytest.raises(SystemExit, match="unknown or project-level harness"):
         update.load_targets(tmp_path, names, env={})

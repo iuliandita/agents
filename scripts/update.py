@@ -91,7 +91,7 @@ def load_targets(repo_root: Path, cli: str | None, env: dict[str, str] | None = 
         )
     if not names:
         raise SystemExit(f"{source} lists no harnesses")
-    supported = [name for name in harness_names() if name != "generic"]
+    supported = [name for name in harness_names() if name not in {"generic", "paperclip"}]
     unknown = [name for name in names if name not in supported]
     if unknown:
         raise SystemExit(f"{source}: unknown or project-level harness {', '.join(unknown)}; supported: {', '.join(supported)}")

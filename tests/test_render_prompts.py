@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-import lint_prompts as linter
 import render_prompts as renderer
 
 
@@ -283,9 +282,31 @@ def test_paperclip_target_drops_workstation_blocks_and_keeps_house_rules(tmp_pat
 def test_drop_sections_removes_only_the_named_section_and_fails_loud_when_missing():
     core = "# Core\n\n## A\n- a\n\n## B\n- b\n\n## C\n- c\n"
 
-    assert renderer.drop_sections(core, ("B",), "x") == "# Core\n\n## A\n- a\n\n## C\n- c\n"
+    assert renderer.drop_sections(core, ("B",)) == "# Core\n\n## A\n- a\n\n## C\n- c\n"
     with pytest.raises(SystemExit, match="'Renamed' not found"):
-        renderer.drop_sections(core, ("Renamed",), "x")
+        renderer.drop_sections(core, ("Renamed",))
+
+
+def test_omitted_sections_are_dropped_after_optional_blocks():
+    core = "# Core\n\n## A\n- a\n\n<!-- optional:subagents -->\n## Delegation\n- d\n<!-- /optional:subagents -->\n## Scope\n- s\n"
+
+    rendered = renderer.render_document("## F\n", core, stamp="x", enabled_optional=frozenset(), omit_sections=("A",))
+
+    assert "## A" not in rendered and "optional" not in rendered.split("\n", 3)[3]
+    assert "## Delegation" not in rendered and "## Scope" in rendered
+
+
+def test_status_reports_stale_rendered_paperclip_file(tmp_path, capsys):
+    repo = Path(__file__).resolve().parents[1]
+    out = tmp_path / "out"
+
+    assert renderer.status(repo, ["paperclip"], "x", out) == 1
+    assert "not rendered" in capsys.readouterr().out
+    renderer.render_all(repo_root=repo, out_dir=out, selected=["paperclip"], stamp="x")
+    assert renderer.status(repo, ["paperclip"], "x", out) == 0
+    (out / "PAPERCLIP.md").write_text("stale\n", encoding="utf-8")
+    assert renderer.status(repo, ["paperclip"], "x", out) == 1
+    assert "differs from a fresh render" in capsys.readouterr().out
 
 
 PRESENT_PINS = {
@@ -458,7 +479,7 @@ def test_prompt_line_limits_are_enforced():
 
     assert len(core_lines) <= 100
     for path in harness_paths:
-        limit = linter.HARNESS_LINE_LIMITS.get(path.stem, (20,))[0]
+        limit = {"paperclip": 45}.get(path.stem, 20)
         assert len(path.read_text(encoding="utf-8").splitlines()) <= limit, path
 
     result = subprocess.run(

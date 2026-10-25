@@ -1,11 +1,12 @@
 {
   "domains": {
     "deployment": {
-      "baseline": true,
       "breaking": "none",
-      "docs": [],
-      "fingerprint": "89b23e43c79244037b5af2ba17dc021a237ac3da37b40a59f86576c6db125d95",
-      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+      "docs": [
+        "INSTALL.md"
+      ],
+      "fingerprint": "f70e73dfc0d9681f379f64e336d23e2b4643e339ab5633bc1632faad6c06876c",
+      "note": "scripts/update refuses the Paperclip target, which has no deploy path."
     },
     "harnesses": {
       "breaking": "none",
@@ -16,8 +17,8 @@
         "docs/harness-contract.md",
         "docs/surfaces.md"
       ],
-      "fingerprint": "59620da8703d61f27b17b2954900aacc4d3ad9cc79b66b90b4775f4106fa92df",
-      "note": "Register the manual Paperclip target and the omit_sections option, with its contract receipt, table row, and surface entry."
+      "fingerprint": "a6513049d477d7b7d63ec00fd3209090aa2ecc50a0b6e28d32bbdd9cfb58158e",
+      "note": "Register the manual Paperclip target, omit_sections applied after optional blocks, and status coverage for the rendered file."
     },
     "maintenance": {
       "breaking": "none",
@@ -56,8 +57,8 @@
         "INSTALL.md",
         "README.md"
       ],
-      "fingerprint": "d8e99c3dd45c66694e15ca572c9e901bbd449144f2d8a1e3a82a35558e4d8ebf",
-      "note": "Add the Paperclip fragment and document that the Paperclip target renders without overlays."
+      "fingerprint": "3cb4f5a05d46ca58aa6eac4d4fbf6716d616c452bd77934eaf031086a9ca6bc0",
+      "note": "Add the Paperclip fragment: board-only approvals, issue text as instruction or data, run-ending questions, and document that the target renders without overlays."
     },
     "workflow-templates": {
       "baseline": true,

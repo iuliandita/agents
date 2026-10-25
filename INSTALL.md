@@ -227,7 +227,8 @@ scripts/sync-ai-prompts --target paperclip
 
 The output is `build/generated/PAPERCLIP.md`. It is built from `prompts/core.md` and
 `prompts/harnesses/paperclip.md` only, so a clean clone renders the same file. Set `PAPERCLIP_RULES_PATH`
-to write it somewhere else with `--deploy`.
+to write it somewhere else with `--deploy`. `scripts/sync-ai-prompts --status --target paperclip` reports
+whether the rendered file still matches a fresh render, and `scripts/update` does not accept the target.
 
 ### Hermes Global Rules
 
