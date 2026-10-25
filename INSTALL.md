@@ -190,7 +190,7 @@ Existing files are backed up under `.backups/` before replacement. Deploy writes
 
 Real deploys refuse when two selected harnesses resolve to the same path, for example after overriding a path with its `*_AGENTS_PATH` env var. Use `--target` for routine deploys so only the harnesses you use are written.
 
-If `prompts/local.md` exists, it is merged into every rendered and deployed file after the shared core. If `prompts/private.md` exists, it follows `local.md`, but only for harnesses listed in `prompts/private-harnesses.txt` (one name per line) or `AGENTS_PRIVATE_HARNESSES` (comma-separated); `all` lists every supported harness, and there is no default. A withheld private overlay prints a notice. Project-level targets (`generic`, `paperclip`, and `hermes` through `HERMES_AGENTS_PATH`) never receive either overlay; the global Hermes merge through `scripts/render-hermes` follows the same rules as the other harnesses. Start from `prompts/local.example.md` and `prompts/private.example.md`.
+If `prompts/local.md` exists, it is merged into every rendered and deployed file after the shared core. If `prompts/private.md` exists, it follows `local.md`, but only for harnesses listed in `prompts/private-harnesses.txt` (one name per line) or `AGENTS_PRIVATE_HARNESSES` (comma-separated); `all` lists every supported harness, and there is no default. A withheld private overlay prints a notice. Project-level and render-only targets (`generic`, `paperclip`, and `hermes` through `HERMES_AGENTS_PATH`) never receive either overlay; the global Hermes merge through `scripts/render-hermes` follows the same rules as the other harnesses. Start from `prompts/local.example.md` and `prompts/private.example.md`.
 
 ## Dry Run
 

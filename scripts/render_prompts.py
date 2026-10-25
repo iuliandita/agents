@@ -712,7 +712,8 @@ def status(repo_root: Path, selected: list[str] | None, stamp: str | None, out_d
                 continue
             else:
                 print(f"{harness.name}: rendered file differs from a fresh render ({built})")
-            drift += 1
+            # A bare --status must not fail for users who never render this target.
+            drift += 1 if selected else 0
             continue
         if dest is None:
             print(f"{harness.name}: manual target ({harness.env_var})")

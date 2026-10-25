@@ -308,7 +308,7 @@ def test_paperclip_is_render_only_even_with_a_path_override(tmp_path, monkeypatc
     assert renderer.status(repo, ["paperclip"], "x", tmp_path / "out") == 1
 
 
-def test_status_reports_stale_rendered_paperclip_file(tmp_path, capsys):
+def test_status_reports_stale_rendered_paperclip_file(tmp_path, capsys, monkeypatch):
     repo = Path(__file__).resolve().parents[1]
     out = tmp_path / "out"
 
@@ -319,6 +319,10 @@ def test_status_reports_stale_rendered_paperclip_file(tmp_path, capsys):
     (out / "PAPERCLIP.md").write_text("stale\n", encoding="utf-8")
     assert renderer.status(repo, ["paperclip"], "x", out) == 1
     assert "differs from a fresh render" in capsys.readouterr().out
+
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "paperclip")
+    monkeypatch.setattr(renderer, "HARNESSES", tuple(h for h in renderer.HARNESSES if h.name == "paperclip"))
+    assert renderer.status(repo, None, "x", out) == 0
 
 
 PRESENT_PINS = {

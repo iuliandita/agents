@@ -16,6 +16,9 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
 ### Changed
 
+- `scripts/sync-ai-prompts --status --target paperclip` compares `build/generated/PAPERCLIP.md` with a fresh
+  render and counts a missing or stale file as drift; a bare `--status` only reports it. `scripts/update`
+  refuses the target.
 - A harness can now omit core sections by heading (`omit_sections` in `scripts/render_prompts.py`); the render
   fails if an omitted heading no longer exists. Only the Paperclip target uses it, to drop Model Selection, so
   the other renders are unchanged.
