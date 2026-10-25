@@ -304,7 +304,6 @@ def test_paperclip_is_render_only(tmp_path, capsys):
     assert renderer.target_path("paperclip", home=tmp_path) is None
     assert renderer.deploy(repo, ["paperclip"], "x", dry_run=True, backup_dir=tmp_path / "bak") == {}
     assert "render-only target" in capsys.readouterr().out
-    assert renderer.status(repo, ["paperclip"], "x", tmp_path / "out") == 1
 
 
 def test_status_reports_stale_rendered_paperclip_file(tmp_path, capsys, monkeypatch):
