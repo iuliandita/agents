@@ -266,7 +266,7 @@ scripts/sync-ai-prompts --list-targets
 
 Each target can be overridden with its environment variable, such as `CLAUDE_AGENTS_PATH`,
 `CODEX_AGENTS_PATH`, `ANTIGRAVITY_AGENTS_PATH`, or `HERMES_AGENTS_PATH`. Manual targets
-(`hermes`, `generic`, `paperclip`) require an explicit override before deploy writes anything. Harnesses removed
+(`hermes`, `generic`) require an explicit override before deploy writes anything; `paperclip` is render-only and deploy skips it. Harnesses removed
 from the catalog are listed in [docs/legacy-harnesses.md](docs/legacy-harnesses.md) with a re-add recipe.
 
 Hermes has no global Markdown rules file. Its global operational rules live in `agent.coding_instructions`

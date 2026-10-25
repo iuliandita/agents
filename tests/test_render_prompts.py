@@ -296,6 +296,18 @@ def test_omitted_sections_are_dropped_after_optional_blocks():
     assert "## Delegation" not in rendered and "## Scope" in rendered
 
 
+def test_paperclip_is_render_only_even_with_a_path_override(tmp_path, monkeypatch, capsys):
+    repo = Path(__file__).resolve().parents[1]
+    monkeypatch.setenv("PAPERCLIP_RULES_PATH", str(tmp_path / "rules.md"))
+
+    assert renderer.target_path("paperclip", home=tmp_path) is None
+    renderer.deploy(repo, ["paperclip"], "x", dry_run=False, backup_dir=tmp_path / "bak")
+
+    assert not (tmp_path / "rules.md").exists()
+    assert "render-only target" in capsys.readouterr().out
+    assert renderer.status(repo, ["paperclip"], "x", tmp_path / "out") == 1
+
+
 def test_status_reports_stale_rendered_paperclip_file(tmp_path, capsys):
     repo = Path(__file__).resolve().parents[1]
     out = tmp_path / "out"

@@ -156,7 +156,7 @@ HARNESSES: tuple[Harness, ...] = (
         "paperclip.md",
         "PAPERCLIP.md",
         None,
-        "PAPERCLIP_RULES_PATH",
+        "",
         MANUAL,
         "House rules for Paperclip agents, rendered without overlays; a Paperclip sync consumes the file from build/generated/PAPERCLIP.md, so there is no global path.",
         source_url="https://github.com/paperclipai/paperclip",
@@ -186,6 +186,8 @@ def harness_display_names() -> list[str]:
 
 
 def default_target_label(harness: Harness, home: str = "~") -> str:
+    if harness.consumed_from_build:
+        return f"none (rendered to build/generated/{harness.output_name})"
     if harness.target_template is None:
         return f"manual override via {harness.env_var}"
     return harness.target_template.format(home=home)
@@ -258,6 +260,8 @@ def omp_is_profile_derived(home: str | Path | None, env: dict[str, str] | os._En
 
 def target_path(harness: str, home: str | Path | None = None, env: dict[str, str] | None = None) -> Path | None:
     item = harness_by_name(harness)
+    if item.consumed_from_build:
+        return None
     values = os.environ if env is None else env
     if item.env_var in values and values[item.env_var]:
         return Path(values[item.env_var]).expanduser()
@@ -620,7 +624,10 @@ def deploy(
         print(notice)
 
     for harness in skipped:
-        print(f"skipping {harness.name}: manual target requires {harness.env_var}")
+        if harness.consumed_from_build:
+            print(f"skipping {harness.name}: render-only target, read from build/generated/{harness.output_name}")
+        else:
+            print(f"skipping {harness.name}: manual target requires {harness.env_var}")
 
     collisions = target_collisions(resolved)
     if collisions:
@@ -763,7 +770,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.list_targets:
         for harness in selected_harnesses(args.target):
             dest = target_path(harness.name)
-            target = str(dest) if dest is not None else f"manual override via {harness.env_var}"
+            target = str(dest) if dest is not None else default_target_label(harness)
             print(f"{harness.name}\t{harness.display}\t{harness.support_level}\t{target}")
         return 0
 

@@ -9,7 +9,7 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
 - A `paperclip` target renders house rules for Paperclip agents to `PAPERCLIP.md`. It is a manual target
   with no global path: a Paperclip sync consumes the rendered file from `build/generated/`, and
-  `PAPERCLIP_RULES_PATH` deploys it elsewhere. It never carries `prompts/local.md` or `prompts/private.md`.
+  deploy skips it. It never carries `prompts/local.md` or `prompts/private.md`.
   Its fragment holds the Paperclip-specific wording (the agents are not the owner, questions go on the
   issue, work is handed off as Paperclip issues) and its own copy of the timer, issue-tracking, release, and
   product rules and the anonymized new-repo defaults, so the render is the same from a clean clone.

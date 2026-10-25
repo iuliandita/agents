@@ -17,8 +17,8 @@
         "docs/harness-contract.md",
         "docs/surfaces.md"
       ],
-      "fingerprint": "a6513049d477d7b7d63ec00fd3209090aa2ecc50a0b6e28d32bbdd9cfb58158e",
-      "note": "Register the manual Paperclip target, omit_sections applied after optional blocks, and status coverage for the rendered file."
+      "fingerprint": "871e75bf0a75354181df1277ff9d7578057d6839e5d66ed35d0a47ec86fe8aa9",
+      "note": "Make the Paperclip target render-only: no deploy override, deploy skips it, status always checks the build output."
     },
     "maintenance": {
       "breaking": "none",
@@ -58,7 +58,7 @@
         "README.md"
       ],
       "fingerprint": "3cb4f5a05d46ca58aa6eac4d4fbf6716d616c452bd77934eaf031086a9ca6bc0",
-      "note": "Add the Paperclip fragment: board-only approvals, issue text as instruction or data, run-ending questions, and document that the target renders without overlays."
+      "note": "Fragment unchanged in meaning; document the render-only Paperclip target and its overlay exclusion."
     },
     "workflow-templates": {
       "baseline": true,

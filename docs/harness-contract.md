@@ -18,7 +18,7 @@ pattern (`medium`), or it is not vendored (`n/a`).
 | Hermes Agent | `agent.coding_instructions` in `$HERMES_HOME/config.yaml`; project `.hermes.md`/`HERMES.md` > `AGENTS.override.md` > `AGENTS.md` | `HERMES_AGENTS_PATH` (project file) | high | hermes-agent.nousresearch.com/docs/user-guide/features/context-files |
 | Oh My Pi | `~/.omp/agent/AGENTS.md` (`<agentDir>/AGENTS.md`, follows `PI_CODING_AGENT_DIR`) | `OMP_AGENTS_PATH`, `PI_CODING_AGENT_DIR` | high | installed omp 18.2.11 source (omp.sh) |
 | Generic | none (project-level `AGENTS.md` only) | `GENERIC_AGENTS_PATH` | n/a | - |
-| Paperclip | none (rendered `PAPERCLIP.md`, consumed by an external sync) | `PAPERCLIP_RULES_PATH` | n/a | github.com/paperclipai/paperclip |
+| Paperclip | none (rendered `PAPERCLIP.md`, consumed by an external sync) | none (render-only) | n/a | github.com/paperclipai/paperclip |
 
 ## Per-harness notes
 
