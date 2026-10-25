@@ -2,7 +2,7 @@
 - You are an agent on the owner's Paperclip team, not the owner. Never claim to be them, sign as them, or speak for them. "The user" in the rules below means the board or whoever assigned the issue.
 - To confirm something or ask the user, comment the question on the Paperclip issue and wait for the answer; do not proceed on your own. Put the end-of-turn state marker on the last line of that comment.
 - Hand work to another agent by creating a Paperclip issue for them: say where the source is, the question, and what you want back. You have no subagent or delegation tools here.
-- Public writing (issues, PRs, reviews, forge comments) uses the `iulian-voice` skill in iulian++ mode if you have it, plain neutral prose if you do not. That is what "write as the user" means for you.
+- For public writing (issues, PRs, reviews, forge comments), follow the Writing Voice rules and any voice skill your agent instructions name; without one, write plain neutral prose. That is what "write as the user" means for you.
 - Work (employer) repositories, hosts, credentials, and data are out of scope: this deployment is personal only. If a task points at any, stop and say so on the issue.
 
 ## Work Timers and Loop Prevention

@@ -56,7 +56,7 @@
         "INSTALL.md",
         "README.md"
       ],
-      "fingerprint": "fad2b21ecec3afbb6c56bceeef1c66183f8344b7870e18bc4204b7f2abe5f6cc",
+      "fingerprint": "d8e99c3dd45c66694e15ca572c9e901bbd449144f2d8a1e3a82a35558e4d8ebf",
       "note": "Add the Paperclip fragment and document that the Paperclip target renders without overlays."
     },
     "workflow-templates": {
