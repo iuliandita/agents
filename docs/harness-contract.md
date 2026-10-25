@@ -18,6 +18,7 @@ pattern (`medium`), or it is not vendored (`n/a`).
 | Hermes Agent | `agent.coding_instructions` in `$HERMES_HOME/config.yaml`; project `.hermes.md`/`HERMES.md` > `AGENTS.override.md` > `AGENTS.md` | `HERMES_AGENTS_PATH` (project file) | high | hermes-agent.nousresearch.com/docs/user-guide/features/context-files |
 | Oh My Pi | `~/.omp/agent/AGENTS.md` (`<agentDir>/AGENTS.md`, follows `PI_CODING_AGENT_DIR`) | `OMP_AGENTS_PATH`, `PI_CODING_AGENT_DIR` | high | installed omp 18.2.11 source (omp.sh) |
 | Generic | none (project-level `AGENTS.md` only) | `GENERIC_AGENTS_PATH` | n/a | - |
+| Paperclip | none (rendered `PAPERCLIP.md`, consumed by an external sync) | none (render-only) | n/a | github.com/paperclipai/paperclip |
 
 ## Per-harness notes
 
@@ -112,6 +113,17 @@ pattern (`medium`), or it is not vendored (`n/a`).
   CLI/TUI, plus `omp acp` (Agent Client Protocol server) for editors; no desktop app.
 - Linux/macOS `~/.omp/`; Windows native unverified (inferred `%USERPROFILE%\.omp\`); WSL reads the WSL
   home. Plain `pi` (the upstream project omp forks) stays in `docs/legacy-harnesses.md`.
+
+### Paperclip
+- Paperclip (agent orchestration) runs agents through other harnesses, so it has no rules file of its own.
+  This target renders `PAPERCLIP.md` for a sync outside this repo to ship to the agents, for example as a
+  Paperclip skill. Registered 2026-10-25; the receipt is the upstream repository, not a documented path.
+- It is a manual target: it never carries `prompts/local.md` or `prompts/private.md`, whatever
+  `prompts/private-harnesses.txt` says. The agents may run on providers outside the private trust list.
+- `prompts/harnesses/paperclip.md` holds everything the overlays supply elsewhere that the agents need,
+  so the render is reproducible from a clean clone. It drops the core Delegation block and the Model
+  Selection section, which assume delegation tools and per-agent model control; rendering fails if that
+  section is renamed.
 
 ## OpenCode effort variants (2026-10-09)
 
