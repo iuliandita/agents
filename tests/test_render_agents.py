@@ -701,6 +701,20 @@ def test_deploy_preflights_every_target_before_any_write(tmp_path, monkeypatch):
     assert not codex_target.exists()
 
 
+@pytest.mark.parametrize("dry_run", [True, False])
+def test_deploy_refuses_harnesses_sharing_a_target_dir(tmp_path, monkeypatch, dry_run):
+    shared = tmp_path / "agents"
+    monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(shared))
+    monkeypatch.setenv("OPENCODE_AGENTS_DIR", str(tmp_path / "x" / ".." / "agents"))
+    monkeypatch.setenv("CLAUDE_HOOKS_DIR", str(tmp_path / "claude-hooks"))
+
+    with pytest.raises(SystemExit, match="collision") as error:
+        ra.deploy(REPO, selected=["claude", "opencode"], overrides={}, dry_run=dry_run, backup_dir=tmp_path / "b")
+
+    assert "claude, opencode" in str(error.value)
+    assert not shared.exists()
+
+
 def test_deploy_dry_run_writes_nothing(tmp_path, monkeypatch, capsys):
     target = tmp_path / "codex-agents"
     monkeypatch.setenv("CODEX_AGENTS_DIR", str(target))

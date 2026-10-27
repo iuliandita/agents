@@ -814,6 +814,17 @@ def deploy(
         preflight_target(target, files)
         deployments.append((harness, target, files, stale))
 
+    by_dir: dict[str, list[str]] = {}
+    for harness, target, _, _ in deployments:
+        # normcase folds case so Windows/macOS default filesystems cannot collide unseen.
+        by_dir.setdefault(os.path.normcase(str(target.expanduser().resolve(strict=False))), []).append(harness)
+    shared = {path: names for path, names in by_dir.items() if len(names) > 1}
+    if shared:
+        lines = ["Agent deploy target collision detected:"]
+        lines.extend(f"- {path}: {', '.join(names)}" for path, names in sorted(shared.items()))
+        lines.append("Select one harness with --target or point one *_AGENTS_DIR env var elsewhere.")
+        raise SystemExit("\n".join(lines))
+
     for harness, target, files, stale in deployments:
         if dry_run:
             for filename, text in files.items():
