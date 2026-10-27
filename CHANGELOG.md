@@ -11,6 +11,12 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
   model at half the Sol input price. `flagship` stays on Sol. Terra needs Codex CLI 0.159.0 or later; to
   keep `builder` on Sol, set `"mid": "gpt-6.1-sol"` under `codex.tiers` in `prompts/models.local.json`.
 
+### Fixed
+
+- `render-hermes --deploy` no longer corrupts `config.yaml` when the `agent:` block is not indented by
+  two spaces; sibling keys such as `model` were swallowed into the rules text. An inline `agent:` value
+  now stops the deploy instead of adding a second `agent:` key that dropped the first.
+
 ## [4.3.0] - 2026-10-25
 
 ### Added

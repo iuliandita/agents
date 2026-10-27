@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pytest
+import yaml
+
 import render_hermes as rh
 
 
@@ -34,6 +37,24 @@ def test_merge_replaces_inline_and_block_values():
     assert "- new\n" not in block
     assert "    - newer" in block
     assert "  reasoning_effort: low" in block
+
+
+@pytest.mark.parametrize(
+    "existing",
+    ["", "    coding_instructions: |\n        - old\n\n        - older\n", "    coding_instructions: old\n      wrapped\n"],
+)
+def test_merge_keeps_sibling_keys_in_four_space_agent_block(existing):
+    text = f"agent:\n{existing}    model: opus\n    max_turns: 50\nother: 1\n"
+
+    merged = yaml.safe_load(rh.merge_coding_instructions(text, "- rule\n\n- two\n"))
+
+    assert merged["agent"] == {"coding_instructions": "- rule\n\n- two\n", "model": "opus", "max_turns": 50}
+    assert merged["other"] == 1
+
+
+def test_merge_refuses_inline_agent_value():
+    with pytest.raises(SystemExit, match="inline value"):
+        rh.merge_coding_instructions("agent: {model: opus}\n", "- rule\n")
 
 
 def test_merge_appends_agent_key_when_missing():

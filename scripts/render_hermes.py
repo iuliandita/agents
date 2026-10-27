@@ -24,7 +24,6 @@ from render_prompts import backup_existing
 KEY = "coding_instructions"
 AGENT = "agent"
 INDENT = "  "
-CONTENT_INDENT = "    "
 
 
 def hermes_config_path(env: dict[str, str] | None = None) -> Path:
@@ -69,44 +68,70 @@ def _block_end(lines: list[str], start: int, min_indent: int) -> int:
     return index
 
 
-def _value_block(rules: str) -> list[str]:
+def _value_block(rules: str, indent: str = INDENT) -> list[str]:
     body = rules.rstrip("\n").split("\n")
-    return [f"{INDENT}{KEY}: |"] + [f"{CONTENT_INDENT}{line}" if line else "" for line in body]
+    content_indent = indent + INDENT
+    return [f"{indent}{KEY}: |"] + [f"{content_indent}{line}" if line else "" for line in body]
+
+
+def _child_indent(lines: list[str], start: int, end: int) -> str:
+    """Indent of the first key in lines[start:end]; the default when the block is empty."""
+    for line in lines[start:end]:
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = line[: len(line) - len(stripped)]
+        if "\t" in indent:
+            raise SystemExit(f"{AGENT}: block is indented with tabs; YAML does not allow that")
+        return indent
+    return INDENT
 
 
 def merge_coding_instructions(text: str, rules: str) -> str:
     """Set agent.coding_instructions while preserving every other line verbatim."""
-    block = _value_block(rules)
     lines = text.split("\n")
     if lines and lines[-1] == "":
         lines.pop()
 
-    agent_index = next(
-        (index for index, line in enumerate(lines) if re.match(rf"^{AGENT}:\s*(#.*)?$", line)),
-        None,
-    )
+    agent_index = None
+    for index, line in enumerate(lines):
+        match = re.match(rf"^{AGENT}\s*:(.*)$", line)
+        if match is None:
+            continue
+        rest = match.group(1).strip()
+        if rest and not rest.startswith("#"):
+            # A flow mapping or scalar here cannot take a block key; appending a
+            # second agent: key would make YAML loaders drop the first.
+            raise SystemExit(
+                f"top-level '{AGENT}:' has an inline value ({rest}); "
+                f"rewrite it as a block mapping, then rerun"
+            )
+        agent_index = index
+        break
+
     if agent_index is None:
         if lines and lines[-1].strip():
             lines.append("")
         lines.append(f"{AGENT}:")
-        lines.extend(block)
+        lines.extend(_value_block(rules))
     else:
         end = _block_end(lines, agent_index + 1, 0)
+        indent = _child_indent(lines, agent_index + 1, end)
+        block = _value_block(rules, indent)
         key_index = next(
             (
                 index
                 for index in range(agent_index + 1, end)
-                if lines[index].startswith(f"{INDENT}{KEY}:")
+                if lines[index].startswith(f"{indent}{KEY}:")
             ),
             None,
         )
         if key_index is None:
             lines[agent_index + 1 : agent_index + 1] = block
         else:
-            value_end = key_index + 1
-            after_colon = lines[key_index].split(":", 1)[1].strip()
-            if after_colon[:1] in ("|", ">"):
-                value_end = _block_end(lines, key_index + 1, len(INDENT))
+            # Block scalars, multi-line plain scalars, and nested values all end
+            # at the next line indented no deeper than the key itself.
+            value_end = _block_end(lines, key_index + 1, len(indent))
             lines[key_index:value_end] = block
 
     result = "\n".join(lines) + "\n"
