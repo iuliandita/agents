@@ -18,6 +18,9 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
   now stops the deploy instead of adding a second `agent:` key that dropped the first.
 - `--prune-backups` keeps the most recently taken backups. Backups used to keep the source file's mtime,
   so a fresh backup of a long-unchanged file was pruned first.
+- Per-agent `agents.<name>` entries in the tracked `prompts/models.json` now apply; they passed validation
+  but were ignored. Entries in `prompts/models.local.json` still win, field by field, and unknown agent
+  names fail for both files.
 
 ## [4.3.0] - 2026-10-25
 

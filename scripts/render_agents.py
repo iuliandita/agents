@@ -292,14 +292,12 @@ def load_overrides(repo_root: Path) -> dict:
     return load_models_file(path)
 
 
-def check_override_agents(overrides: dict, specs: list[AgentSpec]) -> None:
+def check_override_agents(overrides: dict, specs: list[AgentSpec], source: str = "prompts/models.local.json") -> None:
     known = {spec.name for spec in specs}
     for harness, entry in overrides.items():
         for name in entry.get("agents", {}):
             if name not in known:
-                raise SystemExit(
-                    f"prompts/models.local.json: '{harness}.agents.{name}' does not match any agent in agents/"
-                )
+                raise SystemExit(f"{source}: '{harness}.agents.{name}' does not match any agent in agents/")
 
 
 def tier_model(value: object) -> str | None:
@@ -311,7 +309,10 @@ def tier_model(value: object) -> str | None:
 def resolve(spec: AgentSpec, harness: str, overrides: dict, defaults: dict) -> Resolved:
     default_entry = defaults.get(harness, {})
     entry = overrides.get(harness, {})
-    per_agent = entry.get("agents", {}).get(spec.name, {})
+    per_agent = {
+        **default_entry.get("agents", {}).get(spec.name, {}),
+        **entry.get("agents", {}).get(spec.name, {}),
+    }
     tier = per_agent.get("tier", spec.tier)
     effort_level = per_agent.get("effort", spec.effort)
     tiers = dict(default_entry.get("tiers", {}))
@@ -696,6 +697,7 @@ def render_all(
     check_override_agents(overrides, specs)
     invariants = read_invariants(repo_root)
     defaults = load_model_defaults(repo_root)
+    check_override_agents(defaults, specs, "prompts/models.json")
     written: dict[str, list[Path]] = {}
     notices: list[str] = []
     for harness in selected_agent_harnesses(selected):
@@ -800,6 +802,7 @@ def deploy(
     check_override_agents(overrides, specs)
     invariants = read_invariants(repo_root)
     defaults = load_model_defaults(repo_root)
+    check_override_agents(defaults, specs, "prompts/models.json")
     notices: list[str] = []
     deployments: list[tuple[str, Path, dict[str, str], list[Path]]] = []
     for harness in selected_agent_harnesses(selected):

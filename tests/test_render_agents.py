@@ -559,6 +559,27 @@ def test_check_override_agents_rejects_unknown_name():
         ra.check_override_agents(overrides, specs)
 
 
+def test_resolve_applies_tracked_agent_overrides_under_local_ones():
+    defaults = {**DEFAULTS, "codex": {**DEFAULTS["codex"], "agents": {"builder": {"tier": "flagship", "effort": "low"}}}}
+
+    tracked = ra.resolve(spec(name="builder", tier="mid", effort="medium"), "codex", {}, defaults)
+    local = ra.resolve(
+        spec(name="builder", tier="mid", effort="medium"),
+        "codex",
+        {"codex": {"agents": {"builder": {"effort": "high"}}}},
+        defaults,
+    )
+
+    assert (tracked.model, tracked.effort) == ("gpt-6.1-sol", "low")
+    assert (local.model, local.effort) == ("gpt-6.1-sol", "high")
+
+
+def test_check_override_agents_names_the_source_file():
+    specs = ra.load_agents(REPO)
+    with pytest.raises(SystemExit, match=r"prompts/models\.json: 'claude\.agents\.nope'"):
+        ra.check_override_agents({"claude": {"agents": {"nope": {}}}}, specs, "prompts/models.json")
+
+
 def test_render_all_rejects_unknown_override_agent_name(tmp_path):
     overrides = {"claude": {"agents": {"nope": {"tier": "mid"}}}}
     with pytest.raises(SystemExit, match="does not match"):
