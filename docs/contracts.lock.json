@@ -12,14 +12,10 @@
     "harnesses": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
-        "INSTALL.md",
-        "README.md",
-        "docs/harness-contract.md",
-        "docs/surfaces.md"
+        "CHANGELOG.md"
       ],
-      "fingerprint": "fbe98cb0680025f894171f0e1d3edd5f82541f2f058389a2b29e576fb915d984",
-      "note": "Final Paperclip review fixes: CI-pass merge rule, parent-issue approval scope, identity wording, duplicate-heading guard."
+      "fingerprint": "d9cd1a3d3fde83fc0fc3042e95987f6ee377ab0532753e1327eb2fa7dbbb4608",
+      "note": "Backups take a fresh mtime so --prune-backups keeps the most recently taken ones, as README already describes."
     },
     "maintenance": {
       "breaking": "none",

@@ -16,6 +16,8 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 - `render-hermes --deploy` no longer corrupts `config.yaml` when the `agent:` block is not indented by
   two spaces; sibling keys such as `model` were swallowed into the rules text. An inline `agent:` value
   now stops the deploy instead of adding a second `agent:` key that dropped the first.
+- `--prune-backups` keeps the most recently taken backups. Backups used to keep the source file's mtime,
+  so a fresh backup of a long-unchanged file was pruned first.
 
 ## [4.3.0] - 2026-10-25
 

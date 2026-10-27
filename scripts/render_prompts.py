@@ -582,7 +582,9 @@ def backup_existing(path: Path, backup_dir: Path) -> None:
         # Dangling symlink: copy the link itself; following it would crash.
         shutil.copy2(path, backup, follow_symlinks=False)
         return
-    shutil.copy2(path, backup)
+    # copy, not copy2: the backup's mtime must be when it was taken, or
+    # --prune-backups treats a fresh backup of an old file as the oldest.
+    shutil.copy(path, backup)
 
 
 def content_hash(text: str) -> str:
