@@ -226,7 +226,7 @@ them only after verifying the harness and provider support. This migration adds 
 
 ### OpenAI GPT-6.1 Sol
 
-Codex `mid` and `flagship` tiers use `gpt-6.1-sol`, split by role effort. The API accepts `low`,
+The Codex `flagship` tier uses `gpt-6.1-sol`; `mid` moved to Terra on 2026-10-27. The API accepts `low`,
 `medium` (default), `high`, `xhigh`, and `max`; it rejects `none` and `minimal`. Tool calling requires
 the Responses API. See the [GPT-6.1 Sol model reference](https://developers.openai.com/api/docs/models/gpt-6.1-sol).
 
@@ -238,18 +238,32 @@ Cache-preserving effort changes through `configuration_update` apply only to sta
 mode, not native multi-agent. Verify harness support before relying on this API control; see the
 [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning#change-reasoning-mid-conversation).
 
+### OpenAI GPT-6.1 Terra (2026-10-27)
+
+The Codex `mid` tier uses `gpt-6.1-terra`, released 2026-10-26. It costs $1 / $5 per million input
+and output tokens, against $2 for Sol input and $0.10 for Luna, and is the faster model. Only
+`builder` runs on `mid`, so Sol keeps `planner` and `reviewer`. The API accepts `none`, `low`,
+`medium` (default), `high`, `xhigh`, and `max`; tool calling requires the Responses API. See the
+[GPT-6.1 Terra model reference](https://developers.openai.com/api/docs/models/gpt-6.1-terra). To keep
+`builder` on Sol, set `"mid": "gpt-6.1-sol"` under `codex.tiers` in `prompts/models.local.json`.
+
+On 2026-10-27, installed Codex CLI 0.164.0 listed `gpt-6.1-terra` in `codex debug models` with
+efforts `low` through `max`. This confirms the model ID in the CLI catalog, not account availability.
+
 ### OpenAI Codex CLI reference
 
 Moved out of the rendered prompt on 2026-10-12 to keep the Codex global file within its byte budget;
 the prompt keeps the behavior rules and points here for the facts. Verify against current CLI help
 and the [Codex docs](https://developers.openai.com/codex) before scripting.
 
-- Models: GPT-5.6 Luna, Terra, and Sol remain available but cost more than their GPT-6 counterparts;
-  there is no GPT-6 Terra. Astra rollout and account availability vary, so retain Sol as the fallback.
+- Models: GPT-5.6 Luna, Terra, and Sol remain available but cost more than their GPT-6 counterparts.
+  GPT-6.1 Terra needs Codex CLI 0.159.0 or later. Astra rollout and account availability vary, so
+  retain Sol as the fallback.
 - Effort: GPT-6.1 Sol accepts `low`, `medium` (default), `high`, `xhigh`, and `max`,
-  with no `none` or `minimal`; Luna accepts `none` and `low` through `max` but rejects `minimal`;
-  Astra accepts `low` through `max` and has no `none`. An `ultra` level is unconfirmed. Do not assume
-  API and app effort ranges match.
+  with no `none` or `minimal`; Terra accepts `none` and `low` through `max`; Luna accepts `none` and
+  `low` through `max` but rejects `minimal`; Astra accepts `low` through `max` and has no `none`. The
+  Codex 0.164.0 catalog also lists `ultra` for Sol, Terra, and Astra; the API reference does not, so
+  role files do not use it. Do not assume API and app effort ranges match.
 - Multi-agent: Native Responses multi-agent uses the same request model and tools across agents;
   custom Codex roles can select per-role models and tools.
 - Automation: `codex exec` accepts a prompt plus stdin for pipelines. Use explicit flags such as `--json`,
