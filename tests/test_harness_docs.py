@@ -1,4 +1,5 @@
 import subprocess
+import sys
 import textwrap
 from pathlib import Path
 
@@ -7,7 +8,7 @@ def test_harness_docs_are_in_sync_with_renderer_registry():
     repo = Path(__file__).resolve().parents[1]
 
     result = subprocess.run(
-        ["python", "scripts/check_harness_docs.py"],
+        [sys.executable, "scripts/check_harness_docs.py"],
         cwd=repo,
         check=False,
         capture_output=True,
@@ -22,7 +23,7 @@ def test_harness_contract_receipts_are_complete():
     repo = Path(__file__).resolve().parents[1]
 
     result = subprocess.run(
-        ["python", "scripts/check_harness_contract.py"],
+        [sys.executable, "scripts/check_harness_contract.py"],
         cwd=repo,
         check=False,
         capture_output=True,
@@ -96,7 +97,7 @@ def test_harness_docs_check_binds_notes_to_matching_install_row(tmp_path):
     )
 
     result = subprocess.run(
-        ["python", "scripts/check_harness_docs.py"],
+        [sys.executable, "scripts/check_harness_docs.py"],
         cwd=fixture,
         check=False,
         capture_output=True,
