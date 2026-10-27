@@ -142,13 +142,13 @@ def spec(**overrides):
     return ra.AgentSpec(**fields)
 
 
-@pytest.mark.parametrize("tier", ["mid", "flagship"])
+@pytest.mark.parametrize(("tier", "model"), [("mid", "gpt-6.1-terra"), ("flagship", "gpt-6.1-sol")])
 @pytest.mark.parametrize("effort", ["low", "medium", "high", "xhigh", "max"])
-def test_codex_sol_tiers_render_new_model_and_keep_role_effort(tier, effort):
+def test_codex_mid_and_flagship_tiers_render_model_and_keep_role_effort(tier, model, effort):
     role = spec(tier=tier, effort=effort)
     resolved = ra.resolve(role, "codex", {}, DEFAULTS)
     data = tomllib.loads(ra.render_codex(role, resolved, INVARIANTS))
-    assert data["model"] == "gpt-6.1-sol"
+    assert data["model"] == model
     assert data["model_reasoning_effort"] == effort
     assert resolved.notices == []
 

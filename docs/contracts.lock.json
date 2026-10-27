@@ -37,8 +37,8 @@
         "README.md",
         "docs/harness-contract.md"
       ],
-      "fingerprint": "c7aef2c002a4ce4adf4150ff0dd90a5280abecb38f5dcaead38538e2aad722d4",
-      "note": "Document explorer at medium, verifier on the cheap tier at medium, the Command Code verifier provider change with its pin-back override, and Haiku 5.5 pricing tiers."
+      "fingerprint": "d75165b3709b1d2f9b752aa97951c3f2c292f346a147c97290e6171f48b04ac3",
+      "note": "Move the Codex mid tier (builder) from GPT-6.1 Sol to GPT-6.1 Terra; document price, efforts, CLI minimum, and the local pin-back override."
     },
     "overlays-trust": {
       "breaking": "none",
@@ -54,11 +54,10 @@
       "breaking": "none",
       "docs": [
         "CHANGELOG.md",
-        "INSTALL.md",
         "README.md"
       ],
-      "fingerprint": "54fc0c4f4a8eb53be56488b18fca858b9f2ac94e213b250775bf4dff86b91152",
-      "note": "Final Paperclip review fixes: CI-pass merge rule, parent-issue approval scope, identity wording, duplicate-heading guard."
+      "fingerprint": "a20df2013cc07ea84e5311088241612b07e731e9d18e8523550d76e7ef75a709",
+      "note": "Codex model ladder names GPT-6.1 Terra as the mid tier and Sol as flagship."
     },
     "workflow-templates": {
       "baseline": true,

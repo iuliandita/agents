@@ -384,7 +384,8 @@ PRESENT_PINS = {
     ),
     "codex": (
         "GPT-6 Luna = cheap tier",
-        "GPT-6.1 Sol = balanced and flagship",
+        "GPT-6.1 Terra = mid tier",
+        "GPT-6.1 Sol = flagship",
         "GPT-6 Astra = apex",
         "do not freeze stale names",
         "do not assume API and app effort ranges match",
@@ -396,6 +397,7 @@ PRESENT_PINS = {
     "contract": (
         "GPT-6.1 Sol accepts `low`, `medium` (default), `high`, `xhigh`, and `max`",
         "with no `none` or `minimal`",
+        "Terra accepts `none`",
         "Luna accepts `none`",
         "Astra accepts `low` through `max`",
         "`ultra`",
