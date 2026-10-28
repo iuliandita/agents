@@ -49,11 +49,10 @@
     "prompts": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
-        "README.md"
+        "CHANGELOG.md"
       ],
-      "fingerprint": "a20df2013cc07ea84e5311088241612b07e731e9d18e8523550d76e7ef75a709",
-      "note": "Codex model ladder names GPT-6.1 Terra as the mid tier and Sol as flagship."
+      "fingerprint": "9f2cd1c82038491a7bc92b237af611a8403144c30305647d1b2c5463a21f167b",
+      "note": "Core rules yield the preamble and last line to a subagent role's own output format."
     },
     "workflow-templates": {
       "baseline": true,
