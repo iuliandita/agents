@@ -30,12 +30,10 @@
     "models-agents": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
-        "README.md",
-        "docs/harness-contract.md"
+        "CHANGELOG.md"
       ],
-      "fingerprint": "d75165b3709b1d2f9b752aa97951c3f2c292f346a147c97290e6171f48b04ac3",
-      "note": "Move the Codex mid tier (builder) from GPT-6.1 Sol to GPT-6.1 Terra; document price, efforts, CLI minimum, and the local pin-back override."
+      "fingerprint": "998be6f5639eb85b8f780312110f01e3304dd4e5dcfeddd3fc38277ce31f0bbc",
+      "note": "Tracked per-agent overrides in models.json now apply under models.local.json ones; unknown names fail for both files."
     },
     "overlays-trust": {
       "breaking": "none",
