@@ -10,6 +10,9 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 - The Codex `mid` tier now uses `gpt-6.1-terra` instead of `gpt-6.1-sol`, so `builder` runs on the faster
   model at half the Sol input price. `flagship` stays on Sol. Terra needs Codex CLI 0.159.0 or later; to
   keep `builder` on Sol, set `"mid": "gpt-6.1-sol"` under `codex.tiers` in `prompts/models.local.json`.
+- `reviewer` and `explorer` no longer assume a shell, which five of six harnesses do not grant them.
+  `reviewer` takes the diff from the task (pasted or as a patch file) and asks for it when it has neither
+  a diff nor a shell; `explorer` uses native search and says when git history is out of reach.
 
 ### Fixed
 

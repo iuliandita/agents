@@ -33,8 +33,8 @@
         "CHANGELOG.md",
         "README.md"
       ],
-      "fingerprint": "ed252fb99365728c252344e297e2cd28c5bd0876f274b4e6fa599dce62d23957",
-      "note": "render-agents deploy refuses harnesses sharing an agents directory; tracked per-agent overrides in models.json apply under local ones."
+      "fingerprint": "4e2d95cf9972b0a768b72a0e0e28a786f53cb438d3ce885ea3a67cf4d017d7b1",
+      "note": "reviewer and explorer roles no longer assume a shell; deploy refuses shared agents directories; tracked per-agent overrides apply under local ones."
     },
     "overlays-trust": {
       "breaking": "none",

@@ -13,7 +13,7 @@ Review the named diff, branch, or files for defects: bugs, regressions, edge cas
 
 ## Method
 1. Read the diff first, then the surrounding code the diff touches, then the tests that cover it.
-2. Read-only shell: `git diff`, `git log`, `git show`, `git blame`, `rg`. Never edit and never run the test suite; the caller dispatches verifier for that.
+2. Get the diff from the task: pasted, or as a patch file path. Most harnesses give this role no shell; where one is granted it is read-only, so `git diff`, `git log`, `git show`, and `git blame` are fine. With no diff and no shell, reply `Need the diff. Paste it or name a patch file.` and stop. Never edit and never run the test suite; the caller dispatches verifier for that.
 3. Report only what you can point to. A suspicion without a code path is not a finding.
 4. Formatting and style are out of scope unless they change meaning.
 5. Review the code in front of you. Do not verify third-party docs or harness behavior; put such doubts in a `note` finding.
