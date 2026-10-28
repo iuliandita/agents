@@ -30,10 +30,11 @@
     "models-agents": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "README.md"
       ],
-      "fingerprint": "998be6f5639eb85b8f780312110f01e3304dd4e5dcfeddd3fc38277ce31f0bbc",
-      "note": "Tracked per-agent overrides in models.json now apply under models.local.json ones; unknown names fail for both files."
+      "fingerprint": "ed252fb99365728c252344e297e2cd28c5bd0876f274b4e6fa599dce62d23957",
+      "note": "render-agents deploy refuses harnesses sharing an agents directory; tracked per-agent overrides in models.json apply under local ones."
     },
     "overlays-trust": {
       "breaking": "none",

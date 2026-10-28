@@ -21,6 +21,8 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 - Per-agent `agents.<name>` entries in the tracked `prompts/models.json` now apply; they passed validation
   but were ignored. Entries in `prompts/models.local.json` still win, field by field, and unknown agent
   names fail for both files.
+- `render-agents --deploy` stops before writing when two selected harnesses resolve to the same agents
+  directory; the second harness used to overwrite the first one's role files.
 
 ## [4.3.0] - 2026-10-25
 
