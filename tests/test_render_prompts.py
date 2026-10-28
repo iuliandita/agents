@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -499,7 +500,7 @@ def test_prompt_line_limits_are_enforced():
         assert len(path.read_text(encoding="utf-8").splitlines()) <= limit, path
 
     result = subprocess.run(
-        ["python", "scripts/lint_prompts.py"],
+        [sys.executable, "scripts/lint_prompts.py"],
         cwd=repo,
         check=False,
         capture_output=True,
