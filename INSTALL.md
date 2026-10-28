@@ -241,7 +241,9 @@ scripts/render-hermes --deploy
 ```
 
 The merge is a comment-preserving line edit and backs the config up first, so unrelated settings and
-comments are kept. Override the target with `--path` or `HERMES_CONFIG_PATH`, and the home with
+comments are kept. It follows the indent the `agent:` block already uses. An inline value such as
+`agent: {model: opus}` cannot be edited line by line, so deploy stops without writing; rewrite it as a
+block mapping and rerun. Override the target with `--path` or `HERMES_CONFIG_PATH`, and the home with
 `HERMES_HOME`.
 
 ## List Targets

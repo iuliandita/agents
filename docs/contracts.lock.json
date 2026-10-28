@@ -3,10 +3,11 @@
     "deployment": {
       "breaking": "none",
       "docs": [
+        "CHANGELOG.md",
         "INSTALL.md"
       ],
-      "fingerprint": "f70e73dfc0d9681f379f64e336d23e2b4643e339ab5633bc1632faad6c06876c",
-      "note": "scripts/update refuses the Paperclip target, which has no deploy path."
+      "fingerprint": "e2dc398f41cbf3db96ca0922c35bacaa11ec3116fa209426f3765e613b4d8981",
+      "note": "Hermes merge follows the agent block's own indent and refuses an inline agent value instead of writing a duplicate key."
     },
     "harnesses": {
       "breaking": "none",
