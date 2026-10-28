@@ -26,6 +26,8 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
   names fail for both files.
 - `render-agents --deploy` stops before writing when two selected harnesses resolve to the same agents
   directory; the second harness used to overwrite the first one's role files.
+- A subagent whose role defines an output format now follows that format instead of the core preamble
+  and state-marker rules; the two used to compete for the last line.
 
 ## [4.3.0] - 2026-10-25
 

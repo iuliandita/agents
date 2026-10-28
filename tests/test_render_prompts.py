@@ -338,6 +338,7 @@ PRESENT_PINS = {
         "`[waiting]`",
         "`[partial]`",
         "One marker per turn, most-blocking wins",
+        "A subagent whose role defines an output format follows that format instead",
         "Never run destructive infrastructure commands without explicit confirmation",
         "`terraform apply`",
         "`terraform destroy`",
