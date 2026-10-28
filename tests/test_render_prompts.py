@@ -817,6 +817,22 @@ def test_prune_backups_keeps_newest(tmp_path):
     assert sorted(path.name for path in backup_dir.iterdir()) == ["x-3.bak", "x-4.bak"]
 
 
+def test_prune_backups_keeps_new_backup_of_old_file(tmp_path):
+    backup_dir = tmp_path / "b"
+    backup_dir.mkdir()
+    previous = backup_dir / "previous.bak"
+    previous.write_text("previous", encoding="utf-8")
+    os.utime(previous, (2000, 2000))
+    old_source = tmp_path / "AGENTS.md"
+    old_source.write_text("old", encoding="utf-8")
+    os.utime(old_source, (1000, 1000))
+
+    renderer.backup_existing(old_source, backup_dir)
+    assert renderer.prune_backups(backup_dir, 1, dry_run=False) == 0
+
+    assert [path.read_text(encoding="utf-8") for path in backup_dir.iterdir()] == ["old"]
+
+
 def test_deploy_refuses_colliding_targets_even_in_dry_run(tmp_path, monkeypatch):
     repo = Path(__file__).resolve().parents[1]
     target = tmp_path / "AGENTS.md"
