@@ -30,16 +30,6 @@
         "pip_requirements"
       ],
       "groupName": "Python"
-    },
-    {
-      "matchUpdateTypes": [
-        "minor",
-        "patch",
-        "pin",
-        "digest"
-      ],
-      "automerge": true,
-      "platformAutomerge": false
     }
   ]
 }
