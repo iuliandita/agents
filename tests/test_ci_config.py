@@ -122,3 +122,19 @@ def test_release_notes_step_fails_without_a_section_for_the_tag(tmp_path):
     result, _ = run_release_notes_step(tmp_path, "v9.9.9")
     assert result.returncode == 1
     assert "no notes for 9.9.9" in result.stdout
+
+
+def test_stack_conventions_step_is_blocking():
+    steps = load_workflow("ci.yml")["jobs"]["lint"]["steps"]
+    step = next(s for s in steps if s["name"] == "Check stack conventions")
+    assert step["run"] == "python3 .github/stack/stack-check.py"
+    assert "continue-on-error" not in step
+
+
+def test_release_notes_extract_from_the_real_changelog(tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    result, notes = run_release_notes_step(tmp_path, "v4.3.0", (repo / "CHANGELOG.md").read_text(encoding="utf-8"))
+    assert result.returncode == 0, result.stdout
+    text = notes.read_text(encoding="utf-8")
+    assert "paperclip" in text
+    assert "## [" not in text and "compare/" not in text

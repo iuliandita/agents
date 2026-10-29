@@ -1,12 +1,31 @@
 # Changelog
 
-All notable changes to this project are documented here. The project uses semantic versioning once it
-reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
+All notable changes to this project are documented here. Versions follow semantic versioning.
 
 ## [Unreleased]
 
+### Added
+
+- `--json` on `sync-ai-prompts`, `render-agents`, `render-invariants`, `render-hermes`, `update`, and
+  `install_workflow.py` prints one JSON object (`ok`, `errors`, `warnings`, `notes`, a `mode`, and a list of
+  records) to stdout and moves human output to stderr. Exit codes do not change. INSTALL.md lists the keys.
+- `--harness` is an alias of `--target` in `sync-ai-prompts` and `render-agents` and of `--targets` in `update`.
+  The old names keep working.
+- Every `--help` ends with Environment and Exit codes sections.
+- `.github/stack/` holds the conventions shared with the other stack repositories and `stack-check.py`, an
+  offline checker that CI now runs.
+- The logo and wordmark are in `assets/`.
+
 ### Changed
 
+- `develop` is the default and nightly branch and `main` is the stable channel. Clone with
+  `git clone -b main` for stable releases; `scripts/update` follows the checked-out branch. A release is a
+  `develop` to `main` merge commit with the tag on `main`.
+- Errors, warnings, and notes print as lower-case `error:`, `warning:`, and `note:` lines on stderr, one line
+  each. The old upper-case `ERROR:` and `WARN:` lines on stdout, the `notice:` prefix, and unprefixed exit
+  texts are gone, so anything that read them from stdout must read stderr.
+- A missing Python 3.11+ in the launchers, or a missing git in `scripts/update`, exits 3 instead of 1.
+- The release workflow publishes the tagged CHANGELOG section as the release notes instead of generated notes.
 - The Codex `mid` tier now uses `gpt-6.1-terra` instead of `gpt-6.1-sol`, so `builder` runs on the faster
   model at half the Sol input price. `flagship` stays on Sol. Terra needs Codex CLI 0.159.0 or later; to
   keep `builder` on Sol, set `"mid": "gpt-6.1-sol"` under `codex.tiers` in `prompts/models.local.json`.
@@ -313,3 +332,23 @@ reaches `v1.0.0`; until then the `v0.x` line is the prerelease phase.
 
 - The `scripts/autoimprove-prompts` loop and `docs/autoresearch.md`; the mechanical score measured
   validity, not improvement, and the candidate could edit its own checks.
+
+[Unreleased]: https://github.com/iuliandita/agents/compare/v4.3.0...HEAD
+[4.3.0]: https://github.com/iuliandita/agents/compare/v4.2.0...v4.3.0
+[4.2.0]: https://github.com/iuliandita/agents/compare/v4.1.0...v4.2.0
+[4.1.0]: https://github.com/iuliandita/agents/compare/v4.0.0...v4.1.0
+[4.0.0]: https://github.com/iuliandita/agents/compare/v3.6.0...v4.0.0
+[3.6.0]: https://github.com/iuliandita/agents/compare/v3.5.0...v3.6.0
+[3.5.0]: https://github.com/iuliandita/agents/compare/v3.4.1...v3.5.0
+[3.4.1]: https://github.com/iuliandita/agents/compare/v3.4.0...v3.4.1
+[3.4.0]: https://github.com/iuliandita/agents/compare/v3.3.0...v3.4.0
+[3.3.0]: https://github.com/iuliandita/agents/compare/v3.2.0...v3.3.0
+[3.2.0]: https://github.com/iuliandita/agents/compare/v3.1.0...v3.2.0
+[3.1.0]: https://github.com/iuliandita/agents/compare/v3.0.0...v3.1.0
+[3.0.0]: https://github.com/iuliandita/agents/compare/v2.4.0...v3.0.0
+[2.4.0]: https://github.com/iuliandita/agents/compare/v2.3.0...v2.4.0
+[2.3.0]: https://github.com/iuliandita/agents/compare/v2.2.0...v2.3.0
+[2.2.0]: https://github.com/iuliandita/agents/compare/v2.1.1...v2.2.0
+[2.1.1]: https://github.com/iuliandita/agents/compare/v2.1.0...v2.1.1
+[2.1.0]: https://github.com/iuliandita/agents/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/iuliandita/agents/compare/v1.10.1...v2.0.0
