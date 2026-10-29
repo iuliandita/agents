@@ -262,6 +262,12 @@ def long_intro(repo: Path) -> None:
     edit(repo, "README.md", "Hooks for coding agents", "Hooks for coding agents " + "that matter a great deal " * 20)
 
 
+# Built from parts so this file does not trip the private-pattern scan of the repo that ships it.
+HOME_PATH = "/home" + "/someone/project/"
+MAC_PATH = "/Users" + "/someone/x"
+PRIVATE_IP = "192.168" + ".4.20"
+AT = "@"
+
 MD_TITLE = f'# {NAME}\n\n<p><img src="assets/wordmark.png" alt="{NAME} wordmark" width="360"></p>'
 
 def drop_json_flag(repo: Path) -> None:
@@ -306,12 +312,12 @@ FAILURES = [
     ("error-format", lambda r: write(r, "bin/a.py", 'raise SystemExit("broken thing")\n')),
     ("error-format", lambda r: write(r, "bin/a.py", 'raise SystemExit(f"{name} is broken")\n')),
     ("error-format", lambda r: write(r, "bin/a.py", 'import sys\nsys.exit("Error: broken")\n')),
-    ("ascii-markdown", lambda r: edit(r, "README.md", "Run the tool.", "Run the tool — now.")),
-    ("private-patterns", lambda r: write(r, "notes.txt", "see /home/someone/project/\n")),
-    ("private-patterns", lambda r: write(r, "notes.txt", "host 192.168.4.20 is down\n")),
-    ("private-patterns", lambda r: write(r, "notes.txt", "contact someone@corp.example.io\n")),
-    ("private-patterns", lambda r: write(r, "notes.txt", "path /Users/someone/x\n")),
-    ("private-patterns", lambda r: write(r, "wide.txt", "host 10.1.2.3\n".encode("utf-16"))),
+    ("ascii-markdown", lambda r: edit(r, "README.md", "Run the tool.", "Run the tool \u2014 now.")),
+    ("private-patterns", lambda r: write(r, "notes.txt", "see " + HOME_PATH + "\n")),
+    ("private-patterns", lambda r: write(r, "notes.txt", "host " + PRIVATE_IP + " is down\n")),
+    ("private-patterns", lambda r: write(r, "notes.txt", "contact someone" + AT + "corp.example.io\n")),
+    ("private-patterns", lambda r: write(r, "notes.txt", "path " + MAC_PATH + "\n")),
+    ("private-patterns", lambda r: write(r, "wide.txt", ("host " + PRIVATE_IP + "\n").encode("utf-16"))),
     ("vendor", lambda r: edit(r, ".github/stack/canon.json", '"canon_version": 1,', '"canon_version": 1,\n  ')),
     ("vendor", lambda r: (r / ".github/stack/SOURCE").unlink()),
     ("vendor", lambda r: edit(r, ".github/stack/SOURCE", f"commit: {SHA}", "commit: abc")),
@@ -359,7 +365,7 @@ def test_vendor_check_skipped_in_source_repo(repo: Path) -> None:
 
 
 def test_allowlist_suppresses_matching_finding(repo: Path) -> None:
-    write(repo, "notes.txt", "see /home/someone/project/\n")
+    write(repo, "notes.txt", "see " + HOME_PATH + "\n")
     allow = {"check": "private-patterns", "path": "notes.txt", "match": "pattern home-path", "reason": "fixture"}
     write(repo, ".github/stack/repo.json", json.dumps(dict(REPO_JSON, allow=[allow])))
     code, data = run(repo)
@@ -385,9 +391,9 @@ def test_ignored_files_are_not_scanned_in_a_git_checkout(repo: Path) -> None:
         pytest.skip("git is not installed")
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
     write(repo, ".gitignore", "ignored.md\n")
-    write(repo, "ignored.md", "café\n")
+    write(repo, "ignored.md", "caf\u00e9\n")
     assert run(repo)[0] == 0
-    write(repo, "tracked.md", "café\n")
+    write(repo, "tracked.md", "caf\u00e9\n")
     code, data = run(repo)
     assert code == 1 and hits(data) == {"ascii-markdown"}
 
