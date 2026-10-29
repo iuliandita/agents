@@ -60,3 +60,65 @@ def test_ci_smoke_tests_powershell_launchers_on_windows():
 
     assert "runs-on: windows-" in workflow
     assert "./scripts/sync-ai-prompts.ps1 --target claude --check" in workflow
+
+
+def load_workflow(name):
+    import yaml
+
+    repo = Path(__file__).resolve().parents[1]
+    return yaml.safe_load((repo / ".github" / "workflows" / name).read_text(encoding="utf-8"))
+
+
+def test_ci_and_security_run_on_develop_and_main_with_shared_job_ids():
+    for name, jobs in (("ci.yml", {"lint", "test"}), ("security.yml", {"secrets", "zizmor"})):
+        workflow = load_workflow(name)
+        assert workflow[True]["push"]["branches"] == ["develop", "main"]
+        assert jobs <= set(workflow["jobs"])
+        for job_id in jobs:
+            assert workflow["jobs"][job_id]["name"] == job_id
+
+
+RELEASE_CHANGELOG = """# Changelog
+
+## [Unreleased]
+
+- Not released yet.
+
+## [1.2.0] - 2026-10-01
+
+### Added
+
+- The new thing.
+
+## [1.1.0] - 2026-09-01
+
+- Older.
+
+[Unreleased]: https://example.test/compare/v1.2.0...HEAD
+[1.2.0]: https://example.test/compare/v1.1.0...v1.2.0
+"""
+
+
+def run_release_notes_step(tmp_path, tag, changelog=RELEASE_CHANGELOG):
+    import subprocess
+
+    steps = load_workflow("release.yml")["jobs"]["release"]["steps"]
+    step = next(s for s in steps if s["name"] == "Extract release notes from the changelog")
+    (tmp_path / "CHANGELOG.md").write_text(changelog, encoding="utf-8")
+    env = {"PATH": "/usr/bin:/bin", "GITHUB_REF_NAME": tag, "RUNNER_TEMP": str(tmp_path)}
+    result = subprocess.run(["bash", "-c", step["run"]], cwd=tmp_path, env=env, capture_output=True, text=True)
+    return result, tmp_path / "notes.md"
+
+
+def test_release_notes_come_from_the_tagged_changelog_section(tmp_path):
+    result, notes = run_release_notes_step(tmp_path, "v1.2.0")
+    assert result.returncode == 0, result.stdout
+    text = notes.read_text(encoding="utf-8")
+    assert "The new thing." in text
+    assert "Older." not in text and "Not released yet." not in text and "example.test" not in text
+
+
+def test_release_notes_step_fails_without_a_section_for_the_tag(tmp_path):
+    result, _ = run_release_notes_step(tmp_path, "v9.9.9")
+    assert result.returncode == 1
+    assert "no notes for 9.9.9" in result.stdout

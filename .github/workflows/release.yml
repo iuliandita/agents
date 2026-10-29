@@ -49,13 +49,26 @@ jobs:
       - name: Check documentation links and commands
         run: python3 scripts/check_docs_links.py
 
+      - name: Extract release notes from the changelog
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && (/^## \[/ || /^\[[^]]+\]: /) { exit }
+            found { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md"; then
+            echo "::error::CHANGELOG.md has no notes for $version"
+            exit 1
+          fi
+
       - name: Create or update the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" --generate-notes
+            gh release edit "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
           else
-            gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag \
-              || gh release edit "$GITHUB_REF_NAME" --generate-notes
+            gh release create "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag \
+              || gh release edit "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
           fi
