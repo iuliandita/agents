@@ -187,7 +187,7 @@ def readme(ctx: Ctx) -> tuple[str, str] | None:
 def heading_block(lines: list[str]) -> tuple[str | None, str | None, int, int]:
     """Return (kind, name, first_index, end_index_exclusive) for the first heading of the README."""
     i = 0
-    while i < len(lines) and (not lines[i].strip() or re.match(r"^\s*<!--.*-->\s*$", lines[i])):
+    while i < len(lines) and (not lines[i].strip() or lines[i].strip().startswith("<!--")):
         i += 1
     if i >= len(lines):
         return None, None, i, i
@@ -708,7 +708,7 @@ def decode_variants(data: bytes) -> list[str]:
         try:
             texts.append(data.decode(codec))
         except UnicodeDecodeError:
-            pass
+            continue  # not this encoding; the other candidates and the latin-1 fallback still run
     return texts + [data.decode("latin-1")]
 
 
