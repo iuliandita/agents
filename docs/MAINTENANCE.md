@@ -7,7 +7,7 @@ Documentation is part of a change. A new flag needs usage docs, a changed target
 ```bash
 python scripts/check_docs_impact.py
 python scripts/check_docs_impact.py --explain
-python scripts/check_docs_impact.py --base "$(git merge-base origin/main HEAD)"
+python scripts/check_docs_impact.py --base "$(git merge-base origin/develop HEAD)"
 python scripts/check_docs_links.py
 ```
 
@@ -15,7 +15,7 @@ The plain check verifies that every domain's receipt matches its current sources
 
 `check_docs_links.py` is a separate, stateless check: local Markdown links and anchors in every tracked doc must resolve to tracked files, and script commands in the current docs must name tracked scripts and flags those scripts define. Changelog entries are history and `prompts/` fragments are agent context, so the command check skips them; their links are still checked. CI and the release workflow run both scripts.
 
-`--base` adds the range checks: docs a receipt cites must change in the range, a breaking receipt recorded earlier in the range cannot be replaced by a `breaking: none` one, and removing a harness from `scripts/render_prompts.py` needs a breaking receipt that cites `docs/legacy-harnesses.md`. CI runs it against the PR base, or the previous tip on pushes to `main`, with full history. Exit codes: 0 pass, 1 findings, 2 missing tooling or invalid usage. The check needs Git and Python 3.11 and runs offline.
+`--base` adds the range checks: docs a receipt cites must change in the range, a breaking receipt recorded earlier in the range cannot be replaced by a `breaking: none` one, and removing a harness from `scripts/render_prompts.py` needs a breaking receipt that cites `docs/legacy-harnesses.md`. CI runs it against the PR base, or the previous tip on pushes to `develop` and `main`, with full history. Exit codes: 0 pass, 1 findings, 2 missing tooling or invalid usage. The check needs Git and Python 3.11 and runs offline.
 
 ## Domains
 
@@ -70,7 +70,9 @@ The example is illustrative; use the real consequence. A breaking change cannot 
 
 ## Releases
 
-The release workflow runs the guard on the tagged commit with `--base` set to the previous tag and `--release-tag`, which requires a dated `## [X.Y.Z] - YYYY-MM-DD` section in `CHANGELOG.md`. It publishes the release from that same tag. A green guard is not a release qualification: also run the full verification list and read the changelog, upgrade notes, and deployment instructions.
+`develop` is the default and nightly branch and `main` is the stable channel. Feature and fix PRs squash into `develop`. A release is a PR from `develop` to `main` merged with a merge commit, never a squash, so `main` stays an ancestor of `develop`. After that merge, tag the commit on `main` as `v<version>` and push the tag. [CONTRIBUTING.md](../CONTRIBUTING.md#releases) has the steps and the version bump rule.
+
+The release workflow fails when the tagged commit is not on `main`. It runs the guard on the tagged commit with `--base` set to the previous tag and `--release-tag`, which requires a dated `## [X.Y.Z] - YYYY-MM-DD` section in `CHANGELOG.md`. It publishes the release from that same tag. A green guard is not a release qualification: also run the full verification list and read the changelog, upgrade notes, and deployment instructions.
 
 ## Private context
 
