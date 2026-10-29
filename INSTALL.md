@@ -213,6 +213,8 @@ scripts/sync-ai-prompts --target codex,opencode --deploy
 scripts/sync-ai-prompts --target antigravity --deploy
 ```
 
+`--harness` is an alias of `--target` in `scripts/sync-ai-prompts` and `scripts/render-agents`, and of `--targets` in `scripts/update`. Each takes a comma-separated list and can be repeated, so `--harness claude --harness codex` equals `--target claude,codex`. The older names keep working.
+
 ## Manual Targets
 
 Manual targets render by default, but deploy only with an explicit path:

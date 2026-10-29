@@ -865,7 +865,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render and deploy subagent definitions.")
     parser.add_argument("--repo-root", type=Path, default=repo_root)
     parser.add_argument("--out-dir", type=Path, default=repo_root / "build" / "agents")
-    parser.add_argument("--target", action="append", help="Harness target, repeatable or comma-separated.")
+    parser.add_argument(
+        "--target",
+        "--harness",
+        dest="target",
+        action="append",
+        metavar="HARNESS",
+        help="Harness to select, repeatable or comma-separated (--harness is an alias).",
+    )
     parser.add_argument("--deploy", action="store_true", help="Write rendered agents to global harness directories.")
     parser.add_argument("--dry-run", action="store_true", help="Print deploy actions without writing.")
     parser.add_argument("--check", action="store_true", help="Validate rendered output without persistent writes.")

@@ -126,7 +126,7 @@ def test_git_runs_noninteractive_with_timeout(tmp_path, monkeypatch):
     assert seen["timeout"] == update.GIT_TIMEOUT_SECONDS
 
 
-def run_main(tmp_path, monkeypatch, fail_at=None):
+def run_main(tmp_path, monkeypatch, fail_at=None, flag="--targets"):
     calls = []
 
     def fake(cmd, **kwargs):
@@ -137,7 +137,7 @@ def run_main(tmp_path, monkeypatch, fail_at=None):
     monkeypatch.setattr(update.subprocess, "run", fake)
     monkeypatch.delenv("AGENTS_PRIVATE_HARNESSES", raising=False)
     (tmp_path / "prompts").mkdir(exist_ok=True)
-    rc = update.main(["--repo-root", str(tmp_path), "--targets", "claude,codex", "--no-pull"])
+    rc = update.main(["--repo-root", str(tmp_path), flag, "claude,codex", "--no-pull"])
     return rc, calls
 
 
@@ -148,6 +148,16 @@ def test_main_runs_every_step_and_reports_success(tmp_path, monkeypatch, capsys)
     out = capsys.readouterr().out
     assert "private overlay: none" in out
     assert "update complete for: claude, codex" in out
+
+
+def test_harness_is_an_alias_of_targets(tmp_path, monkeypatch, capsys):
+    rc, calls = run_main(tmp_path, monkeypatch, flag="--harness")
+    assert rc == 0
+    assert len(calls) == len(update.plan(tmp_path, ["claude", "codex"], dry_run=False))
+    assert "update complete for: claude, codex" in capsys.readouterr().out
+    assert update.parse_args(["--harness", "claude", "--harness", "codex"]).targets == ["claude", "codex"]
+    assert update.parse_args(["--targets", "claude"]).targets == ["claude"]
+    assert update.parse_args([]).targets is None
 
 
 @pytest.mark.parametrize("fail_at", [1, 3, 6])

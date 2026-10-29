@@ -1095,3 +1095,12 @@ def test_deploy_dry_run_flags_unmanaged_rules_file(tmp_path, monkeypatch, capsys
     mine.write_text(mine.read_text(encoding="utf-8") + "local edit\n", encoding="utf-8")
     renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=True, backup_dir=tmp_path / "b")
     assert f"would update claude: {mine}" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "args", [["--target", "claude,codex"], ["--harness", "claude,codex"], ["--harness", "claude", "--harness", "codex"]]
+)
+def test_harness_is_an_alias_of_target(capsys, args):
+    assert renderer.main(["--list-targets", *args]) == 0
+    out = capsys.readouterr().out
+    assert "claude" in out and "codex" in out and "opencode" not in out
