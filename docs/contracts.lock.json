@@ -5,16 +5,16 @@
       "docs": [
         "INSTALL.md"
       ],
-      "fingerprint": "41d11a59f1b623e6a6d57a55d1d6c26e3f5363d4d1d0fe0923fff350d641c679",
-      "note": "Document the error, warning, and note prefixes and the stderr stream for script messages."
+      "fingerprint": "9547d12476d7c26864d68634caa7dc6ebb4575722cb1cbde834af7833d36c8d7",
+      "note": "Document --harness as an alias of --target and --targets; the old flag names keep working."
     },
     "harnesses": {
       "breaking": "none",
       "docs": [
         "INSTALL.md"
       ],
-      "fingerprint": "ad3acd12e54dbd4746ecd114c58ae74da91ec6f121e1d916fb7a395f43700430",
-      "note": "Document the error, warning, and note prefixes and the stderr stream for script messages."
+      "fingerprint": "031f29654fd998531af8dcf444314cc1d1f27d51b31f4e10dfabc1f5bc7e582e",
+      "note": "Document --harness as an alias of --target and --targets; the old flag names keep working."
     },
     "maintenance": {
       "breaking": "none",
@@ -29,8 +29,8 @@
       "docs": [
         "INSTALL.md"
       ],
-      "fingerprint": "fd37581096118806308b445ae936052607d8116bc9b274127b48794e051cfe4b",
-      "note": "Document the error, warning, and note prefixes and the stderr stream for script messages."
+      "fingerprint": "840d1040dcd6cd176fa0ccd41d523d9e621394a5682f2e55e59d334129dfdbd7",
+      "note": "Document --harness as an alias of --target and --targets; the old flag names keep working."
     },
     "overlays-trust": {
       "breaking": "none",

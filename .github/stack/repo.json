@@ -29,6 +29,7 @@
         "--help"
       ],
       "flags": [
+        "--harness",
         "--target",
         "--deploy",
         "--dry-run",

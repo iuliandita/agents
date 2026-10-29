@@ -746,7 +746,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render and deploy canonical agent prompt files.")
     parser.add_argument("--repo-root", type=Path, default=repo_root)
     parser.add_argument("--out-dir", type=Path, default=repo_root / "build" / "generated")
-    parser.add_argument("--target", action="append", help="Harness target, repeatable or comma-separated.")
+    parser.add_argument(
+        "--target",
+        "--harness",
+        dest="target",
+        action="append",
+        metavar="HARNESS",
+        help="Harness to select, repeatable or comma-separated (--harness is an alias).",
+    )
     parser.add_argument("--stamp", help="Override generated date, useful for tests.")
     parser.add_argument("--deploy", action="store_true", help="Write rendered files to global harness paths.")
     parser.add_argument("--dry-run", action="store_true", help="Print deploy targets without writing.")

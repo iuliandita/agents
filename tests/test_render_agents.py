@@ -754,6 +754,13 @@ def test_main_list_targets(capsys):
         assert harness in out
 
 
+@pytest.mark.parametrize("args", [["--target", "claude,codex"], ["--harness", "claude,codex"], ["--harness", "claude", "--harness", "codex"]])
+def test_harness_is_an_alias_of_target(capsys, args):
+    assert ra.main(["--list-targets", *args]) == 0
+    out = capsys.readouterr().out
+    assert "claude" in out and "codex" in out and "opencode" not in out
+
+
 def test_main_check(capsys):
     assert ra.main(["--check"]) == 0
 

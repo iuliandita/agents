@@ -86,7 +86,7 @@ def load_targets(repo_root: Path, cli: str | None, env: dict[str, str] | None = 
         names, source = parse_names("\n".join(lines)), str(path)
     else:
         raise SystemExit(
-            f"error: no deploy targets. Write them to {path} (one per line), set {TARGETS_ENV}, or pass --targets. "
+            f"error: no deploy targets. Write them to {path} (one per line), set {TARGETS_ENV}, or pass --harness (alias --targets). "
             "Run with --detect to see which supported harnesses are installed."
         )
     if not names:
@@ -187,7 +187,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     repo_root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description="Pull, check, and redeploy prompts and subagents for saved targets.")
     parser.add_argument("--repo-root", type=Path, default=repo_root)
-    parser.add_argument("--targets", help=f"Comma-separated harnesses; overrides {TARGETS_ENV} and prompts/deploy-targets.txt.")
+    parser.add_argument(
+        "--targets",
+        "--harness",
+        dest="targets",
+        action="append",
+        metavar="HARNESS",
+        help=f"Comma-separated harnesses, repeatable; overrides {TARGETS_ENV} and prompts/deploy-targets.txt (--harness is an alias).",
+    )
     parser.add_argument("--detect", action="store_true", help="List supported harnesses installed on this machine and exit.")
     parser.add_argument("--no-pull", action="store_true", help="Skip git pull (use the checkout as is).")
     parser.add_argument("--dry-run", action="store_true", help="Pull and check, then preview deploys without writing.")
@@ -200,7 +207,7 @@ def main(argv: list[str] | None = None) -> int:
         for name, evidence in detect().items():
             print(f"{name}\t{evidence}")
         return 0
-    targets = load_targets(args.repo_root, args.targets)
+    targets = load_targets(args.repo_root, ",".join(args.targets) if args.targets is not None else None)
     with run_lock(args.repo_root):
         if not args.no_pull:
             pull(args.repo_root)
