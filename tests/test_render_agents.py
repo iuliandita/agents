@@ -535,7 +535,7 @@ def test_check_fails_when_marker_missing(monkeypatch, capsys):
     # patch the writer instead so it stops emitting the real marker.
     monkeypatch.setattr(ra, "generated_header", lambda spec, invariants, salt="": "no marker here")
     assert ra.check(REPO, None) == 1
-    assert "lacks the generated marker" in capsys.readouterr().out
+    assert "lacks the generated marker" in capsys.readouterr().err
 
 
 def test_render_all_respects_target_selection(tmp_path):
@@ -544,7 +544,7 @@ def test_render_all_respects_target_selection(tmp_path):
 
 
 def test_render_all_rejects_unknown_target(tmp_path):
-    with pytest.raises(SystemExit, match="Unknown agent harness"):
+    with pytest.raises(SystemExit, match="unknown agent harness"):
         ra.render_all(REPO, tmp_path, selected=["cursor"], overrides={})
 
 

@@ -2,6 +2,7 @@
 """Assert every supported harness carries verification receipts and is documented."""
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from render_prompts import HARNESSES
@@ -34,7 +35,7 @@ def main() -> int:
 
     if failures:
         for failure in failures:
-            print(f"ERROR: {failure}")
+            print(f"error: {failure}", file=sys.stderr)
         return 1
     print("Harness contract check passed")
     return 0

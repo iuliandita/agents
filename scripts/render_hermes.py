@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import sys
 from pathlib import Path
 
 import render_prompts
@@ -42,7 +43,7 @@ def render_rules(repo_root: Path) -> str:
     overlays = render_prompts.load_overlays(repo_root)
     notice = render_prompts.withheld_notice(overlays, [harness.name])
     if notice:
-        print(notice)
+        print(notice, file=sys.stderr)
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
     # agent.coding_instructions is a global rules slot, unlike Hermes' project-file target.
     return render_prompts.render_for(repo_root, harness, core, overlays, with_overlays=True)
@@ -82,7 +83,7 @@ def _child_indent(lines: list[str], start: int, end: int) -> str:
             continue
         indent = line[: len(line) - len(stripped)]
         if "\t" in indent:
-            raise SystemExit(f"{AGENT}: block is indented with tabs; YAML does not allow that")
+            raise SystemExit(f"error: {AGENT}: block is indented with tabs; YAML does not allow that")
         return indent
     return INDENT
 
@@ -103,7 +104,7 @@ def merge_coding_instructions(text: str, rules: str) -> str:
             # A flow mapping or scalar here cannot take a block key; appending a
             # second agent: key would make YAML loaders drop the first.
             raise SystemExit(
-                f"top-level '{AGENT}:' has an inline value ({rest}); "
+                f"error: top-level '{AGENT}:' has an inline value ({rest}); "
                 f"rewrite it as a block mapping, then rerun"
             )
         agent_index = index

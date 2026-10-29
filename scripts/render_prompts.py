@@ -174,7 +174,7 @@ def harness_by_name(name: str) -> Harness:
         if harness.name == name:
             return harness
     supported = ", ".join(harness_names())
-    raise SystemExit(f"Unknown harness: {name}. Supported: {supported}")
+    raise SystemExit(f"error: unknown harness: {name}. Supported: {supported}")
 
 
 def harness_names() -> list[str]:
@@ -208,7 +208,7 @@ def selected_harnesses(selected: list[str] | None) -> list[Harness]:
     for item in selected:
         names.extend(part.strip() for part in item.split(",") if part.strip())
     if not names:
-        raise SystemExit("No harness names parsed from --target; nothing to do")
+        raise SystemExit("error: no harness names parsed from --target; nothing to do")
     return [harness_by_name(name) for name in names]
 
 
@@ -223,7 +223,7 @@ def omp_profile(env: dict[str, str] | os._Environ[str]) -> str | None:
     if not name or name == "default":
         return None
     if name.endswith(".") or not OMP_PROFILE_RE.match(name) or WINDOWS_RESERVED_RE.match(name):
-        raise SystemExit(f"Invalid omp profile {name!r}; names must match {OMP_PROFILE_RE.pattern}")
+        raise SystemExit(f"error: invalid omp profile {name!r}; names must match {OMP_PROFILE_RE.pattern}")
     return name
 
 
@@ -310,9 +310,9 @@ def drop_sections(core: str, names: tuple[str, ...]) -> str:
         heading = f"## {name}"
         starts = [i for i, line in enumerate(lines) if line.rstrip() == heading]
         if not starts:
-            raise SystemExit(f"omitted core section {name!r} not found in prompts/core.md")
+            raise SystemExit(f"error: omitted core section {name!r} not found in prompts/core.md")
         if len(starts) > 1:
-            raise SystemExit(f"omitted core section {name!r} appears more than once in prompts/core.md")
+            raise SystemExit(f"error: omitted core section {name!r} appears more than once in prompts/core.md")
         end = next((i for i in range(starts[0] + 1, len(lines)) if lines[i].startswith(("## ", "# "))), len(lines))
         del lines[starts[0] : end]
     return "".join(lines)
@@ -351,7 +351,7 @@ def render_document(
 def read_fragment(repo_root: Path, harness: Harness) -> str:
     path = repo_root / "prompts" / "harnesses" / harness.fragment
     if not path.exists():
-        raise SystemExit(f"Missing fragment for {harness.name}: {path}")
+        raise SystemExit(f"error: missing fragment for {harness.name}: {path}")
     return path.read_text(encoding="utf-8")
 
 
@@ -389,7 +389,7 @@ def private_harnesses(repo_root: Path, env: dict[str, str] | None = None) -> fro
     unknown = sorted(set(names) - set(harness_names()) - {ALL_HARNESSES_KEYWORD})
     if unknown:
         raise SystemExit(
-            f"Unknown harness in private trust list: {', '.join(unknown)}. "
+            f"error: unknown harness in private trust list: {', '.join(unknown)}. "
             f"Supported: {', '.join(harness_names())}, or {ALL_HARNESSES_KEYWORD}"
         )
     if ALL_HARNESSES_KEYWORD in names:
@@ -421,7 +421,7 @@ def withheld_notice(overlays: Overlays, names: list[str]) -> str | None:
     if not withheld:
         return None
     return (
-        f"notice: prompts/private.md withheld from {', '.join(withheld)}; list trusted harnesses in "
+        f"note: prompts/private.md withheld from {', '.join(withheld)}; list trusted harnesses in "
         f"prompts/{PRIVATE_HARNESSES_FILE} or {PRIVATE_HARNESSES_ENV} (use '{ALL_HARNESSES_KEYWORD}' for every one)"
     )
 
@@ -476,7 +476,7 @@ def enforce_budget(harness: Harness, rendered: str) -> None:
     if size > harness.max_bytes:
         parts = ", ".join(f"{label} {count}" for label, count in section_sizes(rendered))
         raise SystemExit(
-            f"{harness.name}: rendered {size} bytes exceeds its {harness.max_bytes}-byte budget "
+            f"error: {harness.name}: rendered {size} bytes exceeds its {harness.max_bytes}-byte budget "
             f"({parts}); trim the fragment or the local/private overlays"
         )
     if size >= harness.max_bytes * BUDGET_WARN_RATIO:
@@ -503,7 +503,7 @@ def render_all(
     overlays = load_overlays(repo_root)
     notice = withheld_notice(overlays, [harness.name for harness in harnesses if global_target(harness)])
     if notice:
-        print(notice)
+        print(notice, file=sys.stderr)
     written: dict[str, Path] = {}
     for harness in harnesses:
         dest = output_path(out_dir, harness, collisions)
@@ -521,11 +521,11 @@ def check_render_shape(repo_root: Path, selected: list[str] | None = None) -> in
         written = render_all(repo_root, out_dir, selected=selected, stamp="check")
         paths = list(written.values())
         if len(paths) != len(set(paths)):
-            print("ERROR: render output paths collide")
+            print("error: render output paths collide; fix the harness output names", file=sys.stderr)
             return 1
         for harness, path in written.items():
             if not path.exists():
-                print(f"ERROR: missing rendered output for {harness}: {path}")
+                print(f"error: missing rendered output for {harness}: {path}; rerun the render", file=sys.stderr)
                 return 1
         print("Render shape check passed")
         return 0
@@ -557,12 +557,14 @@ def target_collisions(resolved: dict[Harness, Path]) -> dict[Path, list[Harness]
 
 
 def format_target_collision(collisions: dict[Path, list[Harness]]) -> str:
-    lines = ["Deploy target collision detected:"]
+    shared = []
     for dest, harnesses in sorted(collisions.items(), key=lambda item: str(item[0])):
         labels = ", ".join(f"{harness.name} ({harness.display})" for harness in harnesses)
-        lines.append(f"- {dest}: {labels}")
-    lines.append("Select one target with --target or override one path with its *_AGENTS_PATH env var.")
-    return "\n".join(lines)
+        shared.append(f"{dest} is shared by {labels}")
+    return (
+        f"error: deploy target collision: {'; '.join(shared)}; "
+        "select one target with --target or override one path with its *_AGENTS_PATH env var"
+    )
 
 
 def backup_existing(path: Path, backup_dir: Path) -> None:
@@ -625,7 +627,7 @@ def deploy(
     resolved, skipped = resolve_deploy_targets(harnesses)
     notice = withheld_notice(overlays, [harness.name for harness in resolved if global_target(harness)])
     if notice:
-        print(notice)
+        print(notice, file=sys.stderr)
 
     for harness in skipped:
         if harness.consumed_from_build:
@@ -640,7 +642,7 @@ def deploy(
     for harness, dest in resolved.items():
         if dest.is_symlink():
             raise SystemExit(
-                f"{dest} is a symlink; refusing to write through it. "
+                f"error: {dest} is a symlink; refusing to write through it. "
                 f"Move it aside or point {harness.env_var} at a regular file."
             )
 
@@ -676,7 +678,7 @@ def deploy(
 def prune_backups(backup_dir: Path, keep: int, dry_run: bool) -> int:
     """Keep the newest `keep` backups, remove the rest. Dry-run reports only."""
     if keep < 0:
-        raise SystemExit("--prune-backups requires a non-negative count")
+        raise SystemExit("error: --prune-backups requires a non-negative count")
     if not backup_dir.is_dir():
         print(f"no backups at {backup_dir}")
         return 0
@@ -790,7 +792,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.deploy and not args.target:
         raise SystemExit(
-            "--deploy requires --target (for example --target claude,opencode). "
+            "error: --deploy requires --target (for example --target claude,opencode). "
             "Use --dry-run without --target to preview every harness."
         )
 

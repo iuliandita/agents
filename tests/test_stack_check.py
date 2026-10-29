@@ -403,3 +403,14 @@ def test_repo_ships_a_valid_source_of_truth_config() -> None:
     assert repo_json["repo"] == "agents" and repo_json["source_of_truth"] is True
     assert all(entry["reason"].strip() for entry in repo_json["allow"])
     assert [r["name"] for r in CANON["readme"]["stack_repos"]] == ["agents", "skills", "mods", "idstack"]
+
+
+def test_this_repo_keeps_the_canonical_error_format() -> None:
+    proc = subprocess.run(
+        [sys.executable, str(STACK / "stack-check.py"), "--json", "--only", "error-format"],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+    )
+    assert json.loads(proc.stdout)["errors"] == []
+    assert proc.returncode == 0

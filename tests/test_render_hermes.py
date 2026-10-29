@@ -114,7 +114,7 @@ def test_render_rules_adds_local_and_withholds_untrusted_private(tmp_path, monke
     rules = rh.render_rules(overlay_repo(tmp_path))
     assert "local layer" in rules
     assert "private layer" not in rules
-    assert "withheld from hermes" in capsys.readouterr().out
+    assert "withheld from hermes" in capsys.readouterr().err
 
 
 def test_render_rules_includes_private_when_trusted(tmp_path, monkeypatch):

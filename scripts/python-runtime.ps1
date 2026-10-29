@@ -11,7 +11,7 @@ function Get-AgentsPython {
             & $override -c $versionCheck 2>$null
             if ($LASTEXITCODE -eq 0) { return [pscustomobject]@{ Exe = $override; Prefix = @() } }
         }
-        throw 'AGENTS_PYTHON must name a working Python 3.11+ executable (not a command with flags). See INSTALL.md.'
+        throw 'error: AGENTS_PYTHON must name a working Python 3.11+ executable (not a command with flags). See INSTALL.md.'
     }
 
     $root = Split-Path -Parent $PSScriptRoot
@@ -23,7 +23,7 @@ function Get-AgentsPython {
         if (Test-Path -LiteralPath $candidate) {
             & $candidate -c $versionCheck 2>$null
             if ($LASTEXITCODE -eq 0) { return [pscustomobject]@{ Exe = $candidate; Prefix = @() } }
-            throw 'The repository virtual environment python must be a working Python 3.11+ executable. Repair it or set AGENTS_PYTHON. See INSTALL.md.'
+            throw 'error: the repository virtual environment python must be a working Python 3.11+ executable. Repair it or set AGENTS_PYTHON. See INSTALL.md.'
         }
     }
 
@@ -41,5 +41,5 @@ function Get-AgentsPython {
         if ($LASTEXITCODE -eq 0) { return [pscustomobject]@{ Exe = $launcher.Source; Prefix = @('-3') } }
     }
 
-    throw 'Python 3.11+ is required. Activate a supported virtual environment or set AGENTS_PYTHON. See INSTALL.md.'
+    throw 'error: Python 3.11+ is required. Activate a supported virtual environment or set AGENTS_PYTHON. See INSTALL.md.'
 }

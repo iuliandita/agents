@@ -86,15 +86,15 @@ def load_targets(repo_root: Path, cli: str | None, env: dict[str, str] | None = 
         names, source = parse_names("\n".join(lines)), str(path)
     else:
         raise SystemExit(
-            f"No deploy targets. Write them to {path} (one per line), set {TARGETS_ENV}, or pass --targets. "
+            f"error: no deploy targets. Write them to {path} (one per line), set {TARGETS_ENV}, or pass --targets. "
             "Run with --detect to see which supported harnesses are installed."
         )
     if not names:
-        raise SystemExit(f"{source} lists no harnesses")
+        raise SystemExit(f"error: {source} lists no harnesses")
     supported = [name for name in harness_names() if name not in {"generic", "paperclip"}]
     unknown = [name for name in names if name not in supported]
     if unknown:
-        raise SystemExit(f"{source}: unknown or project-level harness {', '.join(unknown)}; supported: {', '.join(supported)}")
+        raise SystemExit(f"error: {source}: unknown or project-level harness {', '.join(unknown)}; supported: {', '.join(supported)}")
     return list(dict.fromkeys(names))
 
 
@@ -137,17 +137,17 @@ def git(repo_root: Path, *args: str, capture: bool = False) -> subprocess.Comple
             timeout=GIT_TIMEOUT_SECONDS,
         )
     except FileNotFoundError:
-        raise SystemExit("git is not on PATH; install it or run with --no-pull")
+        raise SystemExit("error: git is not on PATH; install it or run with --no-pull")
     except subprocess.TimeoutExpired:
-        raise SystemExit(f"git {' '.join(args)} timed out after {GIT_TIMEOUT_SECONDS}s")
+        raise SystemExit(f"error: git {' '.join(args)} timed out after {GIT_TIMEOUT_SECONDS}s")
     except subprocess.CalledProcessError as exc:
-        raise SystemExit(f"git {' '.join(args)} failed with exit {exc.returncode}")
+        raise SystemExit(f"error: git {' '.join(args)} failed with exit {exc.returncode}")
 
 
 def pull(repo_root: Path) -> None:
     dirty = git(repo_root, "status", "--porcelain", "--untracked-files=no", capture=True).stdout.strip()
     if dirty:
-        raise SystemExit(f"Local tracked changes in {repo_root}; not updating:\n{dirty}")
+        raise SystemExit(f"error: local tracked changes in {repo_root}; not updating:\n{dirty}")
     git(repo_root, "pull", "--ff-only")
 
 
@@ -165,7 +165,7 @@ def run_lock(repo_root: Path) -> Iterator[None]:
 
             msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
         except OSError:
-            raise SystemExit(f"Another update is running in {repo_root}")
+            raise SystemExit(f"error: another update is running in {repo_root}")
         yield
     finally:
         handle.close()
@@ -211,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"==> {label}", flush=True)
             result = subprocess.run(step)
             if result.returncode != 0:
-                print(f"update failed at: {label}", file=sys.stderr)
+                print(f"error: update failed at {label}; fix it and rerun", file=sys.stderr)
                 return result.returncode
     print(f"update complete for: {', '.join(targets)}")
     return 0

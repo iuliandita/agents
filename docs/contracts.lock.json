@@ -3,48 +3,42 @@
     "deployment": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
         "INSTALL.md"
       ],
-      "fingerprint": "e2dc398f41cbf3db96ca0922c35bacaa11ec3116fa209426f3765e613b4d8981",
-      "note": "Hermes merge follows the agent block's own indent and refuses an inline agent value instead of writing a duplicate key."
+      "fingerprint": "41d11a59f1b623e6a6d57a55d1d6c26e3f5363d4d1d0fe0923fff350d641c679",
+      "note": "Document the error, warning, and note prefixes and the stderr stream for script messages."
     },
     "harnesses": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "INSTALL.md"
       ],
-      "fingerprint": "d9cd1a3d3fde83fc0fc3042e95987f6ee377ab0532753e1327eb2fa7dbbb4608",
-      "note": "Backups take a fresh mtime so --prune-backups keeps the most recently taken ones, as README already describes."
+      "fingerprint": "ad3acd12e54dbd4746ecd114c58ae74da91ec6f121e1d916fb7a395f43700430",
+      "note": "Document the error, warning, and note prefixes and the stderr stream for script messages."
     },
     "maintenance": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
-        "README.md",
         "docs/MAINTENANCE.md"
       ],
-      "fingerprint": "9b1f83717bef6eb2d7e9398f49793ccc6f34b4b641457e62cc05617527a2ef40",
-      "note": "Document the separate docs link and command check and that CI and releases run both scripts."
+      "fingerprint": "1ee9f97e80d9596fb2662d73381793a9bb4b3c4fa05d4a11db8e475a4bcf3979",
+      "note": "Document that the check scripts print findings as error lines on stderr."
     },
     "models-agents": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
-        "README.md"
+        "INSTALL.md"
       ],
-      "fingerprint": "4e2d95cf9972b0a768b72a0e0e28a786f53cb438d3ce885ea3a67cf4d017d7b1",
-      "note": "reviewer and explorer roles no longer assume a shell; deploy refuses shared agents directories; tracked per-agent overrides apply under local ones."
+      "fingerprint": "fd37581096118806308b445ae936052607d8116bc9b274127b48794e051cfe4b",
+      "note": "Document the error, warning, and note prefixes and the stderr stream for script messages."
     },
     "overlays-trust": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
-        "INSTALL.md",
-        "README.md"
+        "INSTALL.md"
       ],
-      "fingerprint": "08eb42c17f8d186c03a047ef5b7c0b1bbebc6504fa337580ffdddcd4f3aaf24f",
-      "note": "State that the Paperclip target never carries local or private overlays and that the lint line cap for its fragment is larger."
+      "fingerprint": "3a2e492efc4640a99c3f133726d3776554f51f85efba5be2a64e7ba4596ebefc",
+      "note": "Document the error, warning, and note prefixes and the stderr stream for script messages."
     },
     "prompts": {
       "breaking": "none",

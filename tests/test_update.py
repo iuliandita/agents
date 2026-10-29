@@ -86,7 +86,7 @@ def test_pull_refuses_local_tracked_changes(tmp_path):
     git(tmp_path, "add", "file.txt")
     git(tmp_path, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "init")
     (tmp_path / "file.txt").write_text("two\n", encoding="utf-8")
-    with pytest.raises(SystemExit, match="Local tracked changes"):
+    with pytest.raises(SystemExit, match="local tracked changes"):
         update.pull(tmp_path)
 
 
@@ -156,7 +156,7 @@ def test_main_stops_at_first_failing_step(tmp_path, monkeypatch, capsys, fail_at
     assert rc == 1
     assert len(calls) == fail_at
     captured = capsys.readouterr()
-    assert "update failed at:" in captured.err
+    assert "update failed at" in captured.err
     assert "update complete" not in captured.out
 
 
@@ -170,6 +170,6 @@ def test_overlay_summary_names_trust_source(tmp_path, monkeypatch):
 
 def test_second_run_is_refused_while_locked(tmp_path):
     with update.run_lock(tmp_path):
-        with pytest.raises(SystemExit, match="Another update is running"):
+        with pytest.raises(SystemExit, match="another update is running"):
             with update.run_lock(tmp_path):
                 pass

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 from render_prompts import harness_display_names, harness_target_rows
@@ -36,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.write:
         if START not in install or END not in install:
-            print(f"ERROR: INSTALL.md is missing the {START} / {END} markers")
+            print(f"error: INSTALL.md is missing the {START} / {END} markers; add them around the harness table", file=sys.stderr)
             return 1
         install_path.write_text(replace_region(install, render_table()), encoding="utf-8", newline="\n")
         print("Regenerated INSTALL.md harness table")
@@ -64,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if failures:
         for failure in failures:
-            print(f"ERROR: {failure}")
+            print(f"error: {failure}", file=sys.stderr)
         return 1
 
     print("Harness docs check passed")

@@ -15,7 +15,7 @@ select_agents_python() {
       esac
       return 0
     fi
-    printf '%s\n' 'AGENTS_PYTHON must name a working Python 3.11+ executable (not a command with flags). See INSTALL.md.' >&2
+    printf '%s\n' 'error: AGENTS_PYTHON must name a working Python 3.11+ executable (not a command with flags). See INSTALL.md.' >&2
     return 1
   fi
 
@@ -27,7 +27,7 @@ select_agents_python() {
       agents_python="$candidate"
       return 0
     fi
-    printf '%s\n' 'The repository .venv/bin/python must be a working Python 3.11+ executable. Repair the virtual environment or set AGENTS_PYTHON to a supported executable. See INSTALL.md.' >&2
+    printf '%s\n' 'error: the repository .venv/bin/python must be a working Python 3.11+ executable. Repair the virtual environment or set AGENTS_PYTHON to a supported executable. See INSTALL.md.' >&2
     return 1
   fi
 
@@ -37,7 +37,7 @@ select_agents_python() {
       return 0
     fi
   done
-  printf '%s\n' 'Python 3.11+ is required. Neither python nor python3 on PATH is usable. Activate a supported virtual environment or set AGENTS_PYTHON to its executable. See INSTALL.md.' >&2
+  printf '%s\n' 'error: Python 3.11+ is required. Neither python nor python3 on PATH is usable. Activate a supported virtual environment or set AGENTS_PYTHON to its executable. See INSTALL.md.' >&2
   return 1
 }
 

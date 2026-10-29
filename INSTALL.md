@@ -451,6 +451,10 @@ memory stores, provider credentials, model settings, MCP, plugins, or assistant 
 The separately installed consolidation workflow can edit project instructions and
 clear verified project memory only when explicitly invoked.
 
+## Messages
+
+The scripts print `error:`, `warning:`, and `note:` lines to stderr, one line each, in lower case. An error names the failing object and, when one exists, the next command. The withheld-overlay line (`note: prompts/private.md withheld from ...`) is a note. Inventory and status lines on stdout, such as `would update`, `unchanged`, and `update complete`, keep their wording.
+
 ## Recovery and removal
 
 Stop only the updater schedule you configured before recovering files. For the documented
