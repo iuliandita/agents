@@ -10,12 +10,13 @@ def test_ci_installs_python_test_dependencies_from_requirements_file():
     assert "pytest>=" in requirements
 
 
-def test_dependabot_tracks_github_actions_and_pip_dependencies():
+def test_renovate_tracks_github_actions_and_python_dependencies():
     repo = Path(__file__).resolve().parents[1]
-    config = (repo / ".github" / "dependabot.yml").read_text(encoding="utf-8")
+    config = (repo / "renovate.json").read_text(encoding="utf-8")
 
-    assert 'package-ecosystem: "github-actions"' in config
-    assert 'package-ecosystem: "pip"' in config
+    assert '"config:recommended"' in config
+    assert '"GitHub Actions"' in config
+    assert '"Python"' in config
 
 
 def test_release_workflow_creates_a_release_on_version_tags():
@@ -47,11 +48,11 @@ def test_checkouts_do_not_persist_credentials():
                 assert "persist-credentials: false" in block, f"{workflow.name}:{index + 1}"
 
 
-def test_dependabot_waits_before_proposing_releases():
+def test_renovate_waits_before_proposing_releases():
     repo = Path(__file__).resolve().parents[1]
-    config = (repo / ".github" / "dependabot.yml").read_text(encoding="utf-8")
+    config = (repo / "renovate.json").read_text(encoding="utf-8")
 
-    assert config.count("default-days: 7") == 2
+    assert '"minimumReleaseAge": "7 days"' in config
 
 
 def test_ci_smoke_tests_powershell_launchers_on_windows():
