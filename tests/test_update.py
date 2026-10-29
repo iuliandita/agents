@@ -104,13 +104,15 @@ def test_detect_follows_native_config_home(tmp_path, monkeypatch):
     assert found == {"codex": f"config {tmp_path / 'custom-codex'}"}
 
 
-def test_git_missing_fails_with_clear_message(tmp_path, monkeypatch):
+def test_git_missing_exits_three_with_clear_message(tmp_path, monkeypatch, capsys):
     def missing(*args, **kwargs):
         raise FileNotFoundError("git")
 
     monkeypatch.setattr(update.subprocess, "run", missing)
-    with pytest.raises(SystemExit, match="git is not on PATH"):
+    with pytest.raises(SystemExit) as exc:
         update.pull(tmp_path)
+    assert exc.value.code == 3
+    assert "error: git is not on PATH" in capsys.readouterr().err
 
 
 def test_git_runs_noninteractive_with_timeout(tmp_path, monkeypatch):

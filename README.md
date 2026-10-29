@@ -55,6 +55,8 @@ Render only a few harnesses:
 scripts/sync-ai-prompts --target claude,codex,opencode
 ```
 
+Every user-facing command takes `--json` to print one JSON object to stdout, with human output on stderr. The keys are in [INSTALL.md](INSTALL.md#messages-exit-codes-and-json-output).
+
 ## What it does
 
 The rules are opinionated and shaped by 20+ years in IT and DevOps, production incidents, code reviews, and research. Use the parts that fit your workflow.

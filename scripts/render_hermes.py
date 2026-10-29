@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 import render_prompts
-from render_prompts import backup_existing
+from render_prompts import EXIT_CODES_HELP, JsonArgumentParser, backup_existing, json_record, run_json
 
 
 KEY = "coding_instructions"
@@ -152,40 +152,70 @@ def deploy(repo_root: Path, config_path: Path, backup_dir: Path, dry_run: bool) 
     merged = merge_coding_instructions(original, rules)
     if merged == original:
         print(f"unchanged hermes: {config_path}")
+        json_record(harness="hermes", action="unchanged", path=str(config_path))
         return 0
     if dry_run:
         if KEY in original and render_prompts.PROMPT_MARKER not in original:
             print(f"would replace unmanaged hermes {AGENT}.{KEY}: {config_path} (not written by this repo; backed up first)")
+            json_record(harness="hermes", action="would-replace-unmanaged", path=str(config_path))
         else:
             print(f"would update hermes: {config_path}")
+            json_record(harness="hermes", action="would-update", path=str(config_path))
         return 0
     backup_existing(config_path, backup_dir)
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(merged, encoding="utf-8", newline="\n")
     print(f"updated hermes: {config_path}")
+    json_record(harness="hermes", action="updated", path=str(config_path))
     return 0
+
+
+HELP_EPILOG = """\
+Environment:
+  AGENTS_PYTHON            Python 3.11+ executable the launcher runs (a path, not a command).
+  HERMES_CONFIG_PATH       Hermes config.yaml (wins over HERMES_HOME).
+  HERMES_HOME              Hermes home; the config is <HERMES_HOME>/config.yaml.
+  LOCALAPPDATA             On Windows, the default config is %LOCALAPPDATA%\\hermes\\config.yaml.
+  AGENTS_PRIVATE_HARNESSES Comma-separated harnesses that receive prompts/private.md; 'all' for every one.
+  HOME                     Resolves the default ~/.hermes/config.yaml.
+
+""" + EXIT_CODES_HELP
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     repo_root = Path(__file__).resolve().parents[1]
-    parser = argparse.ArgumentParser(description="Merge the shared core into Hermes global rules.")
+    parser = JsonArgumentParser(
+        description="Merge the shared core into Hermes global rules.",
+        epilog=HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--repo-root", type=Path, default=repo_root)
     parser.add_argument("--out-dir", type=Path, default=repo_root / "build" / "generated")
     parser.add_argument("--path", type=Path, help="Hermes config.yaml (default: $HERMES_HOME/config.yaml).")
     parser.add_argument("--deploy", action="store_true", help="Merge into Hermes config.yaml.")
     parser.add_argument("--dry-run", action="store_true", help="Print the target without writing.")
     parser.add_argument("--backup-dir", type=Path, default=repo_root / ".backups", help="Directory for backups.")
+    parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
     return parser.parse_args(argv)
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
+def run(args: argparse.Namespace) -> int:
     config_path = args.path or hermes_config_path()
     if args.deploy or args.dry_run:
         return deploy(args.repo_root, config_path, args.backup_dir, args.dry_run)
     preview = render_preview(args.repo_root, args.out_dir)
     print(f"rendered hermes: {preview}")
+    json_record(harness="hermes", path=str(preview))
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    if not args.json:
+        return run(args)
+    if args.deploy or args.dry_run:
+        return run_json(lambda: run(args), "render-hermes", "actions", mode="deploy", dry_run=args.dry_run)
+    return run_json(lambda: run(args), "render-hermes", "rendered", mode="render")
 
 
 if __name__ == "__main__":

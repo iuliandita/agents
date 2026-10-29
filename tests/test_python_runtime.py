@@ -1,3 +1,5 @@
+import json
+import os
 from pathlib import Path
 import shutil
 import shlex
@@ -179,3 +181,28 @@ def test_powershell_wrapper_preserves_error_status():
         cwd=REPO, capture_output=True, text=True,
     )
     assert result.returncode == 2
+
+
+@pytest.mark.parametrize("old", [False, True])
+def test_missing_python_exits_three_and_reports_json(runtime, old):
+    _, bin_dir, _ = runtime
+    if old:
+        old_python(bin_dir / "python3")
+    result = run(runtime, "sync-ai-prompts", "--json", "--check")
+    assert result.returncode == 3
+    data = json.loads(result.stdout)
+    assert data["ok"] is False
+    assert data["errors"] == ["error: " + result.stderr.strip().removeprefix("error: ")]
+    plain = run(runtime, "sync-ai-prompts", "--check")
+    assert plain.returncode == 3 and plain.stdout == ""
+
+
+@pytest.mark.skipif(PWSH is None, reason="pwsh not installed")
+def test_powershell_wrapper_reports_missing_python_as_json():
+    result = subprocess.run(
+        [PWSH, "-NoProfile", "-File", str(REPO / "scripts/sync-ai-prompts.ps1"), "--json"],
+        cwd=REPO, capture_output=True, text=True, env={**os.environ, "AGENTS_PYTHON": str(REPO / "no-such-python")},
+    )
+    assert result.returncode == 3
+    data = json.loads(result.stdout)
+    assert data["ok"] is False and data["errors"][0].startswith("error: AGENTS_PYTHON must name")
