@@ -3,10 +3,13 @@
 ## Prerequisites
 
 Use Git, Python 3.11+, and Bash. GitHub CLI (`gh`) is not required to clone,
-render, or deploy. Clone this repository using its HTTPS URL from GitHub's Code
-menu, then run commands from the checkout root:
+render, or deploy. Clone the stable channel over HTTPS, then run commands from the
+checkout root. `main` is the stable channel and `develop`, the repository default,
+is the nightly; use `-b develop` for the nightly:
 
 ```sh
+git clone -b main https://github.com/iuliandita/agents.git
+cd agents
 python3 --version
 python3 -m venv .venv
 . .venv/bin/activate
@@ -91,7 +94,9 @@ This runbook is for a coding agent setting the repo up on its user's machine. Ru
 result, and stop on any failure. Steps marked **ask** need the user's answer; do not guess them.
 
 1. **Clone** with git (not a zip download; updates use `git pull --ff-only`) to a stable location, for
-   example `~/code/agents`, then `cd` into it. Check: `git status` shows a clean `main`.
+   example `git clone -b main https://github.com/iuliandita/agents.git ~/code/agents`, then `cd` into it.
+   Use `-b develop` only if the user asks for the nightly channel. Updates follow the checked-out branch,
+   so a `main` clone stays on stable releases. Check: `git status` shows a clean `main`.
 2. **Python**: follow [Prerequisites](#prerequisites). Check: `python3 --version` is 3.11 or newer.
    Rendering and deploying need only the standard library.
 3. **Detect** installed harnesses: `scripts/update --detect` (`./scripts/update.ps1 --detect` on native

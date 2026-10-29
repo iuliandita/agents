@@ -269,29 +269,16 @@ Hermes has no global Markdown rules file. Its global operational rules live in `
 
 ## Verification
 
-Inside a virtual environment, install test dependencies first:
+After a deploy, check that the deployed files match a fresh render and that the roles landed:
 
 ```bash
-python -m pip install -r requirements-dev.txt
-```
-
-```bash
-python scripts/lint_prompts.py
-python scripts/scan_prompt_sources.py
-python scripts/check_harness_docs.py
-python scripts/check_harness_contract.py
-python scripts/check_docs_impact.py
-python scripts/check_docs_links.py
-python -m pytest -q
-bash -n scripts/sync-ai-prompts scripts/render-invariants scripts/render-agents scripts/render-hermes scripts/update scripts/python-runtime.sh
-python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/render_agents.py scripts/install_workflow.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py scripts/check_docs_impact.py scripts/check_docs_links.py scripts/render_hermes.py scripts/update.py
 scripts/sync-ai-prompts --check
-scripts/sync-ai-prompts --dry-run
 scripts/sync-ai-prompts --target claude,codex --status
 scripts/render-agents --check
+scripts/render-agents --target claude,codex --verify
 ```
 
-When a change touches prompt sources, renderers, deployment, overlays, or the workflow skill, update the affected docs and record a review receipt; see [docs/MAINTENANCE.md](docs/MAINTENANCE.md).
+`--status` exits 1 when a deployed rules file differs from a fresh render, and `--verify` checks only that role files exist. The full list of maintainer checks is in [CONTRIBUTING.md](CONTRIBUTING.md#checks-and-documentation). When a change touches prompt sources, renderers, deployment, overlays, or the workflow skill, update the affected docs and record a review receipt; see [docs/MAINTENANCE.md](docs/MAINTENANCE.md).
 
 ## GitHub Actions
 
