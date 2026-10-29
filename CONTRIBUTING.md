@@ -32,5 +32,5 @@ CI also runs actionlint and the macOS and Windows launcher tests. Use [maintenan
 Feature and fix PRs target `develop` and are squash-merged. The version bump follows the conventional-commit titles since the last tag: `feat` is minor, `fix` and `deps` are patch, `!` or `BREAKING CHANGE:` is major; `docs`, `chore`, `ci`, `test`, `style` alone do not release.
 
 1. On `develop`, move the `Unreleased` changelog entries under a new `## [X.Y.Z] - YYYY-MM-DD` heading, by PR. The version lives only in the changelog and the tag.
-2. Open a PR from `develop` to `main` and merge it with a merge commit, never a squash, so `main` stays an ancestor of `develop`.
+2. Open a PR from `develop` to `main` and merge it with a merge commit, never a squash, so every `develop` commit stays in `main`'s history and the next release PR carries only new work.
 3. Tag the merge on `main` as `v<version>` and push the tag. The release workflow checks the tag is on `main`, runs the docs-impact guard from the previous tag, and publishes the release.
