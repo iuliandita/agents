@@ -1,0 +1,123 @@
+{
+  "repo": "agents",
+  "source_of_truth": true,
+  "required_jobs": [
+    "lint",
+    "secrets",
+    "zizmor"
+  ],
+  "installers": [
+    {
+      "argv": [
+        "scripts/sync-ai-prompts",
+        "--help"
+      ],
+      "flags": [
+        "--harness",
+        "--target",
+        "--deploy",
+        "--dry-run",
+        "--check",
+        "--status",
+        "--json"
+      ]
+    },
+    {
+      "argv": [
+        "scripts/render-agents",
+        "--help"
+      ],
+      "flags": [
+        "--target",
+        "--deploy",
+        "--dry-run",
+        "--check",
+        "--json"
+      ]
+    },
+    {
+      "argv": [
+        "scripts/render-invariants",
+        "--help"
+      ],
+      "flags": [
+        "--deploy",
+        "--dry-run",
+        "--json"
+      ]
+    },
+    {
+      "argv": [
+        "scripts/render-hermes",
+        "--help"
+      ],
+      "flags": [
+        "--deploy",
+        "--dry-run",
+        "--json"
+      ]
+    },
+    {
+      "argv": [
+        "scripts/update",
+        "--help"
+      ],
+      "flags": [
+        "--harness",
+        "--targets",
+        "--detect",
+        "--dry-run",
+        "--json"
+      ]
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/install_workflow.py",
+        "--help"
+      ],
+      "flags": [
+        "--skills-dir",
+        "--deploy",
+        "--json"
+      ]
+    }
+  ],
+  "error_scan": {
+    "paths": [
+      "scripts"
+    ],
+    "exclude": []
+  },
+  "allow": [
+    {
+      "check": "private-patterns",
+      "path": "prompts/private-patterns.example.txt",
+      "reason": "The example file lists placeholder paths and an address that users replace with their own."
+    },
+    {
+      "check": "private-patterns",
+      "path": "scripts/lint_prompts.py",
+      "match": "pattern home-path",
+      "reason": "The leak linter ships placeholder home paths as its default markers."
+    },
+    {
+      "check": "private-patterns",
+      "path": "scripts/lint_prompts.py",
+      "match": "pattern mac-home-path",
+      "reason": "The leak linter ships placeholder home paths as its default markers."
+    },
+    {
+      "check": "private-patterns",
+      "path": "tests/test_lint_prompts.py",
+      "match": "pattern home-path",
+      "reason": "The test feeds a placeholder home path to the leak linter."
+    },
+    {
+      "check": "private-patterns",
+      "path": "tests/test_update.py",
+      "match": "pattern email",
+      "reason": "The test sets a throwaway git identity for a temporary repository."
+    }
+  ]
+}

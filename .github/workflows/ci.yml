@@ -62,6 +62,11 @@ jobs:
       - name: Scan prompt sources for malicious instructions
         run: python scripts/scan_prompt_sources.py
 
+      - name: Check stack conventions
+        # Advisory: made blocking once the alignment PRs land.
+        continue-on-error: true
+        run: python3 .github/stack/stack-check.py
+
       - name: Install actionlint
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
