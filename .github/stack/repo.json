@@ -3,6 +3,7 @@
   "source_of_truth": true,
   "required_jobs": [
     "lint",
+    "test",
     "secrets",
     "zizmor"
   ],
