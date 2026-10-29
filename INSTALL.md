@@ -453,9 +453,36 @@ memory stores, provider credentials, model settings, MCP, plugins, or assistant 
 The separately installed consolidation workflow can edit project instructions and
 clear verified project memory only when explicitly invoked.
 
-## Messages
+## Messages, exit codes, and JSON output
 
 The scripts print `error:`, `warning:`, and `note:` lines to stderr, one line each, in lower case. An error names the failing object and, when one exists, the next command. The withheld-overlay line (`note: prompts/private.md withheld from ...`) is a note. Inventory and status lines on stdout, such as `would update`, `unchanged`, and `update complete`, keep their wording.
+
+Exit codes are the same for every command: 0 done, 1 failed, 2 usage error, 3 a required tool is missing (Python 3.11+ for the launchers, git for `scripts/update`). `--check`, `--status`, and `--verify` exit 1 when something is missing or out of sync. `scripts/update` passes through the exit code of a failing step. Every `--help` ends with its Environment and Exit codes sections.
+
+`--json` prints exactly one JSON object to stdout and nothing else. Human output moves to stderr and exit codes do not change. Every object has `ok` (true when the exit code is 0), `errors`, `warnings`, and `notes` (the `error:`, `warning:`, and `note:` lines), plus a `mode` and one list of records named below. A usage error, or a launcher that finds no usable Python, prints the object with `ok` false. `scripts/update` runs its steps with their output on stderr, so a failing step shows up as one `error: update failed at ...` line in `errors`.
+
+| Command | `mode` | Records key | Record fields |
+|---|---|---|---|
+| `scripts/sync-ai-prompts` | `list-targets` | `targets` | `name`, `display`, `support`, `path` (null when none), `target` |
+| | `check` | `checked` | `harness` |
+| | `status` | `harnesses` | `harness`, `state` (`in-sync`, `drift`, `local-edits`, `not-deployed`, `not-rendered`, `manual`), `path` |
+| | `deploy` (`--deploy` or `--dry-run`; adds `dry_run`) | `actions` | `harness`, `action` (`updated`, `unchanged`, `would-update`, `would-replace-unmanaged`, `skipped`), `path`, and `reason` when skipped |
+| | `prune-backups` (adds `keep`, `dry_run`) | `backups` | `path`, `action` (`removed`, `would-remove`) |
+| | `render` | `rendered` | `harness`, `path` |
+| `scripts/render-agents` | `list-targets` | `targets` | `name`, `display`, `path`, `env_var` |
+| | `check` | `checked` | `harness`, `agents` |
+| | `verify` | `harnesses` | `harness`, `path`, `roles`, `missing` |
+| | `deploy` (adds `dry_run`) | `actions` | `harness`, `action` (`updated`, `unchanged`, `would-create`, `would-replace`, `would-replace-unmanaged`, `would-remove-stale`, `removed-stale`), `path` |
+| | `render` | `rendered` | `harness`, `path`, `agents` |
+| `scripts/render-invariants` | `deploy` (adds `dry_run`) | `actions` | `target` (`hook`, `settings`), `action` (`installed`, `merged`, `unchanged`, `would-install`, `would-merge`), `path` |
+| | `render` | `rendered` | `artifact`, `path` |
+| `scripts/render-hermes` | `deploy` (adds `dry_run`) | `actions` | `harness`, `action` (`updated`, `unchanged`, `would-update`, `would-replace-unmanaged`), `path` |
+| | `render` | `rendered` | `harness`, `path` |
+| `scripts/update` | `detect` | `harnesses` | `harness`, `evidence` |
+| | `update` (adds `dry_run`, `pull`, and `targets`, empty until they resolve) | `steps` | `step`, `exit` |
+| `scripts/install_workflow.py` | `dry-run` or `deploy` (adds `dry_run`) | `actions` | `action` (`would-install`, `installed`, `backup`), `path`, and `backup` for a backup |
+
+The check scripts (`scripts/check_*.py`, `scripts/lint_prompts.py`, `scripts/scan_prompt_sources.py`) have no `--json`.
 
 ## Recovery and removal
 

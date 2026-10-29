@@ -9,6 +9,7 @@ from pathlib import Path
 import tempfile
 
 from render_agents import parse_frontmatter
+from render_prompts import EXIT_CODES_HELP, JsonArgumentParser, json_record, run_json
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKILL_NAME = "consolidate-agents-md"
@@ -30,14 +31,14 @@ def checked_path(path: Path, *, directory: bool = False) -> Path:
     return path
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--skills-dir", type=Path, action="append", required=True,
-                        help="Skill directory to install into; repeat for multiple locations")
-    parser.add_argument("--legacy-command", type=Path,
-                        help="Optional legacy Markdown command to migrate")
-    parser.add_argument("--deploy", action="store_true", help="Write files (default: dry run)")
-    args = parser.parse_args(argv)
+HELP_EPILOG = """\
+Environment:
+  HOME                     Expands ~ in --skills-dir and --legacy-command.
+
+""" + EXIT_CODES_HELP
+
+
+def run(args: argparse.Namespace) -> int:
     try:
         source = REPO_ROOT / "skills" / SKILL_NAME / "SKILL.md"
         content = source.read_bytes()
@@ -65,6 +66,7 @@ def main(argv: list[str] | None = None) -> int:
         if not args.deploy:
             for target in changed:
                 print(f"Would install: {target}")
+                json_record(action="would-install", path=str(target))
             print(f"Dry run: {len(changed)} change(s); use --deploy to write")
             return 0
 
@@ -76,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
                 backup.write_bytes(target.read_bytes())
                 backup.chmod(0o600)
                 print(f"Backup: {target} -> {backup}")
+                json_record(action="backup", path=str(target), backup=str(backup))
         for target in changed:
             target.parent.mkdir(parents=True, exist_ok=True)
             fd, temporary = tempfile.mkstemp(prefix=".workflow-", dir=target.parent)
@@ -86,11 +89,30 @@ def main(argv: list[str] | None = None) -> int:
             finally:
                 Path(temporary).unlink(missing_ok=True)
             print(f"Installed: {target}")
+            json_record(action="installed", path=str(target))
         print(f"Installed {len(changed)} change(s)")
         return 0
     except (OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = JsonArgumentParser(
+        description=__doc__,
+        epilog=HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--skills-dir", type=Path, action="append", required=True,
+                        help="Skill directory to install into; repeat for multiple locations")
+    parser.add_argument("--legacy-command", type=Path,
+                        help="Optional legacy Markdown command to migrate")
+    parser.add_argument("--deploy", action="store_true", help="Write files (default: dry run)")
+    parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr")
+    args = parser.parse_args(argv)
+    if not args.json:
+        return run(args)
+    return run_json(lambda: run(args), "install_workflow", "actions", mode="deploy" if args.deploy else "dry-run", dry_run=not args.deploy)
 
 
 if __name__ == "__main__":

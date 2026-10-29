@@ -19,7 +19,15 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from render_invariants import read_invariants
-from render_prompts import backup_existing, omp_agent_dir
+from render_prompts import (
+    CHECK_EXIT_NOTE,
+    EXIT_CODES_HELP,
+    JsonArgumentParser,
+    backup_existing,
+    json_record,
+    omp_agent_dir,
+    run_json,
+)
 
 
 TIERS = ("cheap", "mid", "flagship", "apex")
@@ -626,6 +634,7 @@ def verify(repo_root: Path, selected: list[str] | None, env: dict[str, str] | No
             failures += 1
         else:
             print(f"{harness}: all {len(names)} roles present in {target}")
+        json_record(harness=harness, path=str(target), roles=len(names), missing=missing)
     return 1 if failures else 0
 
 
@@ -739,6 +748,7 @@ def check(repo_root: Path, selected: list[str] | None, allow_inherit: bool = Fal
                     tomllib.loads(text)
                 else:
                     parse_frontmatter(text, path)
+            json_record(harness=harness, agents=len(paths))
     print("Agent render check passed")
     return 0
 
@@ -770,12 +780,17 @@ def print_dry_run(harness: str, dest: Path, text: str) -> None:
     existing = read_text_or_none(dest)
     if existing is None:
         print(f"would create {harness}: {dest}")
+        action = "would-create"
     elif existing == text:
         print(f"unchanged {harness}: {dest}")
+        action = "unchanged"
     elif GENERATED_MARKER in existing:
         print(f"would replace {harness}: {dest}")
+        action = "would-replace"
     else:
         print(f"would replace unmanaged {harness}: {dest} (not written by this repo; backed up first)")
+        action = "would-replace-unmanaged"
+    json_record(harness=harness, action=action, path=str(dest))
 
 
 def preflight_target(target: Path, files: dict[str, str]) -> None:
@@ -833,6 +848,7 @@ def deploy(
                 print_dry_run(harness, target / filename, text)
             for path in stale:
                 print(f"would remove stale {harness}: {path}")
+                json_record(harness=harness, action="would-remove-stale", path=str(path))
             continue
 
         try:
@@ -843,26 +859,50 @@ def deploy(
             dest = target / filename
             if read_text_or_none(dest) == text:
                 print(f"unchanged {harness}: {dest}")
+                json_record(harness=harness, action="unchanged", path=str(dest))
                 continue
             backup_existing(dest, backup_dir)
             dest.write_text(text, encoding="utf-8", newline="\n")
             print(f"updated {harness}: {dest}")
+            json_record(harness=harness, action="updated", path=str(dest))
         if harness == "claude":
             legacy_guard = target / GUARD_NAME
             if is_generated(legacy_guard):
                 backup_existing(legacy_guard, backup_dir)
                 legacy_guard.unlink()
                 print(f"removed stale {harness}: {legacy_guard} (backup in {backup_dir})")
+                json_record(harness=harness, action="removed-stale", path=str(legacy_guard))
         for path in stale:
             backup_existing(path, backup_dir)
             path.unlink()
             print(f"removed stale {harness}: {path} (backup in {backup_dir})")
+            json_record(harness=harness, action="removed-stale", path=str(path))
     print_notices(notices)
+
+
+PROG = "render-agents"
+
+HELP_EPILOG = """\
+Environment:
+  AGENTS_PYTHON            Python 3.11+ executable the launcher runs (a path, not a command).
+  <HARNESS>_AGENTS_DIR     Override one agents directory: CLAUDE, CODEX, OPENCODE, COMMANDCODE, ANTIGRAVITY,
+                           or OMP.
+  CLAUDE_CONFIG_DIR, CODEX_HOME, OPENCODE_CONFIG_DIR
+                           Native config homes that move a harness's default agents directory.
+  OMP_PROFILE, PI_PROFILE, PI_CONFIG_DIR
+                           Select the Oh My Pi profile and config root.
+  HOME                     Resolves the default agents directories.
+
+""" + EXIT_CODES_HELP + CHECK_EXIT_NOTE
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     repo_root = Path(__file__).resolve().parents[1]
-    parser = argparse.ArgumentParser(description="Render and deploy subagent definitions.")
+    parser = JsonArgumentParser(
+        description="Render and deploy subagent definitions.",
+        epilog=HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--repo-root", type=Path, default=repo_root)
     parser.add_argument("--out-dir", type=Path, default=repo_root / "build" / "agents")
     parser.add_argument(
@@ -888,14 +928,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Render harnesses with no tier map as session-model inheritance instead of failing.",
     )
     parser.add_argument("--backup-dir", type=Path, default=repo_root / ".backups", help="Directory for deploy backups.")
+    parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
     return parser.parse_args(argv)
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
+def run(args: argparse.Namespace) -> int:
     if args.list_targets:
         for harness in selected_agent_harnesses(args.target):
             print(f"{harness}\t{HARNESS_DISPLAY[harness]}\t{agent_target_dir(harness)}\t{TARGET_DIRS[harness][1]}")
+            json_record(
+                name=harness,
+                display=HARNESS_DISPLAY[harness],
+                path=str(agent_target_dir(harness)),
+                env_var=TARGET_DIRS[harness][1],
+            )
         return 0
     if args.check:
         return check(args.repo_root, args.target, args.allow_inherit)
@@ -913,7 +959,23 @@ def main(argv: list[str] | None = None) -> int:
     written = render_all(args.repo_root, args.out_dir, args.target, overrides, args.allow_inherit)
     for harness, paths in written.items():
         print(f"rendered {harness}: {paths[0].parent} ({len(paths)} agents)")
+        json_record(harness=harness, path=str(paths[0].parent), agents=len(paths))
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    if not args.json:
+        return run(args)
+    if args.list_targets:
+        return run_json(lambda: run(args), PROG, "targets", mode="list-targets")
+    if args.check:
+        return run_json(lambda: run(args), PROG, "checked", mode="check")
+    if args.verify:
+        return run_json(lambda: run(args), PROG, "harnesses", "a role file is missing; run --deploy", mode="verify")
+    if args.deploy or args.dry_run:
+        return run_json(lambda: run(args), PROG, "actions", mode="deploy", dry_run=args.dry_run)
+    return run_json(lambda: run(args), PROG, "rendered", mode="render")
 
 
 if __name__ == "__main__":

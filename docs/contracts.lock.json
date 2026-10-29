@@ -3,18 +3,20 @@
     "deployment": {
       "breaking": "none",
       "docs": [
-        "INSTALL.md"
+        "INSTALL.md",
+        "README.md"
       ],
-      "fingerprint": "9547d12476d7c26864d68634caa7dc6ebb4575722cb1cbde834af7833d36c8d7",
-      "note": "Document --harness as an alias of --target and --targets; the old flag names keep working."
+      "fingerprint": "c40cffcb2c5dd6e3f76af991a5619b69a75678ff890b5d2b89beaa422ea7c067",
+      "note": "Document --json output, its keys per command, the shared exit codes, and the Environment and Exit codes help sections."
     },
     "harnesses": {
       "breaking": "none",
       "docs": [
-        "INSTALL.md"
+        "INSTALL.md",
+        "README.md"
       ],
-      "fingerprint": "031f29654fd998531af8dcf444314cc1d1f27d51b31f4e10dfabc1f5bc7e582e",
-      "note": "Document --harness as an alias of --target and --targets; the old flag names keep working."
+      "fingerprint": "61a1f6e4702d422ecf6eb81b3498b8209645455db59f8dd05484fd6412a05521",
+      "note": "Document --json output, its keys per command, the shared exit codes, and the Environment and Exit codes help sections."
     },
     "maintenance": {
       "breaking": "none",
@@ -27,10 +29,11 @@
     "models-agents": {
       "breaking": "none",
       "docs": [
-        "INSTALL.md"
+        "INSTALL.md",
+        "README.md"
       ],
-      "fingerprint": "840d1040dcd6cd176fa0ccd41d523d9e621394a5682f2e55e59d334129dfdbd7",
-      "note": "Document --harness as an alias of --target and --targets; the old flag names keep working."
+      "fingerprint": "e1ad342cafcea70316641a105c87b2d4cd1e3055ee451272d9ac01bc9656ff4e",
+      "note": "Document --json output, its keys per command, the shared exit codes, and the Environment and Exit codes help sections."
     },
     "overlays-trust": {
       "breaking": "none",

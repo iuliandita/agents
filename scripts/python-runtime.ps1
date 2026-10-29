@@ -2,16 +2,26 @@
 # Selects AGENTS_PYTHON, then the checkout .venv, then python/python3 on PATH,
 # then the Windows py launcher.
 
-function Get-AgentsPython {
+# Print the error to stderr and, with --json, the one JSON object to stdout, then exit 3: a required tool is missing.
+# Messages must not contain double quotes or backslashes.
+function Stop-AgentsRuntime([string]$Message, [string[]]$LauncherArgs) {
+    [Console]::Error.WriteLine("error: $Message")
+    if ($LauncherArgs -contains '--json') {
+        Write-Output ('{"ok": false, "errors": ["error: ' + $Message + '"], "warnings": [], "notes": []}')
+    }
+    exit 3
+}
+
+function Get-AgentsPython([string[]]$LauncherArgs = @()) {
     $versionCheck = 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)'
 
     if (Test-Path Env:AGENTS_PYTHON) {
         $override = $env:AGENTS_PYTHON
         if ($override) {
-            & $override -c $versionCheck 2>$null
+            try { & $override -c $versionCheck 2>$null } catch { $global:LASTEXITCODE = 1 }
             if ($LASTEXITCODE -eq 0) { return [pscustomobject]@{ Exe = $override; Prefix = @() } }
         }
-        throw 'error: AGENTS_PYTHON must name a working Python 3.11+ executable (not a command with flags). See INSTALL.md.'
+        Stop-AgentsRuntime 'AGENTS_PYTHON must name a working Python 3.11+ executable (not a command with flags). See INSTALL.md.' $LauncherArgs
     }
 
     $root = Split-Path -Parent $PSScriptRoot
@@ -21,9 +31,9 @@ function Get-AgentsPython {
     )
     foreach ($candidate in $venvCandidates) {
         if (Test-Path -LiteralPath $candidate) {
-            & $candidate -c $versionCheck 2>$null
+            try { & $candidate -c $versionCheck 2>$null } catch { $global:LASTEXITCODE = 1 }
             if ($LASTEXITCODE -eq 0) { return [pscustomobject]@{ Exe = $candidate; Prefix = @() } }
-            throw 'error: the repository virtual environment python must be a working Python 3.11+ executable. Repair it or set AGENTS_PYTHON. See INSTALL.md.'
+            Stop-AgentsRuntime 'the repository virtual environment python must be a working Python 3.11+ executable. Repair it or set AGENTS_PYTHON. See INSTALL.md.' $LauncherArgs
         }
     }
 
@@ -41,5 +51,5 @@ function Get-AgentsPython {
         if ($LASTEXITCODE -eq 0) { return [pscustomobject]@{ Exe = $launcher.Source; Prefix = @('-3') } }
     }
 
-    throw 'error: Python 3.11+ is required. Activate a supported virtual environment or set AGENTS_PYTHON. See INSTALL.md.'
+    Stop-AgentsRuntime 'Python 3.11+ is required. Activate a supported virtual environment or set AGENTS_PYTHON. See INSTALL.md.' $LauncherArgs
 }
