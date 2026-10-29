@@ -156,8 +156,8 @@ def test_main_flags_orphan_harness_fragment(tmp_path, capsys):
     captured = capsys.readouterr()
 
     assert rc == 1
-    assert "orphan.md" in captured.out
-    assert "orphan fragment" in captured.out
+    assert "orphan.md" in captured.err
+    assert "orphan fragment" in captured.err
 
 
 def test_main_lints_private_example_when_present(tmp_path, capsys):
@@ -190,8 +190,8 @@ def test_main_lints_private_example_when_present(tmp_path, capsys):
     captured = capsys.readouterr()
 
     assert rc == 1
-    assert "private.example.md" in captured.out
-    assert "private path or name marker" in captured.out
+    assert "private.example.md" in captured.err
+    assert "private path or name marker" in captured.err
 
 
 def test_main_lints_agent_sources(tmp_path, capsys):
@@ -224,8 +224,8 @@ def test_main_lints_agent_sources(tmp_path, capsys):
     rc = sandbox.main()
     captured = capsys.readouterr()
     assert rc == 1
-    assert "explorer.md" in captured.out
-    assert "private path or name marker" in captured.out
+    assert "explorer.md" in captured.err
+    assert "private path or name marker" in captured.err
 
 
 def git_repo_with(tmp_path, files):
@@ -244,7 +244,7 @@ def test_tracked_marker_scan_covers_every_tracked_file(tmp_path, capsys):
     repo = git_repo_with(tmp_path, {"README.md": "see lab.example.net\n", "docs/x.md": "clean\n"})
     (repo / "untracked.md").write_text("lab.example.net\n", encoding="utf-8")
     assert linter.lint_tracked_markers(repo, ("lab.example.net",)) == 1
-    out = capsys.readouterr().out
+    out = capsys.readouterr().err
     assert "README.md: tracked file contains local marker: lab.example.net" in out
     assert "untracked.md" not in out
 

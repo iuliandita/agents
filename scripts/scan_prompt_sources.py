@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import sys
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
@@ -265,8 +266,10 @@ def main(argv: list[str] | None = None) -> int:
     findings = scan_prompt_sources(root)
     if findings:
         for finding in findings:
-            print(f"ERROR: {finding.path}:{finding.line_no}: {finding.rule}: {finding.message}")
-            print(f"  {finding.line}")
+            print(
+                f"error: {finding.path}:{finding.line_no}: {finding.rule}: {finding.message}; line: {finding.line.strip()}",
+                file=sys.stderr,
+            )
         print(f"Prompt source scan failed: {len(findings)} finding(s)")
         return 1
     print("Prompt source scan passed")

@@ -12,13 +12,22 @@ import hashlib
 import json
 import os
 import re
+import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from render_invariants import read_invariants
-from render_prompts import backup_existing, omp_agent_dir
+from render_prompts import (
+    CHECK_EXIT_NOTE,
+    EXIT_CODES_HELP,
+    JsonArgumentParser,
+    backup_existing,
+    json_record,
+    omp_agent_dir,
+    run_json,
+)
 
 
 TIERS = ("cheap", "mid", "flagship", "apex")
@@ -63,7 +72,7 @@ class AgentSpec:
 def parse_frontmatter(text: str, source: Path) -> tuple[dict[str, str], str]:
     lines = text.splitlines(keepends=True)
     if not lines or lines[0].strip() != "---":
-        raise SystemExit(f"{source}: missing opening frontmatter delimiter")
+        raise SystemExit(f"error: {source}: missing opening frontmatter delimiter")
     fields: dict[str, str] = {}
     for index in range(1, len(lines)):
         line = lines[index]
@@ -76,7 +85,7 @@ def parse_frontmatter(text: str, source: Path) -> tuple[dict[str, str], str]:
             # Frontmatter sources stay flat by contract.
             continue
         if ":" not in line:
-            raise SystemExit(f"{source}: frontmatter line without a colon: {line.strip()}")
+            raise SystemExit(f"error: {source}: frontmatter line without a colon: {line.strip()}")
         key, value = line.split(":", 1)
         key = key.strip()
         value = value.strip()
@@ -86,9 +95,9 @@ def parse_frontmatter(text: str, source: Path) -> tuple[dict[str, str], str]:
             if quote not in interior:
                 value = interior
         if key in fields:
-            raise SystemExit(f"{source}: duplicate frontmatter key: {key}")
+            raise SystemExit(f"error: {source}: duplicate frontmatter key: {key}")
         fields[key] = value
-    raise SystemExit(f"{source}: missing closing frontmatter delimiter")
+    raise SystemExit(f"error: {source}: missing closing frontmatter delimiter")
 
 
 def parse_tools(raw: str, source: Path) -> tuple[str, ...]:
@@ -98,13 +107,13 @@ def parse_tools(raw: str, source: Path) -> tuple[str, ...]:
         if not tool:
             continue
         if tool not in TOOLS:
-            raise SystemExit(f"{source}: unknown tool '{tool}'; allowed: {', '.join(TOOLS)}")
+            raise SystemExit(f"error: {source}: unknown tool '{tool}'; allowed: {', '.join(TOOLS)}")
         if tool not in tools:
             tools.append(tool)
     if not tools:
-        raise SystemExit(f"{source}: tools must name at least one tool")
+        raise SystemExit(f"error: {source}: tools must name at least one tool")
     if "shell" in tools and "shell-ro" in tools:
-        raise SystemExit(f"{source}: tools cannot combine shell and shell-ro")
+        raise SystemExit(f"error: {source}: tools cannot combine shell and shell-ro")
     return tuple(tools)
 
 
@@ -113,40 +122,40 @@ def load_agent(path: Path) -> AgentSpec:
     fields, body = parse_frontmatter(text, path)
     for key in REQUIRED_KEYS:
         if key not in fields:
-            raise SystemExit(f"{path}: missing key '{key}'")
+            raise SystemExit(f"error: {path}: missing key '{key}'")
     for key in fields:
         if key not in REQUIRED_KEYS and key not in OPTIONAL_KEYS:
-            raise SystemExit(f"{path}: unknown key '{key}'")
+            raise SystemExit(f"error: {path}: unknown key '{key}'")
 
     name = fields["name"]
     if not NAME_RE.match(name):
-        raise SystemExit(f"{path}: name '{name}' must match {NAME_RE.pattern}")
+        raise SystemExit(f"error: {path}: name '{name}' must match {NAME_RE.pattern}")
     if name != path.stem:
-        raise SystemExit(f"{path}: name '{name}' does not match filename stem '{path.stem}'")
+        raise SystemExit(f"error: {path}: name '{name}' does not match filename stem '{path.stem}'")
     for harness, reserved in RESERVED_NAMES.items():
         if name in reserved:
-            raise SystemExit(f"{path}: name '{name}' is reserved by {harness}")
+            raise SystemExit(f"error: {path}: name '{name}' is reserved by {harness}")
 
     tier = fields["tier"]
     if tier not in TIERS:
-        raise SystemExit(f"{path}: unknown tier '{tier}'; allowed: {', '.join(TIERS)}")
+        raise SystemExit(f"error: {path}: unknown tier '{tier}'; allowed: {', '.join(TIERS)}")
     effort = fields["effort"]
     if effort not in EFFORTS:
-        raise SystemExit(f"{path}: unknown effort '{effort}'; allowed: {', '.join(EFFORTS)}")
+        raise SystemExit(f"error: {path}: unknown effort '{effort}'; allowed: {', '.join(EFFORTS)}")
     description = fields["description"]
     if not description:
-        raise SystemExit(f"{path}: description must be one non-empty line")
+        raise SystemExit(f"error: {path}: description must be one non-empty line")
     if any(ord(char) < 32 for char in description):
-        raise SystemExit(f"{path}: description contains a control character")
+        raise SystemExit(f"error: {path}: description contains a control character")
 
     max_turns: int | None = None
     if "max_turns" in fields:
         if not fields["max_turns"].isdigit() or int(fields["max_turns"]) < 1:
-            raise SystemExit(f"{path}: max_turns must be a positive integer")
+            raise SystemExit(f"error: {path}: max_turns must be a positive integer")
         max_turns = int(fields["max_turns"])
 
     if not body.strip():
-        raise SystemExit(f"{path}: empty prompt body")
+        raise SystemExit(f"error: {path}: empty prompt body")
 
     return AgentSpec(
         name=name,
@@ -164,10 +173,10 @@ def load_agent(path: Path) -> AgentSpec:
 def load_agents(repo_root: Path) -> list[AgentSpec]:
     agents_dir = repo_root / "agents"
     if not agents_dir.is_dir():
-        raise SystemExit(f"Missing agents directory: {agents_dir}")
+        raise SystemExit(f"error: missing agents directory: {agents_dir}")
     specs = [load_agent(path) for path in sorted(agents_dir.glob("*.md"))]
     if not specs:
-        raise SystemExit(f"No agent sources found in {agents_dir}")
+        raise SystemExit(f"error: no agent sources found in {agents_dir}")
     return specs
 
 
@@ -191,78 +200,78 @@ class Resolved:
 def validate_overrides(data: object, source: Path) -> dict:
     label = f"{source}"
     if not isinstance(data, dict):
-        raise SystemExit(f"{label}: root must be an object")
+        raise SystemExit(f"error: {label}: root must be an object")
     for harness, entry in data.items():
         if harness not in AGENT_HARNESSES:
-            raise SystemExit(f"{label}: unknown harness '{harness}'")
+            raise SystemExit(f"error: {label}: unknown harness '{harness}'")
         if not isinstance(entry, dict):
-            raise SystemExit(f"{label}: '{harness}' must be an object")
+            raise SystemExit(f"error: {label}: '{harness}' must be an object")
         for key in entry:
             if key not in OVERRIDE_KEYS:
-                raise SystemExit(f"{label}: '{harness}.{key}' is not one of {sorted(OVERRIDE_KEYS)}")
+                raise SystemExit(f"error: {label}: '{harness}.{key}' is not one of {sorted(OVERRIDE_KEYS)}")
         tiers = entry.get("tiers", {})
         if not isinstance(tiers, dict):
-            raise SystemExit(f"{label}: '{harness}.tiers' must be an object")
+            raise SystemExit(f"error: {label}: '{harness}.tiers' must be an object")
         for tier, value in tiers.items():
             if tier not in TIERS:
-                raise SystemExit(f"{label}: '{harness}.tiers.{tier}' is not a tier")
+                raise SystemExit(f"error: {label}: '{harness}.tiers.{tier}' is not a tier")
             where = f"{label}: '{harness}.tiers.{tier}'"
             model = value
             if isinstance(value, dict):
                 unknown = set(value) - TIER_OBJECT_KEYS
                 if unknown:
-                    raise SystemExit(f"{where} has unknown keys {sorted(unknown)}; allowed: {sorted(TIER_OBJECT_KEYS)}")
+                    raise SystemExit(f"error: {where} has unknown keys {sorted(unknown)}; allowed: {sorted(TIER_OBJECT_KEYS)}")
                 if "model" not in value:
-                    raise SystemExit(f"{where} object needs a 'model' key (null inherits the session model)")
+                    raise SystemExit(f"error: {where} object needs a 'model' key (null inherits the session model)")
                 if "effort" in value and value["effort"] not in EFFORTS:
-                    raise SystemExit(f"{where}.effort = {value['effort']!r} is not one of {', '.join(EFFORTS)}")
+                    raise SystemExit(f"error: {where}.effort = {value['effort']!r} is not one of {', '.join(EFFORTS)}")
                 model = value["model"]
             if model is None:
                 continue
             if not isinstance(model, str) or not model:
-                raise SystemExit(f"{where} must be a non-empty string, null, or an object with 'model'")
+                raise SystemExit(f"error: {where} must be a non-empty string, null, or an object with 'model'")
             if not MODEL_RE.match(model):
-                raise SystemExit(f"{where} has characters outside {MODEL_RE.pattern}")
+                raise SystemExit(f"error: {where} has characters outside {MODEL_RE.pattern}")
         agents = entry.get("agents", {})
         if not isinstance(agents, dict):
-            raise SystemExit(f"{label}: '{harness}.agents' must be an object")
+            raise SystemExit(f"error: {label}: '{harness}.agents' must be an object")
         for name, fields in agents.items():
             if not isinstance(fields, dict):
-                raise SystemExit(f"{label}: '{harness}.agents.{name}' must be an object")
+                raise SystemExit(f"error: {label}: '{harness}.agents.{name}' must be an object")
             for key, value in fields.items():
                 if key not in AGENT_OVERRIDE_KEYS:
-                    raise SystemExit(f"{label}: '{harness}.agents.{name}.{key}' is not tier or effort")
+                    raise SystemExit(f"error: {label}: '{harness}.agents.{name}.{key}' is not tier or effort")
                 allowed = TIERS if key == "tier" else EFFORTS
                 if value not in allowed:
-                    raise SystemExit(f"{label}: '{harness}.agents.{name}.{key}' = '{value}' is invalid")
+                    raise SystemExit(f"error: {label}: '{harness}.agents.{name}.{key}' = '{value}' is invalid")
         # Accepted for backward compatibility with existing ignored local
         # overrides. Unsafe harnesses no longer grant shell-ro access.
         wrappers = entry.get("shell_ro_wrappers", [])
         if not isinstance(wrappers, list):
-            raise SystemExit(f"{label}: '{harness}.shell_ro_wrappers' must be a list of strings")
+            raise SystemExit(f"error: {label}: '{harness}.shell_ro_wrappers' must be a list of strings")
         for wrapper in wrappers:
             if not isinstance(wrapper, str) or not WRAPPER_RE.match(wrapper):
                 raise SystemExit(
-                    f"{label}: '{harness}.shell_ro_wrappers' entry {wrapper!r} must match {WRAPPER_RE.pattern}"
+                    f"error: {label}: '{harness}.shell_ro_wrappers' entry {wrapper!r} must match {WRAPPER_RE.pattern}"
                 )
         effort_key = entry.get("effort_key")
         if effort_key is not None and (not isinstance(effort_key, str) or not KEY_RE.match(effort_key)):
-            raise SystemExit(f"{label}: '{harness}.effort_key' must match {KEY_RE.pattern}")
+            raise SystemExit(f"error: {label}: '{harness}.effort_key' must match {KEY_RE.pattern}")
         effort_map = entry.get("effort_map", {})
         if not isinstance(effort_map, dict):
-            raise SystemExit(f"{label}: '{harness}.effort_map' must be an object")
+            raise SystemExit(f"error: {label}: '{harness}.effort_map' must be an object")
         for level, mapped in effort_map.items():
             if level not in EFFORTS:
-                raise SystemExit(f"{label}: '{harness}.effort_map.{level}' is not an effort level")
+                raise SystemExit(f"error: {label}: '{harness}.effort_map.{level}' is not an effort level")
             if not isinstance(mapped, str) or not mapped:
-                raise SystemExit(f"{label}: '{harness}.effort_map.{level}' must be a non-empty string")
+                raise SystemExit(f"error: {label}: '{harness}.effort_map.{level}' must be a non-empty string")
         # Declared effort names per model, for harnesses that reject undeclared ones (OpenCode variants).
         variants = entry.get("variants", {})
         if not isinstance(variants, dict):
-            raise SystemExit(f"{label}: '{harness}.variants' must map model IDs to lists of names")
+            raise SystemExit(f"error: {label}: '{harness}.variants' must map model IDs to lists of names")
         for model, names in variants.items():
             if not isinstance(names, list) or not names or not all(isinstance(n, str) and n for n in names):
-                raise SystemExit(f"{label}: '{harness}.variants.{model}' must be a non-empty list of strings")
+                raise SystemExit(f"error: {label}: '{harness}.variants.{model}' must be a non-empty list of strings")
     return data
 
 
@@ -272,7 +281,7 @@ def load_models_file(path: Path) -> dict:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise SystemExit(f"{path}: invalid JSON: {exc}")
+        raise SystemExit(f"error: {path}: invalid JSON: {exc}")
     return validate_overrides(data, path)
 
 
@@ -280,10 +289,10 @@ def load_model_defaults(repo_root: Path) -> dict:
     path = repo_root.joinpath(*MODELS_PATH)
     data = load_models_file(path)
     if not data:
-        raise SystemExit(f"Missing or empty model defaults: {path}. Define tiers and effort maps per harness.")
+        raise SystemExit(f"error: missing or empty model defaults: {path}. Define tiers and effort maps per harness.")
     missing = [harness for harness in AGENT_HARNESSES if harness not in data]
     if missing:
-        raise SystemExit(f"{path}: missing harness entries: {', '.join(missing)}")
+        raise SystemExit(f"error: {path}: missing harness entries: {', '.join(missing)}")
     return data
 
 
@@ -297,7 +306,7 @@ def check_override_agents(overrides: dict, specs: list[AgentSpec], source: str =
     for harness, entry in overrides.items():
         for name in entry.get("agents", {}):
             if name not in known:
-                raise SystemExit(f"{source}: '{harness}.agents.{name}' does not match any agent in agents/")
+                raise SystemExit(f"error: {source}: '{harness}.agents.{name}' does not match any agent in agents/")
 
 
 def tier_model(value: object) -> str | None:
@@ -345,7 +354,7 @@ def resolve(spec: AgentSpec, harness: str, overrides: dict, defaults: dict) -> R
     declared = {**default_entry.get("variants", {}), **entry.get("variants", {})}.get(model or "")
     if effort_key and declared is not None and effort not in declared:
         raise SystemExit(
-            f"{harness}/{spec.name}: {effort_key} '{effort}' is not declared for {model} "
+            f"error: {harness}/{spec.name}: {effort_key} '{effort}' is not declared for {model} "
             f"(declared: {', '.join(declared)}); fix effort_map, the tier effort, or the agent override"
         )
     if spec.name in SHADOWED_NAMES.get(harness, frozenset()):
@@ -462,7 +471,7 @@ def toml_string(value: str) -> str:
 def render_codex(spec: AgentSpec, resolved: Resolved, invariants: str) -> str:
     instructions = f"{invariants.rstrip()}\n\n{spec.body}"
     if '"""' in instructions:
-        raise SystemExit(f"{spec.source}: body contains a TOML triple quote (\"\"\"); cannot render for codex")
+        raise SystemExit(f"error: {spec.source}: body contains a TOML triple quote (\"\"\"); cannot render for codex")
     sandbox = "workspace-write" if WRITE_TOOLS & set(spec.tools) else "read-only"
     salt = f"codex:{resolved.model}:{resolved.effort}"
     lines = [
@@ -485,7 +494,7 @@ def render_codex(spec: AgentSpec, resolved: Resolved, invariants: str) -> str:
     try:
         tomllib.loads(text)
     except tomllib.TOMLDecodeError as exc:
-        raise SystemExit(f"{spec.source}: rendered codex TOML is invalid: {exc}")
+        raise SystemExit(f"error: {spec.source}: rendered codex TOML is invalid: {exc}")
     return text
 
 
@@ -625,6 +634,7 @@ def verify(repo_root: Path, selected: list[str] | None, env: dict[str, str] | No
             failures += 1
         else:
             print(f"{harness}: all {len(names)} roles present in {target}")
+        json_record(harness=harness, path=str(target), roles=len(names), missing=missing)
     return 1 if failures else 0
 
 
@@ -635,10 +645,10 @@ def selected_agent_harnesses(selected: list[str] | None) -> list[str]:
     for item in selected:
         names.extend(part.strip() for part in item.split(",") if part.strip())
     if not names:
-        raise SystemExit("No harness names parsed from --target; nothing to do")
+        raise SystemExit("error: no harness names parsed from --target; nothing to do")
     for name in names:
         if name not in AGENT_HARNESSES:
-            raise SystemExit(f"Unknown agent harness: {name}. Supported: {', '.join(AGENT_HARNESSES)}")
+            raise SystemExit(f"error: unknown agent harness: {name}. Supported: {', '.join(AGENT_HARNESSES)}")
     return list(dict.fromkeys(names))
 
 
@@ -681,13 +691,13 @@ def render_harness(
         if allow_inherit:
             notices.append(message)
         else:
-            raise SystemExit(f"{message}. Pass --allow-inherit to render inherited models anyway.")
+            raise SystemExit(f"error: {message}. Pass --allow-inherit to render inherited models anyway.")
     return rendered, notices
 
 
 def print_notices(notices: list[str]) -> None:
     for notice in dict.fromkeys(notices):
-        print(f"notice: {notice}")
+        print(f"note: {notice}", file=sys.stderr)
 
 
 def render_all(
@@ -732,12 +742,13 @@ def check(repo_root: Path, selected: list[str] | None, allow_inherit: bool = Fal
             for path in paths:
                 text = path.read_text(encoding="utf-8")
                 if GENERATED_MARKER not in text:
-                    print(f"ERROR: {harness}/{path.name} lacks the generated marker")
+                    print(f"error: {harness}/{path.name} lacks the generated marker; rerun the render", file=sys.stderr)
                     return 1
                 if harness == "codex":
                     tomllib.loads(text)
                 else:
                     parse_frontmatter(text, path)
+            json_record(harness=harness, agents=len(paths))
     print("Agent render check passed")
     return 0
 
@@ -769,25 +780,30 @@ def print_dry_run(harness: str, dest: Path, text: str) -> None:
     existing = read_text_or_none(dest)
     if existing is None:
         print(f"would create {harness}: {dest}")
+        action = "would-create"
     elif existing == text:
         print(f"unchanged {harness}: {dest}")
+        action = "unchanged"
     elif GENERATED_MARKER in existing:
         print(f"would replace {harness}: {dest}")
+        action = "would-replace"
     else:
         print(f"would replace unmanaged {harness}: {dest} (not written by this repo; backed up first)")
+        action = "would-replace-unmanaged"
+    json_record(harness=harness, action=action, path=str(dest))
 
 
 def preflight_target(target: Path, files: dict[str, str]) -> None:
     if target.exists() and not target.is_dir():
-        raise SystemExit(f"{target} exists and is not a directory")
+        raise SystemExit(f"error: {target} exists and is not a directory")
     if not target.exists():
         existing_parent = next((parent for parent in target.parents if parent.exists()), None)
         if existing_parent is not None and not existing_parent.is_dir():
-            raise SystemExit(f"{existing_parent} exists and is not a directory")
+            raise SystemExit(f"error: {existing_parent} exists and is not a directory")
     for filename in files:
         dest = target / filename
         if dest.is_symlink() or (dest.exists() and not dest.is_file()):
-            raise SystemExit(f"{dest} is a symlink or not a regular file; move it aside")
+            raise SystemExit(f"error: {dest} is a symlink or not a regular file; move it aside")
 
 
 def deploy(
@@ -820,10 +836,11 @@ def deploy(
         by_dir.setdefault(os.path.normcase(str(target.expanduser().resolve(strict=False))), []).append(harness)
     shared = {path: names for path, names in by_dir.items() if len(names) > 1}
     if shared:
-        lines = ["Agent deploy target collision detected:"]
-        lines.extend(f"- {path}: {', '.join(names)}" for path, names in sorted(shared.items()))
-        lines.append("Select one harness with --target or point one *_AGENTS_DIR env var elsewhere.")
-        raise SystemExit("\n".join(lines))
+        shared_dirs = "; ".join(f"{path} is shared by {', '.join(names)}" for path, names in sorted(shared.items()))
+        raise SystemExit(
+            f"error: agent deploy target collision: {shared_dirs}; "
+            "select one harness with --target or point one *_AGENTS_DIR env var elsewhere"
+        )
 
     for harness, target, files, stale in deployments:
         if dry_run:
@@ -831,39 +848,71 @@ def deploy(
                 print_dry_run(harness, target / filename, text)
             for path in stale:
                 print(f"would remove stale {harness}: {path}")
+                json_record(harness=harness, action="would-remove-stale", path=str(path))
             continue
 
         try:
             target.mkdir(parents=True, exist_ok=True)
         except (FileExistsError, NotADirectoryError):
-            raise SystemExit(f"{target} exists and is not a directory")
+            raise SystemExit(f"error: {target} exists and is not a directory")
         for filename, text in files.items():
             dest = target / filename
             if read_text_or_none(dest) == text:
                 print(f"unchanged {harness}: {dest}")
+                json_record(harness=harness, action="unchanged", path=str(dest))
                 continue
             backup_existing(dest, backup_dir)
             dest.write_text(text, encoding="utf-8", newline="\n")
             print(f"updated {harness}: {dest}")
+            json_record(harness=harness, action="updated", path=str(dest))
         if harness == "claude":
             legacy_guard = target / GUARD_NAME
             if is_generated(legacy_guard):
                 backup_existing(legacy_guard, backup_dir)
                 legacy_guard.unlink()
                 print(f"removed stale {harness}: {legacy_guard} (backup in {backup_dir})")
+                json_record(harness=harness, action="removed-stale", path=str(legacy_guard))
         for path in stale:
             backup_existing(path, backup_dir)
             path.unlink()
             print(f"removed stale {harness}: {path} (backup in {backup_dir})")
+            json_record(harness=harness, action="removed-stale", path=str(path))
     print_notices(notices)
+
+
+PROG = "render-agents"
+
+HELP_EPILOG = """\
+Environment:
+  AGENTS_PYTHON            Python 3.11+ executable the launcher runs (a path, not a command).
+  <HARNESS>_AGENTS_DIR     Override one agents directory: CLAUDE, CODEX, OPENCODE, COMMANDCODE, ANTIGRAVITY,
+                           or OMP.
+  CLAUDE_CONFIG_DIR, CODEX_HOME, OPENCODE_CONFIG_DIR
+                           Native config homes that move a harness's default agents directory.
+  OMP_PROFILE, PI_PROFILE, PI_CONFIG_DIR
+                           Select the Oh My Pi profile and config root.
+  HOME                     Resolves the default agents directories.
+
+""" + EXIT_CODES_HELP + CHECK_EXIT_NOTE
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     repo_root = Path(__file__).resolve().parents[1]
-    parser = argparse.ArgumentParser(description="Render and deploy subagent definitions.")
+    parser = JsonArgumentParser(
+        description="Render and deploy subagent definitions.",
+        epilog=HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--repo-root", type=Path, default=repo_root)
     parser.add_argument("--out-dir", type=Path, default=repo_root / "build" / "agents")
-    parser.add_argument("--target", action="append", help="Harness target, repeatable or comma-separated.")
+    parser.add_argument(
+        "--target",
+        "--harness",
+        dest="target",
+        action="append",
+        metavar="HARNESS",
+        help="Harness to select, repeatable or comma-separated (--harness is an alias).",
+    )
     parser.add_argument("--deploy", action="store_true", help="Write rendered agents to global harness directories.")
     parser.add_argument("--dry-run", action="store_true", help="Print deploy actions without writing.")
     parser.add_argument("--check", action="store_true", help="Validate rendered output without persistent writes.")
@@ -879,14 +928,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Render harnesses with no tier map as session-model inheritance instead of failing.",
     )
     parser.add_argument("--backup-dir", type=Path, default=repo_root / ".backups", help="Directory for deploy backups.")
+    parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
     return parser.parse_args(argv)
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
+def run(args: argparse.Namespace) -> int:
     if args.list_targets:
         for harness in selected_agent_harnesses(args.target):
             print(f"{harness}\t{HARNESS_DISPLAY[harness]}\t{agent_target_dir(harness)}\t{TARGET_DIRS[harness][1]}")
+            json_record(
+                name=harness,
+                display=HARNESS_DISPLAY[harness],
+                path=str(agent_target_dir(harness)),
+                env_var=TARGET_DIRS[harness][1],
+            )
         return 0
     if args.check:
         return check(args.repo_root, args.target, args.allow_inherit)
@@ -894,7 +949,7 @@ def main(argv: list[str] | None = None) -> int:
         return verify(args.repo_root, args.target)
     if args.deploy and not args.target:
         raise SystemExit(
-            "--deploy requires --target (for example --target claude,opencode). "
+            "error: --deploy requires --target (for example --target claude,opencode). "
             "Use --dry-run without --target to preview every harness."
         )
     overrides = load_overrides(args.repo_root)
@@ -904,7 +959,23 @@ def main(argv: list[str] | None = None) -> int:
     written = render_all(args.repo_root, args.out_dir, args.target, overrides, args.allow_inherit)
     for harness, paths in written.items():
         print(f"rendered {harness}: {paths[0].parent} ({len(paths)} agents)")
+        json_record(harness=harness, path=str(paths[0].parent), agents=len(paths))
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    if not args.json:
+        return run(args)
+    if args.list_targets:
+        return run_json(lambda: run(args), PROG, "targets", mode="list-targets")
+    if args.check:
+        return run_json(lambda: run(args), PROG, "checked", mode="check")
+    if args.verify:
+        return run_json(lambda: run(args), PROG, "harnesses", "a role file is missing; run --deploy", mode="verify")
+    if args.deploy or args.dry_run:
+        return run_json(lambda: run(args), PROG, "actions", mode="deploy", dry_run=args.dry_run)
+    return run_json(lambda: run(args), PROG, "rendered", mode="render")
 
 
 if __name__ == "__main__":

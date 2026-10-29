@@ -194,11 +194,11 @@ def main(argv: list[str] | None = None) -> int:
         files = tracked_files(repo)
         failures = check_links(repo, files) + check_commands(repo, files)
     except ToolError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+        print(f"error: {exc}", file=sys.stderr)
         return 2
     if failures:
         for failure in failures:
-            print(f"ERROR: {failure}")
+            print(f"error: {failure}", file=sys.stderr)
         return 1
     print("Docs links check passed")
     return 0

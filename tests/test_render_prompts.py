@@ -606,7 +606,7 @@ def test_backup_existing_copies_dangling_symlink_without_crashing(tmp_path):
 
 
 def test_selected_harnesses_reject_empty_target_list():
-    with pytest.raises(SystemExit, match="No harness names"):
+    with pytest.raises(SystemExit, match="no harness names"):
         renderer.selected_harnesses([""])
 
 
@@ -664,7 +664,7 @@ def test_deploy_refuses_colliding_targets_before_writing(tmp_path, monkeypatch):
         )
 
     message = str(exc_info.value)
-    assert "Deploy target collision detected" in message
+    assert "deploy target collision" in message
     assert "codex (OpenAI Codex)" in message
     assert "opencode (OpenCode)" in message
     assert str(target) in message
@@ -692,7 +692,7 @@ def test_deploy_refuses_normalized_colliding_targets_before_writing(tmp_path, mo
         )
 
     message = str(exc_info.value)
-    assert "Deploy target collision detected" in message
+    assert "deploy target collision" in message
     assert "codex (OpenAI Codex)" in message
     assert "opencode (OpenCode)" in message
     assert str(direct_target.resolve(strict=False)) in message
@@ -887,14 +887,14 @@ def test_private_harnesses_all_keyword(tmp_path):
 
 @pytest.mark.parametrize("names", ["claud", "all,claud"])
 def test_private_harnesses_rejects_unknown_names_from_env(tmp_path, names):
-    with pytest.raises(SystemExit, match="Unknown harness in private trust list: claud"):
+    with pytest.raises(SystemExit, match="unknown harness in private trust list: claud"):
         renderer.private_harnesses(tmp_path, env={"AGENTS_PRIVATE_HARNESSES": names})
 
 
 def test_private_harnesses_rejects_unknown_names_from_file(tmp_path):
     (tmp_path / "prompts").mkdir()
     (tmp_path / "prompts" / "private-harnesses.txt").write_text("all\nclaud\n", encoding="utf-8")
-    with pytest.raises(SystemExit, match="Unknown harness in private trust list: claud"):
+    with pytest.raises(SystemExit, match="unknown harness in private trust list: claud"):
         renderer.private_harnesses(tmp_path, env={})
 
 
@@ -929,7 +929,7 @@ def test_private_overlay_withheld_everywhere_without_trust_list(tmp_path, monkey
         text = path.read_text(encoding="utf-8")
         assert ("local layer" in text) == (renderer.harness_by_name(harness).support_level == renderer.DEPLOYABLE)
         assert "private layer" not in text
-    notice = capsys.readouterr().out
+    notice = capsys.readouterr().err
     assert "prompts/private.md withheld from claude, codex" in notice
     assert "generic" not in notice
 
@@ -942,7 +942,7 @@ def test_private_overlay_reaches_only_trusted_harnesses(tmp_path, monkeypatch, c
 
     for harness, path in written.items():
         assert ("private layer" in path.read_text(encoding="utf-8")) == (harness in {"opencode", "omp"})
-    notice = capsys.readouterr().out
+    notice = capsys.readouterr().err
     assert "withheld from claude, codex, commandcode" in notice
     assert "omp" not in notice.split("withheld from")[1].split(";")[0]
 
@@ -958,7 +958,7 @@ def test_trust_all_reaches_every_global_target_without_notice(tmp_path, monkeypa
         is_global = renderer.harness_by_name(harness).support_level == renderer.DEPLOYABLE
         assert ("private layer" in text) == is_global
         assert ("local layer" in text) == is_global
-    assert "withheld" not in capsys.readouterr().out
+    assert "withheld" not in capsys.readouterr().err
 
 
 def test_project_level_targets_never_carry_overlays(tmp_path, monkeypatch):
@@ -1009,7 +1009,7 @@ def test_omp_explicit_path_beats_profile(tmp_path):
 
 @pytest.mark.parametrize("name", ["Work", "../x", "trailing.", "con"])
 def test_omp_invalid_profile_fails_loud(tmp_path, name):
-    with pytest.raises(SystemExit, match="Invalid omp profile"):
+    with pytest.raises(SystemExit, match="invalid omp profile"):
         renderer.target_path("omp", home=tmp_path, env={"OMP_PROFILE": name})
 
 
@@ -1095,3 +1095,12 @@ def test_deploy_dry_run_flags_unmanaged_rules_file(tmp_path, monkeypatch, capsys
     mine.write_text(mine.read_text(encoding="utf-8") + "local edit\n", encoding="utf-8")
     renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=True, backup_dir=tmp_path / "b")
     assert f"would update claude: {mine}" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "args", [["--target", "claude,codex"], ["--harness", "claude,codex"], ["--harness", "claude", "--harness", "codex"]]
+)
+def test_harness_is_an_alias_of_target(capsys, args):
+    assert renderer.main(["--list-targets", *args]) == 0
+    out = capsys.readouterr().out
+    assert "claude" in out and "codex" in out and "opencode" not in out

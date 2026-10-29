@@ -18,6 +18,124 @@ DEPLOYABLE = "deployable"
 MANUAL = "manual"
 SUPPORT_LEVELS = {DEPLOYABLE, MANUAL}
 
+EXIT_CODES_HELP = """\
+Exit codes:
+  0  done
+  1  failed
+  2  usage error
+  3  a required tool is missing
+"""
+
+CHECK_EXIT_NOTE = "  --check, --status, and --verify exit 0 when all is good and 1 when something is missing or out of sync.\n"
+
+PROG = "sync-ai-prompts"
+
+HELP_EPILOG = """\
+Environment:
+  AGENTS_PYTHON            Python 3.11+ executable the launcher runs (a path, not a command).
+  AGENTS_PRIVATE_HARNESSES Comma-separated harnesses that receive prompts/private.md; 'all' for every one.
+  <HARNESS>_AGENTS_PATH    Override one rules file: CLAUDE, CODEX, OPENCODE, COMMANDCODE, ANTIGRAVITY, OMP,
+                           HERMES, or GENERIC. Manual targets need it before --deploy writes.
+  CLAUDE_CONFIG_DIR, CODEX_HOME, OPENCODE_CONFIG_DIR, PI_CODING_AGENT_DIR
+                           Native config homes that move a harness's default rules path.
+  OMP_PROFILE, PI_PROFILE, PI_CONFIG_DIR
+                           Select the Oh My Pi profile and config root.
+  HOME                     Resolves the default global paths.
+
+""" + EXIT_CODES_HELP + CHECK_EXIT_NOTE
+
+JSON_RECORDS: list[dict] | None = None
+JSON_EXTRA: dict[str, object] = {}
+
+
+def json_record(**fields: object) -> None:
+    """Add one record to the --json result of the running command; a no-op without --json."""
+    if JSON_RECORDS is not None:
+        JSON_RECORDS.append(fields)
+
+
+def json_extra(**fields: object) -> None:
+    """Add top-level keys to the --json result, for values known only while the command runs."""
+    if JSON_RECORDS is not None:
+        JSON_EXTRA.update(fields)
+
+
+class JsonArgumentParser(argparse.ArgumentParser):
+    """Argument parser that reports usage errors as the --json object when --json was given."""
+
+    wants_json = False
+
+    def parse_args(self, args=None, namespace=None):  # type: ignore[override]
+        self.wants_json = "--json" in (sys.argv[1:] if args is None else args)
+        return super().parse_args(args, namespace)
+
+    def error(self, message: str):  # type: ignore[override]
+        if self.wants_json:
+            line = f"error: {self.prog}: {message}; run with --help for usage"
+            print(json.dumps({"ok": False, "errors": [line], "warnings": [], "notes": []}))
+            raise SystemExit(2)
+        super().error(message)
+
+
+class _Tee:
+    """Write-through stream that keeps what was written."""
+
+    def __init__(self, target) -> None:
+        self.target = target
+        self.chunks: list[str] = []
+
+    def write(self, text: str) -> int:
+        self.chunks.append(text)
+        return self.target.write(text)
+
+    def flush(self) -> None:
+        self.target.flush()
+
+    def lines(self) -> list[str]:
+        return "".join(self.chunks).splitlines()
+
+
+def run_json(work, prog: str, key: str, fail_message: str | None = None, **fixed: object) -> int:
+    """Run work() with human output moved to stderr, then print the one --json object to stdout.
+
+    The object holds ok, errors, warnings, notes, any fixed keys, and the records the command
+    added with json_record() under `key`. The exit code is the one work() returns.
+    """
+    global JSON_RECORDS
+    records: list[dict] = []
+    JSON_RECORDS = records
+    JSON_EXTRA.clear()
+    real_stdout, real_stderr = sys.stdout, sys.stderr
+    tee = _Tee(real_stderr)
+    sys.stdout = sys.stderr = tee  # type: ignore[assignment]
+    code = 0
+    try:
+        code = work()
+    except SystemExit as exc:
+        if isinstance(exc.code, str):
+            print(exc.code)
+            code = 1
+        else:
+            code = exc.code or 0
+    finally:
+        sys.stdout, sys.stderr = real_stdout, real_stderr
+        JSON_RECORDS = None
+    lines = tee.lines()
+    errors = [line for line in lines if line.startswith("error:")]
+    if code != 0 and not errors:
+        errors.append(f"error: {prog}: {fail_message or f'exited with status {code}'}")
+    payload = {
+        "ok": code == 0,
+        "errors": errors,
+        "warnings": [line for line in lines if line.startswith("warning:")],
+        "notes": [line for line in lines if line.startswith("note:")],
+        **fixed,
+        **JSON_EXTRA,
+        key: records,
+    }
+    print(json.dumps(payload))
+    return code
+
 
 class Harness(NamedTuple):
     name: str
@@ -174,7 +292,7 @@ def harness_by_name(name: str) -> Harness:
         if harness.name == name:
             return harness
     supported = ", ".join(harness_names())
-    raise SystemExit(f"Unknown harness: {name}. Supported: {supported}")
+    raise SystemExit(f"error: unknown harness: {name}. Supported: {supported}")
 
 
 def harness_names() -> list[str]:
@@ -208,7 +326,7 @@ def selected_harnesses(selected: list[str] | None) -> list[Harness]:
     for item in selected:
         names.extend(part.strip() for part in item.split(",") if part.strip())
     if not names:
-        raise SystemExit("No harness names parsed from --target; nothing to do")
+        raise SystemExit("error: no harness names parsed from --target; nothing to do")
     return [harness_by_name(name) for name in names]
 
 
@@ -223,7 +341,7 @@ def omp_profile(env: dict[str, str] | os._Environ[str]) -> str | None:
     if not name or name == "default":
         return None
     if name.endswith(".") or not OMP_PROFILE_RE.match(name) or WINDOWS_RESERVED_RE.match(name):
-        raise SystemExit(f"Invalid omp profile {name!r}; names must match {OMP_PROFILE_RE.pattern}")
+        raise SystemExit(f"error: invalid omp profile {name!r}; names must match {OMP_PROFILE_RE.pattern}")
     return name
 
 
@@ -310,9 +428,9 @@ def drop_sections(core: str, names: tuple[str, ...]) -> str:
         heading = f"## {name}"
         starts = [i for i, line in enumerate(lines) if line.rstrip() == heading]
         if not starts:
-            raise SystemExit(f"omitted core section {name!r} not found in prompts/core.md")
+            raise SystemExit(f"error: omitted core section {name!r} not found in prompts/core.md")
         if len(starts) > 1:
-            raise SystemExit(f"omitted core section {name!r} appears more than once in prompts/core.md")
+            raise SystemExit(f"error: omitted core section {name!r} appears more than once in prompts/core.md")
         end = next((i for i in range(starts[0] + 1, len(lines)) if lines[i].startswith(("## ", "# "))), len(lines))
         del lines[starts[0] : end]
     return "".join(lines)
@@ -351,7 +469,7 @@ def render_document(
 def read_fragment(repo_root: Path, harness: Harness) -> str:
     path = repo_root / "prompts" / "harnesses" / harness.fragment
     if not path.exists():
-        raise SystemExit(f"Missing fragment for {harness.name}: {path}")
+        raise SystemExit(f"error: missing fragment for {harness.name}: {path}")
     return path.read_text(encoding="utf-8")
 
 
@@ -389,7 +507,7 @@ def private_harnesses(repo_root: Path, env: dict[str, str] | None = None) -> fro
     unknown = sorted(set(names) - set(harness_names()) - {ALL_HARNESSES_KEYWORD})
     if unknown:
         raise SystemExit(
-            f"Unknown harness in private trust list: {', '.join(unknown)}. "
+            f"error: unknown harness in private trust list: {', '.join(unknown)}. "
             f"Supported: {', '.join(harness_names())}, or {ALL_HARNESSES_KEYWORD}"
         )
     if ALL_HARNESSES_KEYWORD in names:
@@ -421,7 +539,7 @@ def withheld_notice(overlays: Overlays, names: list[str]) -> str | None:
     if not withheld:
         return None
     return (
-        f"notice: prompts/private.md withheld from {', '.join(withheld)}; list trusted harnesses in "
+        f"note: prompts/private.md withheld from {', '.join(withheld)}; list trusted harnesses in "
         f"prompts/{PRIVATE_HARNESSES_FILE} or {PRIVATE_HARNESSES_ENV} (use '{ALL_HARNESSES_KEYWORD}' for every one)"
     )
 
@@ -476,7 +594,7 @@ def enforce_budget(harness: Harness, rendered: str) -> None:
     if size > harness.max_bytes:
         parts = ", ".join(f"{label} {count}" for label, count in section_sizes(rendered))
         raise SystemExit(
-            f"{harness.name}: rendered {size} bytes exceeds its {harness.max_bytes}-byte budget "
+            f"error: {harness.name}: rendered {size} bytes exceeds its {harness.max_bytes}-byte budget "
             f"({parts}); trim the fragment or the local/private overlays"
         )
     if size >= harness.max_bytes * BUDGET_WARN_RATIO:
@@ -503,7 +621,7 @@ def render_all(
     overlays = load_overlays(repo_root)
     notice = withheld_notice(overlays, [harness.name for harness in harnesses if global_target(harness)])
     if notice:
-        print(notice)
+        print(notice, file=sys.stderr)
     written: dict[str, Path] = {}
     for harness in harnesses:
         dest = output_path(out_dir, harness, collisions)
@@ -521,12 +639,13 @@ def check_render_shape(repo_root: Path, selected: list[str] | None = None) -> in
         written = render_all(repo_root, out_dir, selected=selected, stamp="check")
         paths = list(written.values())
         if len(paths) != len(set(paths)):
-            print("ERROR: render output paths collide")
+            print("error: render output paths collide; fix the harness output names", file=sys.stderr)
             return 1
         for harness, path in written.items():
             if not path.exists():
-                print(f"ERROR: missing rendered output for {harness}: {path}")
+                print(f"error: missing rendered output for {harness}: {path}; rerun the render", file=sys.stderr)
                 return 1
+            json_record(harness=harness)
         print("Render shape check passed")
         return 0
 
@@ -557,12 +676,14 @@ def target_collisions(resolved: dict[Harness, Path]) -> dict[Path, list[Harness]
 
 
 def format_target_collision(collisions: dict[Path, list[Harness]]) -> str:
-    lines = ["Deploy target collision detected:"]
+    shared = []
     for dest, harnesses in sorted(collisions.items(), key=lambda item: str(item[0])):
         labels = ", ".join(f"{harness.name} ({harness.display})" for harness in harnesses)
-        lines.append(f"- {dest}: {labels}")
-    lines.append("Select one target with --target or override one path with its *_AGENTS_PATH env var.")
-    return "\n".join(lines)
+        shared.append(f"{dest} is shared by {labels}")
+    return (
+        f"error: deploy target collision: {'; '.join(shared)}; "
+        "select one target with --target or override one path with its *_AGENTS_PATH env var"
+    )
 
 
 def backup_existing(path: Path, backup_dir: Path) -> None:
@@ -625,13 +746,15 @@ def deploy(
     resolved, skipped = resolve_deploy_targets(harnesses)
     notice = withheld_notice(overlays, [harness.name for harness in resolved if global_target(harness)])
     if notice:
-        print(notice)
+        print(notice, file=sys.stderr)
 
     for harness in skipped:
         if harness.consumed_from_build:
             print(f"skipping {harness.name}: render-only target, read from build/generated/{harness.output_name}")
+            json_record(harness=harness.name, action="skipped", path=None, reason="render-only")
         else:
             print(f"skipping {harness.name}: manual target requires {harness.env_var}")
+            json_record(harness=harness.name, action="skipped", path=None, reason=f"manual; set {harness.env_var}")
 
     collisions = target_collisions(resolved)
     if collisions:
@@ -640,7 +763,7 @@ def deploy(
     for harness, dest in resolved.items():
         if dest.is_symlink():
             raise SystemExit(
-                f"{dest} is a symlink; refusing to write through it. "
+                f"error: {dest} is a symlink; refusing to write through it. "
                 f"Move it aside or point {harness.env_var} at a regular file."
             )
 
@@ -654,18 +777,24 @@ def deploy(
             existing = dest.read_text(encoding="utf-8", errors="replace") if dest.exists() else None
             if existing is not None and PROMPT_MARKER not in existing:
                 print(f"would replace unmanaged {harness.name}: {dest} (not written by this repo; backed up first)")
+                action = "would-replace-unmanaged"
             elif existing == rendered:
                 print(f"unchanged {harness.name}: {dest}")
+                action = "unchanged"
             else:
                 print(f"would update {harness.name}: {dest}")
+                action = "would-update"
+            json_record(harness=harness.name, action=action, path=str(dest))
             continue
         dest.parent.mkdir(parents=True, exist_ok=True)
         if dest.exists() and dest.read_text(encoding="utf-8", errors="replace") == rendered:
             print(f"unchanged {harness.name}: {dest}")
+            json_record(harness=harness.name, action="unchanged", path=str(dest))
         else:
             backup_existing(dest, backup_dir)
             dest.write_text(rendered, encoding="utf-8", newline="\n")
             print(f"updated {harness.name}: {dest}")
+            json_record(harness=harness.name, action="updated", path=str(dest))
         manifest[harness.name] = {"path": str(dest), "hash": content_hash(rendered)}
 
     if not dry_run:
@@ -676,7 +805,7 @@ def deploy(
 def prune_backups(backup_dir: Path, keep: int, dry_run: bool) -> int:
     """Keep the newest `keep` backups, remove the rest. Dry-run reports only."""
     if keep < 0:
-        raise SystemExit("--prune-backups requires a non-negative count")
+        raise SystemExit("error: --prune-backups requires a non-negative count")
     if not backup_dir.is_dir():
         print(f"no backups at {backup_dir}")
         return 0
@@ -690,9 +819,11 @@ def prune_backups(backup_dir: Path, keep: int, dry_run: bool) -> int:
     for path in stale:
         if dry_run:
             print(f"would remove {path}")
+            json_record(path=str(path), action="would-remove")
             continue
         path.unlink()
         print(f"removed {path}")
+        json_record(path=str(path), action="removed")
     verb = "would prune" if dry_run else "pruned"
     print(f"{verb} {len(stale)} of {len(files)} backups in {backup_dir}")
     return 0
@@ -711,40 +842,61 @@ def status(repo_root: Path, selected: list[str] | None, stamp: str | None, out_d
             built = (out_dir or repo_root / "build" / "generated") / harness.output_name
             if not built.exists():
                 print(f"{harness.name}: not rendered ({built})")
+                state = "not-rendered"
             elif built.read_text(encoding="utf-8", errors="replace") == rendered:
                 print(f"{harness.name}: rendered file in sync ({built})")
+                json_record(harness=harness.name, state="in-sync", path=str(built))
                 continue
             else:
                 print(f"{harness.name}: rendered file differs from a fresh render ({built})")
+                state = "drift"
             # A bare --status must not fail for users who never render this target.
+            json_record(harness=harness.name, state=state, path=str(built))
             drift += 1 if selected else 0
             continue
         if dest is None:
             print(f"{harness.name}: manual target ({harness.env_var})")
+            json_record(harness=harness.name, state="manual", path=None)
             continue
         if not dest.exists():
             print(f"{harness.name}: not deployed ({dest})")
+            json_record(harness=harness.name, state="not-deployed", path=str(dest))
             drift += 1
             continue
         current = dest.read_text(encoding="utf-8", errors="replace")
         if current == rendered:
             print(f"{harness.name}: in sync ({dest})")
+            json_record(harness=harness.name, state="in-sync", path=str(dest))
             continue
         recorded = manifest.get(harness.name, {}).get("hash")
         if recorded and content_hash(current) != recorded:
             print(f"{harness.name}: local edits since deploy ({dest})")
+            state = "local-edits"
         else:
             print(f"{harness.name}: drift from current render ({dest})")
+            state = "drift"
+        json_record(harness=harness.name, state=state, path=str(dest))
         drift += 1
     return 1 if drift else 0
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     repo_root = Path(__file__).resolve().parents[1]
-    parser = argparse.ArgumentParser(description="Render and deploy canonical agent prompt files.")
+    parser = JsonArgumentParser(
+        description="Render and deploy canonical agent prompt files.",
+        epilog=HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--repo-root", type=Path, default=repo_root)
     parser.add_argument("--out-dir", type=Path, default=repo_root / "build" / "generated")
-    parser.add_argument("--target", action="append", help="Harness target, repeatable or comma-separated.")
+    parser.add_argument(
+        "--target",
+        "--harness",
+        dest="target",
+        action="append",
+        metavar="HARNESS",
+        help="Harness to select, repeatable or comma-separated (--harness is an alias).",
+    )
     parser.add_argument("--stamp", help="Override generated date, useful for tests.")
     parser.add_argument("--deploy", action="store_true", help="Write rendered files to global harness paths.")
     parser.add_argument("--dry-run", action="store_true", help="Print deploy targets without writing.")
@@ -767,16 +919,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=repo_root / ".backups",
         help="Directory for deploy backups.",
     )
+    parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
     return parser.parse_args(argv)
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
+def run(args: argparse.Namespace) -> int:
     if args.list_targets:
         for harness in selected_harnesses(args.target):
             dest = target_path(harness.name)
             target = str(dest) if dest is not None else default_target_label(harness)
             print(f"{harness.name}\t{harness.display}\t{harness.support_level}\t{target}")
+            json_record(
+                name=harness.name,
+                display=harness.display,
+                support=harness.support_level,
+                path=str(dest) if dest is not None else None,
+                target=target,
+            )
         return 0
 
     if args.check:
@@ -790,7 +949,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.deploy and not args.target:
         raise SystemExit(
-            "--deploy requires --target (for example --target claude,opencode). "
+            "error: --deploy requires --target (for example --target claude,opencode). "
             "Use --dry-run without --target to preview every harness."
         )
 
@@ -801,7 +960,27 @@ def main(argv: list[str] | None = None) -> int:
     written = render_all(args.repo_root, args.out_dir, selected=args.target, stamp=args.stamp)
     for harness, path in written.items():
         print(f"rendered {harness}: {path}")
+        json_record(harness=harness, path=str(path))
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    if not args.json:
+        return run(args)
+    if args.list_targets:
+        return run_json(lambda: run(args), PROG, "targets", mode="list-targets")
+    if args.check:
+        return run_json(lambda: run(args), PROG, "checked", mode="check")
+    if args.status:
+        return run_json(lambda: run(args), PROG, "harnesses", "deployed files differ from a fresh render", mode="status")
+    if args.prune_backups is not None:
+        return run_json(
+            lambda: run(args), PROG, "backups", mode="prune-backups", keep=args.prune_backups, dry_run=args.dry_run
+        )
+    if args.deploy or args.dry_run:
+        return run_json(lambda: run(args), PROG, "actions", mode="deploy", dry_run=args.dry_run)
+    return run_json(lambda: run(args), PROG, "rendered", mode="render")
 
 
 if __name__ == "__main__":

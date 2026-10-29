@@ -23,6 +23,7 @@ jobs:
   promptfoo:
     name: LLM security scan
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     env:
       PROMPTFOO_API_KEY: ${{ secrets.PROMPTFOO_API_KEY }}
     steps:

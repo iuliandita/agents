@@ -86,7 +86,7 @@ def test_pull_refuses_local_tracked_changes(tmp_path):
     git(tmp_path, "add", "file.txt")
     git(tmp_path, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "init")
     (tmp_path / "file.txt").write_text("two\n", encoding="utf-8")
-    with pytest.raises(SystemExit, match="Local tracked changes"):
+    with pytest.raises(SystemExit, match="local tracked changes"):
         update.pull(tmp_path)
 
 
@@ -104,13 +104,15 @@ def test_detect_follows_native_config_home(tmp_path, monkeypatch):
     assert found == {"codex": f"config {tmp_path / 'custom-codex'}"}
 
 
-def test_git_missing_fails_with_clear_message(tmp_path, monkeypatch):
+def test_git_missing_exits_three_with_clear_message(tmp_path, monkeypatch, capsys):
     def missing(*args, **kwargs):
         raise FileNotFoundError("git")
 
     monkeypatch.setattr(update.subprocess, "run", missing)
-    with pytest.raises(SystemExit, match="git is not on PATH"):
+    with pytest.raises(SystemExit) as exc:
         update.pull(tmp_path)
+    assert exc.value.code == 3
+    assert "error: git is not on PATH" in capsys.readouterr().err
 
 
 def test_git_runs_noninteractive_with_timeout(tmp_path, monkeypatch):
@@ -126,7 +128,7 @@ def test_git_runs_noninteractive_with_timeout(tmp_path, monkeypatch):
     assert seen["timeout"] == update.GIT_TIMEOUT_SECONDS
 
 
-def run_main(tmp_path, monkeypatch, fail_at=None):
+def run_main(tmp_path, monkeypatch, fail_at=None, flag="--targets"):
     calls = []
 
     def fake(cmd, **kwargs):
@@ -137,7 +139,7 @@ def run_main(tmp_path, monkeypatch, fail_at=None):
     monkeypatch.setattr(update.subprocess, "run", fake)
     monkeypatch.delenv("AGENTS_PRIVATE_HARNESSES", raising=False)
     (tmp_path / "prompts").mkdir(exist_ok=True)
-    rc = update.main(["--repo-root", str(tmp_path), "--targets", "claude,codex", "--no-pull"])
+    rc = update.main(["--repo-root", str(tmp_path), flag, "claude,codex", "--no-pull"])
     return rc, calls
 
 
@@ -150,13 +152,23 @@ def test_main_runs_every_step_and_reports_success(tmp_path, monkeypatch, capsys)
     assert "update complete for: claude, codex" in out
 
 
+def test_harness_is_an_alias_of_targets(tmp_path, monkeypatch, capsys):
+    rc, calls = run_main(tmp_path, monkeypatch, flag="--harness")
+    assert rc == 0
+    assert len(calls) == len(update.plan(tmp_path, ["claude", "codex"], dry_run=False))
+    assert "update complete for: claude, codex" in capsys.readouterr().out
+    assert update.parse_args(["--harness", "claude", "--harness", "codex"]).targets == ["claude", "codex"]
+    assert update.parse_args(["--targets", "claude"]).targets == ["claude"]
+    assert update.parse_args([]).targets is None
+
+
 @pytest.mark.parametrize("fail_at", [1, 3, 6])
 def test_main_stops_at_first_failing_step(tmp_path, monkeypatch, capsys, fail_at):
     rc, calls = run_main(tmp_path, monkeypatch, fail_at=fail_at)
     assert rc == 1
     assert len(calls) == fail_at
     captured = capsys.readouterr()
-    assert "update failed at:" in captured.err
+    assert "update failed at" in captured.err
     assert "update complete" not in captured.out
 
 
@@ -170,6 +182,6 @@ def test_overlay_summary_names_trust_source(tmp_path, monkeypatch):
 
 def test_second_run_is_refused_while_locked(tmp_path):
     with update.run_lock(tmp_path):
-        with pytest.raises(SystemExit, match="Another update is running"):
+        with pytest.raises(SystemExit, match="another update is running"):
             with update.run_lock(tmp_path):
                 pass

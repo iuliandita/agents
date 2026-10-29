@@ -1,50 +1,49 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "none",
-      "docs": [
-        "CHANGELOG.md",
-        "INSTALL.md"
-      ],
-      "fingerprint": "e2dc398f41cbf3db96ca0922c35bacaa11ec3116fa209426f3765e613b4d8981",
-      "note": "Hermes merge follows the agent block's own indent and refuses an inline agent value instead of writing a duplicate key."
-    },
-    "harnesses": {
-      "breaking": "none",
+      "breaking": "Wrappers that read ERROR:, WARN:, or notice: lines from stdout, or that test for exit code 1 when Python 3.11+ or the VCS tool is missing, no longer match: messages are lower-case error:, warning:, and note: lines on stderr, and a missing tool exits 3.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "d9cd1a3d3fde83fc0fc3042e95987f6ee377ab0532753e1327eb2fa7dbbb4608",
-      "note": "Backups take a fresh mtime so --prune-backups keeps the most recently taken ones, as README already describes."
+      "fingerprint": "c40cffcb2c5dd6e3f76af991a5619b69a75678ff890b5d2b89beaa422ea7c067",
+      "migration": "Back up any wrapper script or CI step that parses launcher output. To upgrade, switch it to read stderr and the lower-case prefixes and to treat exit 3 as a missing tool, or use --json for a stable stdout object. Roll back by checking out v4.3.0 and redeploying; deployed files are unchanged.",
+      "note": "Record the stderr prefixes, exit code 3 for a missing Python or VCS tool, and the --json contract as breaking; INSTALL.md already documents them."
+    },
+    "harnesses": {
+      "breaking": "Scripts that read ERROR: or notice: lines from sync-ai-prompts stdout, or test for exit code 1 when Python 3.11+ is missing, no longer match: messages are lower-case error:, warning:, and note: lines on stderr, and a missing Python exits 3.",
+      "docs": [
+        "CHANGELOG.md"
+      ],
+      "fingerprint": "61a1f6e4702d422ecf6eb81b3498b8209645455db59f8dd05484fd6412a05521",
+      "migration": "Back up any wrapper that parses sync-ai-prompts output. To upgrade, switch it to read stderr and the lower-case prefixes and to treat exit 3 as a missing tool, or use --json; --target keeps working beside --harness. Roll back by checking out v4.3.0 and redeploying; rendered rules files are unchanged.",
+      "note": "Record the stderr prefixes, exit code 3, the --harness alias, and the --json contract as breaking; INSTALL.md already documents them."
     },
     "maintenance": {
-      "breaking": "none",
+      "breaking": "Tooling that reads ERROR: or WARN: lines from the check_*.py scripts on stdout no longer matches; findings are error: and warning: lines on stderr and the exit codes are unchanged.",
       "docs": [
-        "CHANGELOG.md",
-        "README.md",
-        "docs/MAINTENANCE.md"
+        "CHANGELOG.md"
       ],
-      "fingerprint": "9b1f83717bef6eb2d7e9398f49793ccc6f34b4b641457e62cc05617527a2ef40",
-      "note": "Document the separate docs link and command check and that CI and releases run both scripts."
+      "fingerprint": "1ee9f97e80d9596fb2662d73381793a9bb4b3c4fa05d4a11db8e475a4bcf3979",
+      "migration": "Back up the CI step or hook that parses check output. To upgrade, switch it to read stderr and the lower-case prefixes and keep the exit code as the gate. Roll back by checking out v4.3.0.",
+      "note": "Record that the check scripts print lower-case error: and warning: lines on stderr; docs/MAINTENANCE.md already says so."
     },
     "models-agents": {
-      "breaking": "none",
+      "breaking": "Scripts that read ERROR: or notice: lines from render-agents stdout no longer match, and the Codex mid tier (builder) now renders gpt-6.1-terra instead of gpt-6.1-sol, which needs Codex CLI 0.159.0 or later.",
       "docs": [
-        "CHANGELOG.md",
-        "README.md"
+        "CHANGELOG.md"
       ],
-      "fingerprint": "4e2d95cf9972b0a768b72a0e0e28a786f53cb438d3ce885ea3a67cf4d017d7b1",
-      "note": "reviewer and explorer roles no longer assume a shell; deploy refuses shared agents directories; tracked per-agent overrides apply under local ones."
+      "fingerprint": "e1ad342cafcea70316641a105c87b2d4cd1e3055ee451272d9ac01bc9656ff4e",
+      "migration": "Back up deployed Codex role files and read render-agents errors and notes from stderr. To upgrade, redeploy; to keep builder on Sol, set mid to gpt-6.1-sol under codex.tiers in prompts/models.local.json first. Roll back by checking out v4.3.0 and redeploying.",
+      "note": "Record the stderr prefixes for render-agents, the Codex mid tier move to gpt-6.1-terra, and the --json contract as breaking; INSTALL.md and the harness contract already document them."
     },
     "overlays-trust": {
-      "breaking": "none",
+      "breaking": "CI steps or hooks that read ERROR: lines from lint_prompts.py or scan_prompt_sources.py on stdout no longer match; findings are error: lines on stderr and the exit codes are unchanged.",
       "docs": [
-        "CHANGELOG.md",
-        "INSTALL.md",
-        "README.md"
+        "CHANGELOG.md"
       ],
-      "fingerprint": "08eb42c17f8d186c03a047ef5b7c0b1bbebc6504fa337580ffdddcd4f3aaf24f",
-      "note": "State that the Paperclip target never carries local or private overlays and that the lint line cap for its fragment is larger."
+      "fingerprint": "3a2e492efc4640a99c3f133726d3776554f51f85efba5be2a64e7ba4596ebefc",
+      "migration": "Back up the hook or CI step that parses the output. To upgrade, switch it to read stderr and the lower-case prefix and keep the exit code as the gate. Roll back by checking out v4.3.0; overlays and ignore rules are unchanged.",
+      "note": "Record that lint_prompts and scan_prompt_sources print lower-case error: lines on stderr; INSTALL.md already documents the prefixes."
     },
     "prompts": {
       "breaking": "none",
