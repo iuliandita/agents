@@ -4,6 +4,24 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-10-29
+
+### Breaking
+
+- Errors, warnings, and notes print as lower-case `error:`, `warning:`, and `note:` lines on stderr, one line
+  each. The old upper-case `ERROR:` and `WARN:` lines on stdout, the `notice:` prefix (now `note:`), and
+  unprefixed exit texts are gone. This covers the renderers, `scripts/update`, `install_workflow.py`, and the
+  `check_*.py`, `lint_prompts.py`, and `scan_prompt_sources.py` checks. To adapt, read stderr instead of
+  stdout and match the lower-case prefixes; the exit codes of these paths did not change.
+- A missing Python 3.11+ in the launchers, or a missing git in `scripts/update`, exits 3 instead of 1. To
+  adapt, treat 3 as "a required tool is missing" in wrappers that tested for 1.
+- The Codex `mid` tier now uses `gpt-6.1-terra` instead of `gpt-6.1-sol`, so `builder` runs on the faster
+  model at half the Sol input price. `flagship` stays on Sol. Terra needs Codex CLI 0.159.0 or later; to
+  keep `builder` on Sol, set `"mid": "gpt-6.1-sol"` under `codex.tiers` in `prompts/models.local.json`.
+- The release workflow publishes the tagged CHANGELOG section as the release notes instead of generated notes,
+  and the CI checks are now named `lint`, `test`, and `secrets` (formerly `Lint and test` and `Gitleaks`). Update
+  branch protection or tooling that names the old checks.
+
 ### Added
 
 - `--json` on `sync-ai-prompts`, `render-agents`, `render-invariants`, `render-hermes`, `update`, and
@@ -21,14 +39,7 @@ All notable changes to this project are documented here. Versions follow semanti
 - `develop` is the default and nightly branch and `main` is the stable channel. Clone with
   `git clone -b main` for stable releases; `scripts/update` follows the checked-out branch. A release is a
   `develop` to `main` merge commit with the tag on `main`.
-- Errors, warnings, and notes print as lower-case `error:`, `warning:`, and `note:` lines on stderr, one line
-  each. The old upper-case `ERROR:` and `WARN:` lines on stdout, the `notice:` prefix, and unprefixed exit
-  texts are gone, so anything that read them from stdout must read stderr.
-- A missing Python 3.11+ in the launchers, or a missing git in `scripts/update`, exits 3 instead of 1.
-- The release workflow publishes the tagged CHANGELOG section as the release notes instead of generated notes.
-- The Codex `mid` tier now uses `gpt-6.1-terra` instead of `gpt-6.1-sol`, so `builder` runs on the faster
-  model at half the Sol input price. `flagship` stays on Sol. Terra needs Codex CLI 0.159.0 or later; to
-  keep `builder` on Sol, set `"mid": "gpt-6.1-sol"` under `codex.tiers` in `prompts/models.local.json`.
+- CI runs `lint` and `test` as separate jobs, and the README follows the layout shared across the stack.
 - `reviewer` and `explorer` no longer assume a shell, which five of six harnesses do not grant them.
   `reviewer` takes the diff from the task (pasted or as a patch file) and asks for it when it has neither
   a diff nor a shell; `explorer` uses native search and says when git history is out of reach.
@@ -333,7 +344,8 @@ All notable changes to this project are documented here. Versions follow semanti
 - The `scripts/autoimprove-prompts` loop and `docs/autoresearch.md`; the mechanical score measured
   validity, not improvement, and the candidate could edit its own checks.
 
-[Unreleased]: https://github.com/iuliandita/agents/compare/v4.3.0...HEAD
+[Unreleased]: https://github.com/iuliandita/agents/compare/v5.0.0...HEAD
+[5.0.0]: https://github.com/iuliandita/agents/compare/v4.3.0...v5.0.0
 [4.3.0]: https://github.com/iuliandita/agents/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/iuliandita/agents/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/iuliandita/agents/compare/v4.0.0...v4.1.0
