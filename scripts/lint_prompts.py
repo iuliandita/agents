@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 from render_prompts import HARNESSES
@@ -43,11 +44,11 @@ AGENT_MAX_LINES = 90
 
 
 def error(message: str) -> None:
-    print(f"ERROR: {message}")
+    print(f"error: {message}", file=sys.stderr)
 
 
 def warn(message: str) -> None:
-    print(f"WARN: {message}")
+    print(f"warning: {message}", file=sys.stderr)
 
 
 def lint_line_count(path: Path, warn_at: int, max_lines: int) -> int:

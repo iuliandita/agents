@@ -107,7 +107,7 @@ def test_harness_docs_check_binds_notes_to_matching_install_row(tmp_path):
     assert result.returncode == 1
     assert (
         "INSTALL.md target row drifted for Alpha: deployable ~/alpha Alpha notes"
-        in result.stdout
+        in result.stderr
     )
 
 

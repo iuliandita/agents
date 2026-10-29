@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from pathlib import Path
 import tempfile
 
@@ -88,7 +89,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Installed {len(changed)} change(s)")
         return 0
     except (OSError, ValueError) as exc:
-        print(f"ERROR: {exc}")
+        print(f"error: {exc}", file=sys.stderr)
         return 1
 
 
