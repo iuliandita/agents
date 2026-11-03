@@ -27,3 +27,4 @@ CLAUDE.local.md
 htmlcov/
 __pycache__/
 *.pyc
+node_modules/

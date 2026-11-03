@@ -23,6 +23,8 @@ scripts/sync-ai-prompts --check
 scripts/sync-ai-prompts --dry-run
 scripts/render-agents --check
 python3 .github/stack/stack-check.py
+npm ci --ignore-scripts --prefix .github/tools/markdownlint && .github/tools/markdownlint/node_modules/.bin/markdownlint-cli2
+lychee --config lychee.toml AGENTS.md CHANGELOG.md CONTRIBUTING.md INSTALL.md README.md SECURITY.md 'docs/**/*.md'
 ```
 
 CI also runs actionlint and the macOS and Windows launcher tests. Use [maintenance guidance](docs/MAINTENANCE.md) for docs-impact receipts and exclusions: `.github/`, tests, and docs are outside receipt domains. Review compatibility, installation, update, and recovery instructions when paths, flags, overlays, or supported harnesses change. `render-agents --verify` checks role-file existence only; it does not validate model behavior.

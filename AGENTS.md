@@ -21,6 +21,8 @@ scripts/sync-ai-prompts --check
 scripts/sync-ai-prompts --dry-run
 scripts/render-agents --check
 python3 .github/stack/stack-check.py
+npm ci --ignore-scripts --prefix .github/tools/markdownlint && .github/tools/markdownlint/node_modules/.bin/markdownlint-cli2
+lychee --config lychee.toml AGENTS.md CHANGELOG.md CONTRIBUTING.md INSTALL.md README.md SECURITY.md 'docs/**/*.md'
 scripts/sync-ai-prompts && scripts/render-agents
 ```
 

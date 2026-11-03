@@ -35,6 +35,17 @@
       "groupName": "Python",
       "semanticCommitType": "deps",
       "semanticCommitScope": "dev"
+    },
+    {
+      "matchManagers": [
+        "npm"
+      ],
+      "matchFileNames": [
+        ".github/tools/markdownlint/**"
+      ],
+      "groupName": "markdownlint",
+      "semanticCommitType": "deps",
+      "semanticCommitScope": "ci"
     }
   ]
 }

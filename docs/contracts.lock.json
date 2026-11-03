@@ -38,8 +38,8 @@
       "docs": [
         "SECURITY.md"
       ],
-      "fingerprint": "5a05e3bfe9740a5b67493e2fe296e2beaa6927d5af97de5f35efb0cfdb801bd8",
-      "note": "Track the root AGENTS.md and CLAUDE.md, ignore AGENTS.local.md, CLAUDE.local.md, and .handoff/; SECURITY.md restructured to the shared headings with scope unchanged."
+      "fingerprint": "be20ebe67d7a168e12ed364658b89f6885f2951464f6918f026c13dc79666df2",
+      "note": "Track the root AGENTS.md and CLAUDE.md, ignore AGENTS.local.md, CLAUDE.local.md, .handoff/, and node_modules/; SECURITY.md restructured to the shared headings with scope unchanged."
     },
     "prompts": {
       "breaking": "none",
