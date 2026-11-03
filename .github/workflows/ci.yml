@@ -118,6 +118,57 @@ jobs:
       - name: Dry-run deploy rendering
         run: scripts/sync-ai-prompts --dry-run
 
+  markdown:
+    name: markdown
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install markdownlint-cli2
+        run: |
+          mkdir -p "$RUNNER_TEMP/markdownlint-cli2"
+          cp .github/tools/markdownlint/package.json .github/tools/markdownlint/package-lock.json "$RUNNER_TEMP/markdownlint-cli2/"
+          npm ci --prefix "$RUNNER_TEMP/markdownlint-cli2" --ignore-scripts --no-audit --no-fund
+          echo "$RUNNER_TEMP/markdownlint-cli2/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Lint Markdown
+        run: markdownlint-cli2
+
+  links:
+    name: links
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install lychee
+        env:
+          LYCHEE_VERSION: "0.24.2"
+          LYCHEE_SHA256: "1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a"
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSLo /tmp/lychee.tar.gz "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-x86_64-unknown-linux-gnu.tar.gz"
+          echo "${LYCHEE_SHA256}  /tmp/lychee.tar.gz" | sha256sum --check
+          tar -xzf /tmp/lychee.tar.gz -C "$HOME/.local/bin" --strip-components=1 lychee-x86_64-unknown-linux-gnu/lychee
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Check links
+        run: |
+          mapfile -t markdown_files < <(
+            {
+              printf '%s\n' AGENTS.md CHANGELOG.md CONTRIBUTING.md INSTALL.md README.md SECURITY.md
+              find docs -type f -name '*.md' -not -path 'docs/local/*' -not -path 'docs/superpowers/*' -not -path '*/node_modules/*'
+            } | sort -u
+          )
+          lychee --config lychee.toml "${markdown_files[@]}"
+
   macos-setup:
     name: macOS setup smoke test
     runs-on: macos-15

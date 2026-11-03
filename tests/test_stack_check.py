@@ -119,6 +119,32 @@ jobs:
       - run: echo hi
 """
 
+AGENTS = f"""# {NAME}
+
+Hooks for coding agents. `develop` is the default and nightly branch, `main` is stable.
+
+{CANON['agent_entry']['local_sentence']} It holds local paths and preferences.
+
+## Commands
+
+```sh
+# run the checks
+python -m pytest -q
+```
+
+## Layout
+
+Sources are in `bin/`.
+
+## Rules
+
+- Issue first.
+
+## For agents
+
+Every script takes `--json`.
+"""
+
 TOOL = """import sys
 
 if "--help" in sys.argv:
@@ -175,6 +201,7 @@ def repo(tmp_path: Path) -> Path:
     write(tmp_path, ".github/stack/repo.json", json.dumps(REPO_JSON))
     write(tmp_path, "README.md", README)
     write(tmp_path, "CONTRIBUTING.md", CONTRIBUTING)
+    write(tmp_path, "AGENTS.md", AGENTS)
     write(tmp_path, ".github/workflows/ci.yml", WORKFLOW)
     write(tmp_path, "bin/tool.py", TOOL)
     write(tmp_path, "assets/logo.png", png(1024, 1024))
@@ -188,6 +215,25 @@ def repo(tmp_path: Path) -> Path:
     ).stdout
     write(tmp_path, ".github/stack/SOURCE", source)
     return tmp_path
+
+
+def git(repo: Path, *args: str, stdin: str | None = None) -> str:
+    return subprocess.run(["git", *args], cwd=repo, input=stdin, capture_output=True, text=True, check=True).stdout.strip()
+
+
+def stage_claude(repo: Path, mode: str, content: str) -> None:
+    blob = git(repo, "hash-object", "-w", "--stdin", stdin=content)
+    git(repo, "update-index", "--add", "--cacheinfo", f"{mode},{blob},CLAUDE.md")
+
+
+def git_entry(repo: Path) -> None:
+    """Turn the fixture into a git checkout with the index state the agent-entry check expects."""
+    if shutil.which("git") is None:
+        pytest.skip("git is not installed")
+    git(repo, "init", "-q")
+    write(repo, ".gitignore", "AGENTS.local.md\nCLAUDE.local.md\n")
+    git(repo, "add", "AGENTS.md", ".gitignore")
+    stage_claude(repo, "120000", "AGENTS.md")
 
 
 def test_fixture_repo_passes(repo: Path) -> None:
@@ -318,6 +364,10 @@ FAILURES = [
     ("private-patterns", lambda r: write(r, "notes.txt", "contact someone" + AT + "corp.example.io\n")),
     ("private-patterns", lambda r: write(r, "notes.txt", "path " + MAC_PATH + "\n")),
     ("private-patterns", lambda r: write(r, "wide.txt", ("host " + PRIVATE_IP + "\n").encode("utf-16"))),
+    ("agent-entry", lambda r: edit(r, "AGENTS.md", "Sources are in `bin/`.", "Sources are in `bin/`.\n" * 60)),
+    ("agent-entry", lambda r: edit(r, "AGENTS.md", "## Rules\n\n- Issue first.\n\n## For agents", "## For agents\n\n## Rules\n\n- Issue first.")),
+    ("agent-entry", lambda r: edit(r, "AGENTS.md", CANON["agent_entry"]["local_sentence"], "Read the local file.")),
+    ("agent-entry", lambda r: edit(r, "AGENTS.md", f"# {NAME}", "# other")),
     ("vendor", lambda r: edit(r, ".github/stack/canon.json", '"canon_version": 1,', '"canon_version": 1,\n  ')),
     ("vendor", lambda r: (r / ".github/stack/SOURCE").unlink()),
     ("vendor", lambda r: edit(r, ".github/stack/SOURCE", f"commit: {SHA}", "commit: abc")),
@@ -389,13 +439,41 @@ def test_allowlist_entry_needs_a_reason(repo: Path) -> None:
 def test_ignored_files_are_not_scanned_in_a_git_checkout(repo: Path) -> None:
     if shutil.which("git") is None:
         pytest.skip("git is not installed")
-    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
-    write(repo, ".gitignore", "ignored.md\n")
+    git_entry(repo)
+    write(repo, ".gitignore", "AGENTS.local.md\nCLAUDE.local.md\nignored.md\n")
     write(repo, "ignored.md", "caf\u00e9\n")
     assert run(repo)[0] == 0
     write(repo, "tracked.md", "caf\u00e9\n")
     code, data = run(repo)
     assert code == 1 and hits(data) == {"ascii-markdown"}
+
+
+def test_agent_entry_passes_in_a_git_checkout(repo: Path) -> None:
+    git_entry(repo)
+    code, data = run(repo)
+    assert data["errors"] == [] and code == 0
+
+
+def test_agent_entry_ignores_headings_inside_fences(repo: Path) -> None:
+    edit(repo, "AGENTS.md", "# run the checks", "# run the checks\n## Rules\n# not a title")
+    code, data = run(repo)
+    assert data["errors"] == [] and code == 0
+
+
+GIT_FAILURES = [
+    lambda r: stage_claude(r, "100644", "AGENTS.md"),
+    lambda r: stage_claude(r, "120000", "README.md"),
+    lambda r: write(r, ".gitignore", "AGENTS.local.md\n"),
+    lambda r: write(r, ".gitignore", "AGENTS.local.md\nCLAUDE.local.md\nAGENTS.md\n"),
+]
+
+
+@pytest.mark.parametrize("mutate", GIT_FAILURES, ids=["plain-file", "wrong-target", "missing-ignore", "entry-ignored"])
+def test_agent_entry_git_failures(repo: Path, mutate) -> None:
+    git_entry(repo)
+    mutate(repo)
+    code, data = run(repo)
+    assert code == 1 and hits(data) == {"agent-entry"}, data["errors"]
 
 
 def test_repo_ships_a_valid_source_of_truth_config() -> None:

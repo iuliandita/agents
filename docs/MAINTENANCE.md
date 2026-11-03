@@ -31,7 +31,7 @@ The plain check verifies that every domain's receipt matches its current sources
 | workflow-templates | `skills/` and `templates/` | README, INSTALL, CHANGELOG |
 | maintenance | `scripts/check_*.py` | this file, README, CHANGELOG |
 
-`.github/`, `tests/`, and docs are outside the domains. Action pins have Dependabot and actionlint, tests are not user facing, and docs are the obligation itself. New source files count once staged; untracked scratch files are ignored. Change sources and rerun the renderers; never hand-edit rendered output.
+`.github/`, `tests/`, and docs are outside the domains. Action pins have Renovate and actionlint, tests are not user facing, and docs are the obligation itself. New source files count once staged; untracked scratch files are ignored. Change sources and rerun the renderers; never hand-edit rendered output.
 
 ## Record a review
 
@@ -70,7 +70,7 @@ The example is illustrative; use the real consequence. A breaking change cannot 
 
 ## Releases
 
-`develop` is the default and nightly branch and `main` is the stable channel. Feature and fix PRs squash into `develop`. A release is a PR from `develop` to `main` merged with a merge commit, never a squash, so `main` stays an ancestor of `develop`. After that merge, tag the commit on `main` as `v<version>` and push the tag. [CONTRIBUTING.md](../CONTRIBUTING.md#releases) has the steps and the version bump rule.
+`develop` is the default and nightly branch and `main` is the stable channel. Feature and fix PRs squash into `develop`. A release is a PR from `develop` to `main` merged with a merge commit, never a squash, so every `develop` commit stays in `main`'s history and the next release PR carries only new work. After that merge, tag the commit on `main` as `v<version>` and push the tag. [CONTRIBUTING.md](../CONTRIBUTING.md#releases) has the steps and the version bump rule.
 
 The release workflow fails when the tagged commit is not on `main`. It runs the guard on the tagged commit with `--base` set to the previous tag and `--release-tag`, which requires a dated `## [X.Y.Z] - YYYY-MM-DD` section in `CHANGELOG.md`. It publishes the release from that same tag. A green guard is not a release qualification: also run the full verification list and read the changelog, upgrade notes, and deployment instructions.
 

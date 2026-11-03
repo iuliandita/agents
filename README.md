@@ -71,6 +71,19 @@ The rules are opinionated and shaped by 20+ years in IT and DevOps, production i
 - Provides opt-in shared and local project instruction templates and a portable context-consolidation skill.
 - Lints public prompt sources, including `prompts/private.example.md`, for private paths, token-like secrets, missing harness fragments, and non-ASCII drift.
 
+## How it works
+
+```mermaid
+flowchart LR
+    core["prompts/<br>canonical fragments"] --> sync["scripts/sync-ai-prompts"]
+    local["prompts/local.md<br>every harness, gitignored"] -.-> sync
+    private["prompts/private.md<br>trusted harnesses, gitignored"] -.-> sync
+    sync --> build["build/generated/"]
+    sync -->|"--target ... --deploy<br>with backups"| rules["global rules file<br>of each harness"]
+    roles["agents/<br>six subagent roles"] --> render["scripts/render-agents"]
+    render -->|"--deploy"| native["subagent files in each<br>harness's native format"]
+```
+
 ## Layout
 
 ```text
@@ -284,11 +297,33 @@ scripts/render-agents --target claude,codex --verify
 
 ## GitHub Actions
 
-- `.github/workflows/ci.yml` runs on pull requests and on pushes to `develop` and `main`. The `lint` job runs the prompt lint, harness-doc and contract checks, the docs-impact guard against the PR base, the docs link and command check, the prompt-injection scan, the stack conventions check, actionlint, shell syntax checks, and the render checks. The `test` job runs pytest, Python compile checks, the PowerShell launcher check, and a dry-run render on Python 3.11 and 3.13. Separate jobs run macOS and Windows setup smoke tests on Python 3.11; the Windows job runs the PowerShell launchers.
+- `.github/workflows/ci.yml` runs on pull requests and on pushes to `develop` and `main`. The `lint` job runs the prompt lint, harness-doc and contract checks, the docs-impact guard against the PR base, the docs link and command check, the prompt-injection scan, the stack conventions check, actionlint, shell syntax checks, and the render checks. The `test` job runs pytest, Python compile checks, the PowerShell launcher check, and a dry-run render on Python 3.11 and 3.13. Separate jobs run macOS and Windows setup smoke tests on Python 3.11; the Windows job runs the PowerShell launchers. The `markdown` job runs a pinned markdownlint-cli2 over the root docs and `docs/`, and the `links` job runs lychee over the same files.
 - `.github/workflows/security.yml` runs CodeQL, zizmor, and a secret scan (`secrets`) with a pinned gitleaks binary.
-- Every job has a timeout, every checkout sets `persist-credentials: false`, and Dependabot groups action and pip updates and waits seven days before proposing a release.
+- Every job has a timeout, every checkout sets `persist-credentials: false`, and Renovate groups action and pip updates and waits seven days before proposing a release.
 - `.github/workflows/release.yml` runs when a `v*` tag is pushed. It checks that the tag is on `main`, checks the docs-impact receipts for the range since the previous tag, the dated CHANGELOG section, and doc links and commands. It then creates or updates a GitHub release with that CHANGELOG section as the notes.
 - `.github/workflows/promptfoo-code-scan.yml` wires in Promptfoo's LLM security scanner for prompt-sensitive PRs when `PROMPTFOO_API_KEY` is configured. The Promptfoo GitHub App is the cleaner no-key setup if you want hosted PR comments without storing a token.
+
+## How the stack fits together
+
+Each repo installs on its own. idstack calls skills by name and sits on pstack.
+
+```mermaid
+flowchart LR
+    agents["agents<br>global rules, subagent roles"]
+    skills["skills<br>task skills"]
+    mods["mods<br>hooks and panels"]
+    idstack["idstack<br>infra playbooks"]
+    pstack["pstack"]
+    harness["your coding agent<br>Claude Code, Codex, OpenCode, ..."]
+    agents --> harness
+    skills --> harness
+    mods --> harness
+    idstack --> harness
+    idstack -->|"layered on"| pstack
+    idstack -.->|"calls by name"| skills
+    classDef self fill:#123A6B,stroke:#123A6B,color:#fff
+    class agents self
+```
 
 ## License
 

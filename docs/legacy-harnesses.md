@@ -16,7 +16,6 @@ fragment and follow the steps below.
 | GitHub Copilot CLI | `prompts/harnesses/copilot.md` | Global file is `~/.copilot/copilot-instructions.md`. |
 | Crush | `prompts/harnesses/crush.md` | Path was correct; removed by scope decision. |
 | Cursor | `prompts/harnesses/cursor.md` | No global AGENTS.md; user rules live in Settings. |
-| Gemini CLI | `prompts/harnesses/gemini.md` | Legacy; superseded by Antigravity (shared path). |
 | Goose | `prompts/harnesses/goose.md` | No user-level instruction file documented. |
 | Kimi Code | `prompts/harnesses/kimi.md` | Removed by scope decision; path was unverified. |
 | Kiro | `prompts/harnesses/kiro.md` | Global rules in `~/.kiro/steering/*.md`. |
