@@ -14,8 +14,9 @@
       "security"
     ]
   },
+  "timezone": "Etc/UTC",
   "schedule": [
-    "on monday"
+    "* 6 * * 1"
   ],
   "minimumReleaseAge": "7 days",
   "packageRules": [
@@ -23,13 +24,17 @@
       "matchManagers": [
         "github-actions"
       ],
-      "groupName": "GitHub Actions"
+      "groupName": "GitHub Actions",
+      "semanticCommitType": "deps",
+      "semanticCommitScope": "ci"
     },
     {
       "matchManagers": [
         "pip_requirements"
       ],
-      "groupName": "Python"
+      "groupName": "Python",
+      "semanticCommitType": "deps",
+      "semanticCommitScope": "dev"
     }
   ]
 }
