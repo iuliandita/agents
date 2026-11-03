@@ -31,7 +31,7 @@ The plain check verifies that every domain's receipt matches its current sources
 | workflow-templates | `skills/` and `templates/` | README, INSTALL, CHANGELOG |
 | maintenance | `scripts/check_*.py` | this file, README, CHANGELOG |
 
-`.github/`, `tests/`, and docs are outside the domains. Action pins have Dependabot and actionlint, tests are not user facing, and docs are the obligation itself. New source files count once staged; untracked scratch files are ignored. Change sources and rerun the renderers; never hand-edit rendered output.
+`.github/`, `tests/`, and docs are outside the domains. Action pins have Renovate and actionlint, tests are not user facing, and docs are the obligation itself. New source files count once staged; untracked scratch files are ignored. Change sources and rerun the renderers; never hand-edit rendered output.
 
 ## Record a review
 

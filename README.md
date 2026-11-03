@@ -286,7 +286,7 @@ scripts/render-agents --target claude,codex --verify
 
 - `.github/workflows/ci.yml` runs on pull requests and on pushes to `develop` and `main`. The `lint` job runs the prompt lint, harness-doc and contract checks, the docs-impact guard against the PR base, the docs link and command check, the prompt-injection scan, the stack conventions check, actionlint, shell syntax checks, and the render checks. The `test` job runs pytest, Python compile checks, the PowerShell launcher check, and a dry-run render on Python 3.11 and 3.13. Separate jobs run macOS and Windows setup smoke tests on Python 3.11; the Windows job runs the PowerShell launchers.
 - `.github/workflows/security.yml` runs CodeQL, zizmor, and a secret scan (`secrets`) with a pinned gitleaks binary.
-- Every job has a timeout, every checkout sets `persist-credentials: false`, and Dependabot groups action and pip updates and waits seven days before proposing a release.
+- Every job has a timeout, every checkout sets `persist-credentials: false`, and Renovate groups action and pip updates and waits seven days before proposing a release.
 - `.github/workflows/release.yml` runs when a `v*` tag is pushed. It checks that the tag is on `main`, checks the docs-impact receipts for the range since the previous tag, the dated CHANGELOG section, and doc links and commands. It then creates or updates a GitHub release with that CHANGELOG section as the notes.
 - `.github/workflows/promptfoo-code-scan.yml` wires in Promptfoo's LLM security scanner for prompt-sensitive PRs when `PROMPTFOO_API_KEY` is configured. The Promptfoo GitHub App is the cleaner no-key setup if you want hosted PR comments without storing a token.
 

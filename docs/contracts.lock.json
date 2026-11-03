@@ -19,13 +19,10 @@
       "note": "Record the stderr prefixes, exit code 3, the --harness alias, and the --json contract as breaking; INSTALL.md already documents them."
     },
     "maintenance": {
-      "breaking": "Tooling that reads ERROR: or WARN: lines from the check_*.py scripts on stdout no longer matches; findings are error: and warning: lines on stderr and the exit codes are unchanged.",
-      "docs": [
-        "CHANGELOG.md"
-      ],
-      "fingerprint": "1ee9f97e80d9596fb2662d73381793a9bb4b3c4fa05d4a11db8e475a4bcf3979",
-      "migration": "Back up the CI step or hook that parses check output. To upgrade, switch it to read stderr and the lower-case prefixes and keep the exit code as the gate. Roll back by checking out v4.3.0.",
-      "note": "Record that the check scripts print lower-case error: and warning: lines on stderr; docs/MAINTENANCE.md already says so."
+      "breaking": "none",
+      "docs": [],
+      "fingerprint": "f28526bfd799bcaec3ad07aed2a8121635401f68b7a18a855834b5b429b6da07",
+      "no_impact": "Comment names Renovate instead of Dependabot; no behavior change."
     },
     "models-agents": {
       "breaking": "Scripts that read ERROR: or notice: lines from render-agents stdout no longer match, and the Codex mid tier (builder) now renders gpt-6.1-terra instead of gpt-6.1-sol, which needs Codex CLI 0.159.0 or later.",

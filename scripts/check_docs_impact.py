@@ -23,7 +23,7 @@ SCHEMA = 1
 CHANGELOG = "CHANGELOG.md"
 
 # Each tracked file under MAPPED_ROOTS must belong to exactly one domain.
-# .github/, tests/, and docs are excluded: action pins have Dependabot and
+# .github/, tests/, and docs are excluded: action pins have Renovate and
 # actionlint, tests are not user-facing, and docs are the obligation itself.
 MAPPED_ROOTS = ("agents/", "prompts/", "scripts/", "skills/", "templates/")
 DOMAINS: dict[str, dict[str, tuple[str, ...]]] = {
