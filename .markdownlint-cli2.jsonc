@@ -1,0 +1,28 @@
+{
+  "config": {
+    "default": false,
+    "code-block-style": {
+      "style": "fenced"
+    },
+    "code-fence-style": {
+      "style": "backtick"
+    },
+    "no-duplicate-heading": {
+      "siblings_only": true
+    }
+  },
+  "globs": [
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "INSTALL.md",
+    "README.md",
+    "SECURITY.md",
+    "docs/**/*.md"
+  ],
+  "ignores": [
+    "docs/local/**",
+    "docs/superpowers/**",
+    "**/node_modules/**"
+  ]
+}

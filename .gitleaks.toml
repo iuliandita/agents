@@ -1,0 +1,4 @@
+# Gitleaks configuration. Keep allowlists content-specific; do not exclude whole paths.
+
+[extend]
+  useDefault = true

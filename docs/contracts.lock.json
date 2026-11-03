@@ -19,13 +19,10 @@
       "note": "Record the stderr prefixes, exit code 3, the --harness alias, and the --json contract as breaking; INSTALL.md already documents them."
     },
     "maintenance": {
-      "breaking": "Tooling that reads ERROR: or WARN: lines from the check_*.py scripts on stdout no longer matches; findings are error: and warning: lines on stderr and the exit codes are unchanged.",
-      "docs": [
-        "CHANGELOG.md"
-      ],
-      "fingerprint": "1ee9f97e80d9596fb2662d73381793a9bb4b3c4fa05d4a11db8e475a4bcf3979",
-      "migration": "Back up the CI step or hook that parses check output. To upgrade, switch it to read stderr and the lower-case prefixes and keep the exit code as the gate. Roll back by checking out v4.3.0.",
-      "note": "Record that the check scripts print lower-case error: and warning: lines on stderr; docs/MAINTENANCE.md already says so."
+      "breaking": "none",
+      "docs": [],
+      "fingerprint": "f28526bfd799bcaec3ad07aed2a8121635401f68b7a18a855834b5b429b6da07",
+      "no_impact": "Comment names Renovate instead of Dependabot; no behavior change."
     },
     "models-agents": {
       "breaking": "Scripts that read ERROR: or notice: lines from render-agents stdout no longer match, and the Codex mid tier (builder) now renders gpt-6.1-terra instead of gpt-6.1-sol, which needs Codex CLI 0.159.0 or later.",
@@ -37,13 +34,12 @@
       "note": "Record the stderr prefixes for render-agents, the Codex mid tier move to gpt-6.1-terra, and the --json contract as breaking; INSTALL.md and the harness contract already document them."
     },
     "overlays-trust": {
-      "breaking": "CI steps or hooks that read ERROR: lines from lint_prompts.py or scan_prompt_sources.py on stdout no longer match; findings are error: lines on stderr and the exit codes are unchanged.",
+      "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "SECURITY.md"
       ],
-      "fingerprint": "3a2e492efc4640a99c3f133726d3776554f51f85efba5be2a64e7ba4596ebefc",
-      "migration": "Back up the hook or CI step that parses the output. To upgrade, switch it to read stderr and the lower-case prefix and keep the exit code as the gate. Roll back by checking out v4.3.0; overlays and ignore rules are unchanged.",
-      "note": "Record that lint_prompts and scan_prompt_sources print lower-case error: lines on stderr; INSTALL.md already documents the prefixes."
+      "fingerprint": "be20ebe67d7a168e12ed364658b89f6885f2951464f6918f026c13dc79666df2",
+      "note": "Track the root AGENTS.md and CLAUDE.md, ignore AGENTS.local.md, CLAUDE.local.md, .handoff/, and node_modules/; SECURITY.md restructured to the shared headings with scope unchanged."
     },
     "prompts": {
       "breaking": "none",
