@@ -7,4 +7,4 @@
 - Subagents live in `.agents/agents/<name>.md` (workspace) and `~/.gemini/config/agents/` (global); invoke them from the running agent.
 - Permissions and sandbox are per-surface; check the current permission mode before assuming a write is gated.
 - Hooks: `hooks.json` in `.agents/` or `~/.gemini/config/` with `PreToolUse`, `PostToolUse`, `PreInvocation`, `PostInvocation`, and `Stop`; `PreInvocation` can inject an `ephemeralMessage`, which is the invariants channel for this harness.
-- Verify discovery after deploy: the agent list shows the rendered roles and the session names the expected model. Gemini CLI is legacy; the shared `GEMINI.md` path now serves Antigravity.
+- Verify discovery after deploy: the agent list shows the rendered roles and the session names the expected model.

@@ -50,8 +50,8 @@
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "9f2cd1c82038491a7bc92b237af611a8403144c30305647d1b2c5463a21f167b",
-      "note": "Core rules yield the preamble and last line to a subagent role's own output format."
+      "fingerprint": "ead29d2ec4de1de00744a79b606860eed23a9393a0e10cd85a85ab7690aa37d7",
+      "note": "Drop the Gemini CLI note from the Antigravity fragment; rules path and override unchanged."
     },
     "workflow-templates": {
       "baseline": true,
