@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+### Changed
+
+- The Antigravity fragment no longer mentions Gemini CLI, and the legacy harness list drops its row. Paths
+  and the `GEMINI.md` rules file are unchanged.
+
 ## [5.0.0] - 2026-10-29
 
 ### Breaking
