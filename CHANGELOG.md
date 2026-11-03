@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+## [5.0.1] - 2026-11-03
+
+### Added
+
+- The shared stack check verifies the tracked `AGENTS.md` entry point and the `CLAUDE.md` symlink.
+
 ### Changed
 
 - The Antigravity fragment no longer mentions Gemini CLI, and the legacy harness list drops its row. Paths
@@ -349,7 +355,8 @@ All notable changes to this project are documented here. Versions follow semanti
 - The `scripts/autoimprove-prompts` loop and `docs/autoresearch.md`; the mechanical score measured
   validity, not improvement, and the candidate could edit its own checks.
 
-[Unreleased]: https://github.com/iuliandita/agents/compare/v5.0.0...HEAD
+[Unreleased]: https://github.com/iuliandita/agents/compare/v5.0.1...HEAD
+[5.0.1]: https://github.com/iuliandita/agents/compare/v5.0.0...v5.0.1
 [5.0.0]: https://github.com/iuliandita/agents/compare/v4.3.0...v5.0.0
 [4.3.0]: https://github.com/iuliandita/agents/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/iuliandita/agents/compare/v4.1.0...v4.2.0
