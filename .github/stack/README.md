@@ -4,7 +4,7 @@ This directory holds the shared conventions for the agents, skills, mods, and id
 
 | File | Role | Vendored |
 |---|---|---|
-| `canon.json` | Shared rules as data: README layout, stack lines, assets, CONTRIBUTING headings, workflow rules, error format, patterns. | yes |
+| `canon.json` | Shared rules as data: README layout, stack lines, assets, CONTRIBUTING headings, the agent entry point, workflow rules, error format, patterns. | yes |
 | `stack-check.py` | The checker. Python 3.11+, standard library only, no network. | yes |
 | `repo.json` | Per-repository settings: repo name, required CI job ids, installer help commands, paths to scan for error strings, allowlist. | no |
 | `SOURCE` | Records the source commit and the sha256 of each vendored file. Absent in this repository. | no |
@@ -25,6 +25,7 @@ Run it from the repository root. Findings print to stderr, one per line, as `err
 - README: first heading is the repo name, the wordmark is referenced near the top, the opening paragraph is 110-350 characters with no bold and no version number, a `Status:` line names `main` and `develop`, the `##` sections appear in the canonical order, and `Part of the stack` and `Project and support` match the canon.
 - Assets: `assets/logo.png`, `assets/logo-256.png`, and `assets/wordmark.png` exist, and the two logos have the canonical pixel sizes.
 - CONTRIBUTING: the shared opening paragraph, the three `##` headings in order, a `sh` block first under `Checks and documentation`, and `develop`, `main`, and `Unreleased` in `Releases`.
+- Agent entry point: `AGENTS.md` names the repo in its first heading, stays within 60 lines, has the `Commands`, `Layout`, `Rules`, and `For agents` sections in order, and tells agents to read `AGENTS.local.md`. In a git checkout, `CLAUDE.md` must be a symlink to `AGENTS.md` in the git index (the filesystem is not consulted, because Windows checks symlinks out as plain files), `AGENTS.local.md` and `CLAUDE.local.md` must be git-ignored, and `AGENTS.md` and `CLAUDE.md` must not be. Outside a git checkout only the file checks run.
 - Workflows (line-based, no YAML parser): the required job ids exist and are named after their id, every `uses:` is pinned to a 40-hex SHA with a `# v` comment, every job has `timeout-minutes`, and every checkout step sets `persist-credentials: false`.
 - Installer help: each command in `repo.json` exits 0 on `--help`, lists its declared flags, and has `Environment` and `Exit codes` sections.
 - Error strings: no upper-case `ERROR:`, and no `SystemExit("...")` or `sys.exit("...")` with a string literal that lacks an `error:`, `warning:`, or `note:` prefix, in the paths named in `repo.json`.
