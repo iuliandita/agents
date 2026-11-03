@@ -12,10 +12,10 @@ prompts/deploy-targets.txt
 prompts/models.local.json
 SECURITY-AUDIT.md
 /.claude/
+.handoff/
+AGENTS.local.md
+CLAUDE.local.md
 /.codex
-/CLAUDE.md
-/AGENTS.md
-/GEMINI.md
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/

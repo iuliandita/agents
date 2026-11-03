@@ -37,13 +37,12 @@
       "note": "Record the stderr prefixes for render-agents, the Codex mid tier move to gpt-6.1-terra, and the --json contract as breaking; INSTALL.md and the harness contract already document them."
     },
     "overlays-trust": {
-      "breaking": "CI steps or hooks that read ERROR: lines from lint_prompts.py or scan_prompt_sources.py on stdout no longer match; findings are error: lines on stderr and the exit codes are unchanged.",
+      "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "SECURITY.md"
       ],
-      "fingerprint": "3a2e492efc4640a99c3f133726d3776554f51f85efba5be2a64e7ba4596ebefc",
-      "migration": "Back up the hook or CI step that parses the output. To upgrade, switch it to read stderr and the lower-case prefix and keep the exit code as the gate. Roll back by checking out v4.3.0; overlays and ignore rules are unchanged.",
-      "note": "Record that lint_prompts and scan_prompt_sources print lower-case error: lines on stderr; INSTALL.md already documents the prefixes."
+      "fingerprint": "5a05e3bfe9740a5b67493e2fe296e2beaa6927d5af97de5f35efb0cfdb801bd8",
+      "note": "Track the root AGENTS.md and CLAUDE.md, ignore AGENTS.local.md, CLAUDE.local.md, and .handoff/; SECURITY.md restructured to the shared headings with scope unchanged."
     },
     "prompts": {
       "breaking": "none",
