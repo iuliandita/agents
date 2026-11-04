@@ -22,7 +22,7 @@
       ],
       "fingerprint": "3a84a0bee8ed1271c8bb04b23fc87ef6836e9b10f09d508298bc37f9cc19da27",
       "migration": "Back up saved commands, upgrade by removing the target, and roll back to the previous release if needed.",
-      "note": "Remove the retired harness target from the registry and active documentation."
+      "note": "Remove the retired harness target from the registry and active documentation; list it under legacy harnesses."
     },
     "maintenance": {
       "breaking": "none",
