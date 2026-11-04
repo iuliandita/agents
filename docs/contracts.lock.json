@@ -1,22 +1,28 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "Wrappers that read ERROR:, WARN:, or notice: lines from stdout, or that test for exit code 1 when Python 3.11+ or the VCS tool is missing, no longer match: messages are lower-case error:, warning:, and note: lines on stderr, and a missing tool exits 3.",
+      "breaking": "Update no longer accepts the retired target.",
       "docs": [
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "INSTALL.md"
       ],
-      "fingerprint": "c40cffcb2c5dd6e3f76af991a5619b69a75678ff890b5d2b89beaa422ea7c067",
-      "migration": "Back up any wrapper script or CI step that parses launcher output. To upgrade, switch it to read stderr and the lower-case prefixes and to treat exit 3 as a missing tool, or use --json for a stable stdout object. Roll back by checking out v4.3.0 and redeploying; deployed files are unchanged.",
-      "note": "Record the stderr prefixes, exit code 3 for a missing Python or VCS tool, and the --json contract as breaking; INSTALL.md already documents them."
+      "fingerprint": "a74212abea55305ffaa98781132113258e6dc5ce456801e9cce8078e3b96238f",
+      "migration": "Back up saved commands, upgrade by removing the target, and roll back to the previous release if needed.",
+      "note": "Remove the retired target from update selection."
     },
     "harnesses": {
-      "breaking": "Scripts that read ERROR: or notice: lines from sync-ai-prompts stdout, or test for exit code 1 when Python 3.11+ is missing, no longer match: messages are lower-case error:, warning:, and note: lines on stderr, and a missing Python exits 3.",
+      "breaking": "Saved commands selecting the retired target fail.",
       "docs": [
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "INSTALL.md",
+        "README.md",
+        "docs/harness-contract.md",
+        "docs/legacy-harnesses.md",
+        "docs/surfaces.md"
       ],
-      "fingerprint": "61a1f6e4702d422ecf6eb81b3498b8209645455db59f8dd05484fd6412a05521",
-      "migration": "Back up any wrapper that parses sync-ai-prompts output. To upgrade, switch it to read stderr and the lower-case prefixes and to treat exit 3 as a missing tool, or use --json; --target keeps working beside --harness. Roll back by checking out v4.3.0 and redeploying; rendered rules files are unchanged.",
-      "note": "Record the stderr prefixes, exit code 3, the --harness alias, and the --json contract as breaking; INSTALL.md already documents them."
+      "fingerprint": "3a84a0bee8ed1271c8bb04b23fc87ef6836e9b10f09d508298bc37f9cc19da27",
+      "migration": "Back up saved commands, upgrade by removing the target, and roll back to the previous release if needed.",
+      "note": "Remove the retired harness target from the registry and active documentation."
     },
     "maintenance": {
       "breaking": "none",
@@ -36,18 +42,23 @@
     "overlays-trust": {
       "breaking": "none",
       "docs": [
-        "SECURITY.md"
+        "CHANGELOG.md",
+        "INSTALL.md",
+        "README.md"
       ],
-      "fingerprint": "be20ebe67d7a168e12ed364658b89f6885f2951464f6918f026c13dc79666df2",
-      "note": "Track the root AGENTS.md and CLAUDE.md, ignore AGENTS.local.md, CLAUDE.local.md, .handoff/, and node_modules/; SECURITY.md restructured to the shared headings with scope unchanged."
+      "fingerprint": "ad18f5f014b58f4ec199b627cb6f46e2e03400945ae49f7a2f054bfa31b685ce",
+      "note": "Remove the retired fragment-specific lint limit."
     },
     "prompts": {
-      "breaking": "none",
+      "breaking": "Saved commands selecting the retired target fail.",
       "docs": [
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "INSTALL.md",
+        "README.md"
       ],
-      "fingerprint": "ead29d2ec4de1de00744a79b606860eed23a9393a0e10cd85a85ab7690aa37d7",
-      "note": "Drop the Gemini CLI note from the Antigravity fragment; rules path and override unchanged."
+      "fingerprint": "470785da83cc4a43cd12ead92c61312ff54c75babeaafc58e322f0e86b790292",
+      "migration": "Back up saved commands, upgrade by removing the target, and roll back to the previous release if needed.",
+      "note": "Remove the retired harness fragment and its documented target."
     },
     "workflow-templates": {
       "baseline": true,

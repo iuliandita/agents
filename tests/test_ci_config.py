@@ -137,5 +137,5 @@ def test_release_notes_extract_from_the_real_changelog(tmp_path):
     result, notes = run_release_notes_step(tmp_path, "v4.3.0", (repo / "CHANGELOG.md").read_text(encoding="utf-8"))
     assert result.returncode == 0, result.stdout
     text = notes.read_text(encoding="utf-8")
-    assert "paperclip" in text
+    assert "omit_sections" in text
     assert "## [" not in text and "compare/" not in text

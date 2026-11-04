@@ -42,7 +42,7 @@ CI also runs actionlint, gitleaks, zizmor, CodeQL, and the macOS and Windows lau
 - No AI attribution in commits, PRs, tags, or files.
 - No private hosts, domains, IPs, machine paths, or work context in tracked files.
 - Never deploy to global config paths (`--deploy`) unless the user asks, and always pass `--target`.
-- `paperclip` is render-only; project-level targets never receive `local.md` or `private.md`.
+- Project-level targets never receive `local.md` or `private.md`.
 - Source changes need a docs-impact receipt: update the docs, then `python scripts/check_docs_impact.py --accept <domain> ...` (see `docs/MAINTENANCE.md`).
 - Keep public prompt fragments anonymized and portable; the leak linter and the injection scan gate them.
 
