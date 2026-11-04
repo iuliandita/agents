@@ -52,9 +52,7 @@
     "prompts": {
       "breaking": "Saved commands selecting the retired target fail.",
       "docs": [
-        "CHANGELOG.md",
-        "INSTALL.md",
-        "README.md"
+        "CHANGELOG.md"
       ],
       "fingerprint": "b4b06c41412544643a4e943815d2bca890a627a627b74ddbafe44014e11dece2",
       "migration": "Back up saved commands, upgrade by removing the target, and roll back to the previous release if needed.",
