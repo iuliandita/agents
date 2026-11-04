@@ -159,7 +159,7 @@ class Harness(NamedTuple):
     consumed_from_build: bool = False
 
 
-# Seven supported harnesses, one generic project-level target, and the Paperclip rules target. Paths,
+# Seven supported harnesses and one generic project-level target. Paths,
 # overrides, and verification receipts live in docs/harness-contract.md. Only add a harness
 # here once its rules path is confirmed against upstream docs.
 HARNESSES: tuple[Harness, ...] = (
@@ -267,22 +267,6 @@ HARNESSES: tuple[Harness, ...] = (
         verified_on="2026-09-17",
         confidence="n/a",
         optional_blocks=(),
-    ),
-    Harness(
-        "paperclip",
-        "Paperclip",
-        "paperclip.md",
-        "PAPERCLIP.md",
-        None,
-        "",
-        MANUAL,
-        "House rules for Paperclip agents, rendered without overlays; a Paperclip sync consumes the file from build/generated/PAPERCLIP.md, so there is no global path.",
-        source_url="https://github.com/paperclipai/paperclip",
-        verified_on="2026-10-25",
-        confidence="n/a",
-        optional_blocks=(),
-        omit_sections=("Model Selection",),
-        consumed_from_build=True,
     ),
 )
 
