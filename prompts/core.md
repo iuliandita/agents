@@ -39,7 +39,7 @@ Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are ex
 ## Code
 - Read before edit. Do not modify files you have not inspected in the current session.
 - Use explicit file paths, expected output, and verification commands. Prefer small reviewable batches and list target files when scope matters.
-- Detect the user's active shell from context or environment before giving interactive shell advice. Portable scripts should declare their shell explicitly and enable strict error handling where that shell supports it.
+- Detect the user's active shell from context or environment before giving interactive shell advice. Portable scripts should declare their shell explicitly and enable strict error handling where that shell supports it. Never run `pkill -f` with a literal pattern: the shell running the command carries it in its own command line, so it kills your shell (exit 144). Use `pkill -x <name>`, an anchored `^...$` pattern, a bracketed letter (`[v]ite`), or a PID.
 - Pick shell or Python by fit: whichever is clearer, faster, or uses fewer tokens.
 - Fail loud. Do not hide errors behind silent fallbacks; guard expected non-zero exits in parallel checks.
 - Python: modern syntax, type hints where useful, f-strings, `pathlib`. Avoid unnecessary classes.
