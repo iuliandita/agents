@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-11-04
+
+- Removed the retired Paperclip harness target.
+- Core prompt: agents no longer use `pkill -f` with a literal pattern, which killed their own shell (#180).
+
 ## [5.0.1] - 2026-11-03
 
 ### Added

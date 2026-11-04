@@ -22,6 +22,7 @@ fragment and follow the steps below.
 | NanoClaw | `prompts/harnesses/nanoclaw.md` | Render-only; no verified target. |
 | OpenClaw | `prompts/harnesses/openclaw.md` | Removed by scope decision. |
 | OpenHands | `prompts/harnesses/openhands.md` | No global AGENTS.md; repo microagents only. |
+| Paperclip | `prompts/harnesses/paperclip.md` | Render-only house rules; Paperclip was retired. |
 | Pi Coding Agent | `prompts/harnesses/pi.md` | Removed by scope decision. |
 | Qwen Code | `prompts/harnesses/qwen.md` | Global memory is `~/.qwen/QWEN.md`. |
 | Roo Code | `prompts/harnesses/roo.md` | Global rules in `~/.roo/rules/`. |
