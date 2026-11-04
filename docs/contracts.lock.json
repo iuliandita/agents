@@ -50,15 +50,12 @@
       "note": "Remove the retired fragment-specific lint limit."
     },
     "prompts": {
-      "breaking": "Saved commands selecting the retired target fail.",
+      "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
-        "INSTALL.md",
-        "README.md"
+        "CHANGELOG.md"
       ],
-      "fingerprint": "470785da83cc4a43cd12ead92c61312ff54c75babeaafc58e322f0e86b790292",
-      "migration": "Back up saved commands, upgrade by removing the target, and roll back to the previous release if needed.",
-      "note": "Remove the retired harness fragment and its documented target."
+      "fingerprint": "b4b06c41412544643a4e943815d2bca890a627a627b74ddbafe44014e11dece2",
+      "note": "Add one core rule against pkill -f with a literal pattern; no flag, path or overlay behavior changes."
     },
     "workflow-templates": {
       "baseline": true,
