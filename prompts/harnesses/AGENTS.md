@@ -3,3 +3,4 @@
 - Keep the file portable: do not assume Claude, Codex, OpenCode, Command Code, Antigravity, or Hermes-specific features or flags.
 - Prefer project facts and conventions here, and keep cross-project preferences in the user's global rules.
 - Add a dedicated harness target only once its global rules path is confirmed against upstream docs; see `docs/harness-contract.md`.
+- Do not assume a question tool exists; use one only when the session exposes it, otherwise use numbered options.
