@@ -54,8 +54,8 @@
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "ec95132954715191dc84391fdadf1714aa7b53c7d6f72b3e27679c7ced07d5b4",
-      "note": "Document closing marker sections and question tool guidance; keep the real-block, no-offers and no-fabrication guards."
+      "fingerprint": "614ec802ad12fd90efadd03d3d36c5b9c0ff0bcccdd3513948f0c33155c95da8",
+      "note": "Tighten the marker and question rules and the Codex question-tool note to fit the Codex budget (#188); no rule, flag, path or overlay behavior changes."
     },
     "workflow-templates": {
       "baseline": true,

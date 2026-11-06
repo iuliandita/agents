@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+## [5.2.1] - 2026-11-06
+
+- Core prompt: the marker and question rules say the same in about 600 fewer bytes, so the Codex render fits its 32 KiB budget with personal overlays (#188).
+
 ## [5.2.0] - 2026-11-06
 
 - Clarified closing markers, optional sections, and native question tools.
