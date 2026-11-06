@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- Clarified closing markers, optional sections, and native question tools.
+
 ## [5.1.0] - 2026-11-04
 
 - Removed the retired Paperclip harness target.

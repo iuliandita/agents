@@ -9,3 +9,4 @@
 - Permissions use `permission:` keys (`read`, `edit`, `bash`, `task`, `todowrite`, `webfetch`, `websearch`, `external_directory`, `lsp`, `skill`, `question`); unlisted custom and MCP tools fall back to global config, so a read-only role needs an explicit deny-all before its allowances.
 - Hooks and plugins can inject rules per turn; keep the hard rules in `prompts/invariants.md` and let the hook deliver them instead of repeating them per prompt.
 - Verify discovery after deploy: `opencode agent list` shows the rendered roles and the session header names the expected model. The TUI, CLI, and desktop app share this config.
+- Use `question` when available: each option has a label and description; `multiple` enables multi-select. It adds a typed-answer option and is gated by the `question` permission key.
