@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- Core prompt and harness notes: removed rules that contradicted each other (#194).
+  - Model routing now has one stated precedence, and the Claude and Codex ladders drop prices and version numbers.
+  - The Claude auto-mode note no longer reads as skipping confirmation.
+  - The secret ban is unconditional, and the private-infrastructure rule is scoped to public repos.
+  - Task-end branch cleanup belongs to the main thread.
+  - The Command Code memory and hook notes are scoped.
+
 - Core prompt: the Writing Voice rules now cover commits and PRs/MRs. Both take a `type(scope): description` title, commit bodies are at most three short lines of why, and PR/MR bodies are capped at ten lines. Quick dev text may be lower-case; email, wikis, and external docs are capitalized and proofread (#192).
 
 ## [5.2.1] - 2026-11-06

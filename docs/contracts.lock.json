@@ -54,8 +54,8 @@
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "61b48d832280641c635e96344811879ada0b84c216bef138319763d88bc3a0b2",
-      "note": "Writing Voice covers commits and PRs/MRs with conventional titles, short bodies, and an audience split for capitalization (#192); no flag, path or overlay behavior changes."
+      "fingerprint": "6c5d44801d61b678e53b9402af2031c15b3c29795096e9811c98fe3733af9b7f",
+      "note": "Contradicting rules removed (#194): model precedence line, slimmer Claude and Codex ladders, scoped auto-mode, secret, cleanup, and Command Code notes; no flag, path or overlay behavior changes."
     },
     "workflow-templates": {
       "baseline": true,
