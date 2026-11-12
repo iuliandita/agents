@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- Core prompt: the Writing Voice rules now cover commits (conventional subject plus at most three short lines of why) and cap PR/MR bodies at ten lines (#192).
+
 ## [5.2.1] - 2026-11-06
 
 - Core prompt: the marker and question rules say the same in about 600 fewer bytes, so the Codex render fits its 32 KiB budget with personal overlays (#188).

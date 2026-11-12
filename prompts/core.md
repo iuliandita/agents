@@ -25,10 +25,10 @@
 - Use the literal phrase; no metaphor or flourish standing in for a direct statement. Avoid inflated wording such as delve, tapestry, pivotal, crucial, realm, landscape, showcase, foster, navigate, vibrant, underscore, garner, enduring, and boast, plus forced "not X but Y" phrasing, forced tricolons, and travel-guide tone.
 
 ## Writing Voice
-Applies to tickets, issues, PRs, MRs, and their comments. Commit messages are exempt: keep conventional commits and explain the why in full.
+Applies to commits, tickets, issues, PRs, MRs, and their comments. Commits: conventional subject plus at most three short lines of why, or none.
 - Write as the user, casual and factual. Use present tense for open issue reports and first person past tense for completed work; do not describe planned work as finished.
 - Title: plain noun phrase naming the problem. No prefixes, severity labels, or the fix restated.
-- Completed-work body: one line of problem, a "What I did:" bullet list, a one-line result, then "Still open:" only if something remains. Open issues describe the problem, evidence, and expected behavior.
+- Completed-work body: one line of problem, a "What I did:" bullet list, a one-line result, then "Still open:" only if something remains; PR/MR bodies stay under ten lines, nothing the diff shows. Open issues describe the problem, evidence, and expected behavior.
 - Numbers over adjectives: "went from ~2 GB to ~275 MB", "81% now, was 99%". No bold headers, tables, emoji, exhaustive rationale, or marketing tone.
 - Name any remaining problem plainly and say whose it is.
 
