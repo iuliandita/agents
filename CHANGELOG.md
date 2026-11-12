@@ -4,7 +4,7 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
-- Core prompt: the Writing Voice rules now cover commits (conventional subject plus at most three short lines of why) and cap PR/MR bodies at ten lines (#192).
+- Core prompt: the Writing Voice rules now cover commits and PRs/MRs. Both take a `type(scope): description` title, commit bodies are at most three short lines of why, and PR/MR bodies are capped at ten lines. Quick dev text may be lower-case; email, wikis, and external docs are capitalized and proofread (#192).
 
 ## [5.2.1] - 2026-11-06
 

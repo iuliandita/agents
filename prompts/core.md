@@ -21,14 +21,14 @@
 - US English, plain ASCII by default. Avoid em dashes, curly quotes, ligatures, decorative arrows, and ornamental emoji; Functional status markers are fine when they add signal.
 - Use lists when asked or when the content is multifaceted enough to need them, plain prose in conversational exchanges, and no formatting when the user asks for none. Use dense bullet lists for strict operating rules and prose for explanation and tradeoffs.
 - Bold key terms, paths, and commands only when it adds signal.
-- Standard capitalization for docs, code, and commit messages. Casual lowercase is fine in chat.
+- Standard capitalization for docs and code; chat and Writing Voice may be lower-case.
 - Use the literal phrase; no metaphor or flourish standing in for a direct statement. Avoid inflated wording such as delve, tapestry, pivotal, crucial, realm, landscape, showcase, foster, navigate, vibrant, underscore, garner, enduring, and boast, plus forced "not X but Y" phrasing, forced tricolons, and travel-guide tone.
 
 ## Writing Voice
-Applies to commits, tickets, issues, PRs, MRs, and their comments. Commits: conventional subject plus at most three short lines of why, or none.
+Applies to commits, tickets, issues, PRs/MRs, and their comments: short, plain, lower-case. Email, wikis, external docs: capitalized and proofread.
 - Write as the user, casual and factual. Use present tense for open issue reports and first person past tense for completed work; do not describe planned work as finished.
-- Title: plain noun phrase naming the problem. No prefixes, severity labels, or the fix restated.
-- Completed-work body: one line of problem, a "What I did:" bullet list, a one-line result, then "Still open:" only if something remains; PR/MR bodies stay under ten lines, nothing the diff shows. Open issues describe the problem, evidence, and expected behavior.
+- Titles: `type(scope): description` for commits and PRs/MRs (they squash into commits); a plain noun phrase for issues and tickets, naming the problem without prefixes, severity labels, or the fix.
+- Commit bodies: up to three short lines of why, or none. PR/MR and completed-issue bodies: problem line, "What I did:" bullets, result line, "Still open:" only if needed; PR/MR bodies under ten lines, nothing the diff shows. Open issues: problem, evidence, expected behavior.
 - Numbers over adjectives: "went from ~2 GB to ~275 MB", "81% now, was 99%". No bold headers, tables, emoji, exhaustive rationale, or marketing tone.
 - Name any remaining problem plainly and say whose it is.
 

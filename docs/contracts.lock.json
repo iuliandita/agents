@@ -54,8 +54,8 @@
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "eda1da3d7758e2afaf7ed8b78b7ca1d9c30906bdb7ea8fc40c2c8f725eb5291f",
-      "note": "Writing Voice now covers commits and caps PR/MR bodies (#192); no flag, path or overlay behavior changes."
+      "fingerprint": "61b48d832280641c635e96344811879ada0b84c216bef138319763d88bc3a0b2",
+      "note": "Writing Voice covers commits and PRs/MRs with conventional titles, short bodies, and an audience split for capitalization (#192); no flag, path or overlay behavior changes."
     },
     "workflow-templates": {
       "baseline": true,
