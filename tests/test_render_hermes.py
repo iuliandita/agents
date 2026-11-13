@@ -238,9 +238,37 @@ def test_work_tree_detection_resolves_parent_symlinks(tmp_path):
     (repo / ".git").mkdir()
     alias = tmp_path / "alias"
     alias.symlink_to(repo, target_is_directory=True)
-
     assert rh._inside_work_tree(alias / "new" / "config.yaml")
 
+
+def test_hermes_replace_failure_preserves_config_and_private_preview(tmp_path, monkeypatch):
+    repo = overlay_repo(tmp_path)
+    config = tmp_path / "config.yaml"
+    original = "agent:\n  model: existing\n"
+    config.write_text(original)
+    replace = rh.os.replace
+
+    def fail_config(source, target):
+        if target == config:
+            assert Path(source).parent == config.parent
+            raise OSError("config replacement failed")
+        replace(source, target)
+
+    monkeypatch.setattr(rh.os, "replace", fail_config)
+    with pytest.raises(OSError, match="replacement failed"):
+        rh.deploy(repo, config, tmp_path / "backups", False)
+    assert config.read_text() == original
+    assert not list(tmp_path.glob(".agents-*"))
+    preview = rh.render_preview(repo, tmp_path / "out")
+    if rh.os.name != "nt":
+        assert preview.stat().st_mode & 0o777 == 0o600
+
+
+def test_hermes_directory_target_refused(tmp_path):
+    config = tmp_path / "config.yaml"
+    config.mkdir()
+    with pytest.raises(SystemExit, match="not a regular file"):
+        rh.deploy(REPO, config, tmp_path / "backups", False)
 
 def test_dry_run_flags_unmanaged_coding_instructions(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("AGENTS_PRIVATE_HARNESSES", raising=False)

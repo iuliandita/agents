@@ -23,9 +23,12 @@ from render_prompts import (
     CHECK_EXIT_NOTE,
     EXIT_CODES_HELP,
     JsonArgumentParser,
+    atomic_write,
     backup_existing,
     json_record,
     omp_agent_dir,
+    record_deployed,
+    require_owned,
     run_json,
 )
 
@@ -716,15 +719,17 @@ def render_all(
     check_override_agents(defaults, specs, "prompts/models.json")
     written: dict[str, list[Path]] = {}
     notices: list[str] = []
+    prepared: list[tuple[str, dict[str, str]]] = []
     for harness in selected_agent_harnesses(selected):
         files, harness_notices = render_harness(specs, harness, overrides, invariants, defaults, allow_inherit)
         notices.extend(harness_notices)
+        prepared.append((harness, files))
+    for harness, files in prepared:
         dest_dir = out_dir / harness
-        dest_dir.mkdir(parents=True, exist_ok=True)
         paths: list[Path] = []
         for filename, text in files.items():
             dest = dest_dir / filename
-            dest.write_text(text, encoding="utf-8", newline="\n")
+            atomic_write(dest, text)
             paths.append(dest)
         # Prune renders of agents that no longer exist; only our own files.
         for path in stale_outputs(dest_dir, EXTENSIONS[harness], files):
@@ -766,9 +771,23 @@ def read_text_or_none(path: Path) -> str | None:
         return None
 
 
+def generated_text(text: str) -> bool:
+    if text.startswith("#!"):
+        _, _, text = text.partition("\n")
+    if text.startswith(f"# {GENERATED_MARKER} from ") or text.splitlines()[:1] == [f"# {GENERATED_MARKER}"]:
+        return True
+    if text.startswith("---\n"):
+        _, separator, text = text[4:].partition("\n---\n")
+        if not separator:
+            return False
+    return text.startswith(f"<!-- {GENERATED_MARKER} from ") or text.startswith(f"<!-- {GENERATED_MARKER} -->")
+
+
 def is_generated(path: Path) -> bool:
+    if path.is_symlink() or not path.is_file():
+        return False
     text = read_text_or_none(path)
-    return text is not None and GENERATED_MARKER in text
+    return text is not None and generated_text(text)
 
 
 def stale_outputs(directory: Path, extension: str, files: dict[str, str]) -> list[Path]:
@@ -790,7 +809,7 @@ def print_dry_run(harness: str, dest: Path, text: str) -> None:
     elif existing == text:
         print(f"unchanged {harness}: {dest}")
         action = "unchanged"
-    elif GENERATED_MARKER in existing:
+    elif generated_text(existing):
         print(f"would replace {harness}: {dest}")
         action = "would-replace"
     else:
@@ -799,7 +818,7 @@ def print_dry_run(harness: str, dest: Path, text: str) -> None:
     json_record(harness=harness, action=action, path=str(dest))
 
 
-def preflight_target(target: Path, files: dict[str, str]) -> None:
+def preflight_target(target: Path, files: dict[str, str], adopt: bool = False) -> None:
     if target.exists() and not target.is_dir():
         raise SystemExit(f"error: {target} exists and is not a directory")
     if not target.exists():
@@ -810,6 +829,8 @@ def preflight_target(target: Path, files: dict[str, str]) -> None:
         dest = target / filename
         if dest.is_symlink() or (dest.exists() and not dest.is_file()):
             raise SystemExit(f"error: {dest} is a symlink or not a regular file; move it aside")
+        if dest.exists():
+            require_owned(dest, generated_text(dest.read_text(encoding="utf-8", errors="replace")), adopt)
 
 
 def deploy(
@@ -819,6 +840,7 @@ def deploy(
     dry_run: bool,
     backup_dir: Path,
     allow_inherit: bool = False,
+    adopt: bool = False,
 ) -> None:
     specs = load_agents(repo_root)
     check_override_agents(overrides, specs)
@@ -833,7 +855,7 @@ def deploy(
         target = agent_target_dir(harness)
         extension = EXTENSIONS[harness]
         stale = stale_outputs(target, extension, files)
-        preflight_target(target, files)
+        preflight_target(target, files, adopt or dry_run)
         deployments.append((harness, target, files, stale))
 
     by_dir: dict[str, list[str]] = {}
@@ -864,11 +886,13 @@ def deploy(
         for filename, text in files.items():
             dest = target / filename
             if read_text_or_none(dest) == text:
+                record_deployed(repo_root, f"roles:{harness}:{filename}", dest, text)
                 print(f"unchanged {harness}: {dest}")
                 json_record(harness=harness, action="unchanged", path=str(dest))
                 continue
             backup_existing(dest, backup_dir)
-            dest.write_text(text, encoding="utf-8", newline="\n")
+            atomic_write(dest, text)
+            record_deployed(repo_root, f"roles:{harness}:{filename}", dest, text)
             print(f"updated {harness}: {dest}")
             json_record(harness=harness, action="updated", path=str(dest))
         if harness == "claude":
@@ -920,6 +944,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Harness to select, repeatable or comma-separated (--harness is an alias).",
     )
     parser.add_argument("--deploy", action="store_true", help="Write rendered agents to global harness directories.")
+    parser.add_argument("--adopt", action="store_true", help="Allow replacing unmanaged role files after backing them up.")
     parser.add_argument("--dry-run", action="store_true", help="Print deploy actions without writing.")
     parser.add_argument("--check", action="store_true", help="Validate rendered output without persistent writes.")
     parser.add_argument("--list-targets", action="store_true", help="List supported harnesses and target directories.")
@@ -960,7 +985,7 @@ def run(args: argparse.Namespace) -> int:
         )
     overrides = load_overrides(args.repo_root)
     if args.deploy or args.dry_run:
-        deploy(args.repo_root, args.target, overrides, args.dry_run, args.backup_dir, args.allow_inherit)
+        deploy(args.repo_root, args.target, overrides, args.dry_run, args.backup_dir, args.allow_inherit, args.adopt)
         return 0
     written = render_all(args.repo_root, args.out_dir, args.target, overrides, args.allow_inherit)
     for harness, paths in written.items():

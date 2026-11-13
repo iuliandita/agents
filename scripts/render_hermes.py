@@ -182,13 +182,11 @@ def merge_coding_instructions(text: str, rules: str) -> str:
 def render_preview(repo_root: Path, out_dir: Path) -> Path:
     destination = out_dir / "hermes" / "coding_instructions.md"
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(render_rules(repo_root), encoding="utf-8", newline="\n")
+    render_prompts.atomic_write(destination, render_rules(repo_root), mode=0o600)
     return destination
 
 
-def _inside_work_tree(path: Path) -> bool:
-    resolved = path.expanduser().resolve()
-    return any((parent / ".git").exists() for parent in resolved.parents)
+_inside_work_tree = render_prompts._inside_work_tree
 
 
 def deploy(
@@ -199,6 +197,8 @@ def deploy(
             f"error: {config_path} is a symlink; refusing to write through it. "
             "Move it aside or point HERMES_CONFIG_PATH at a regular file."
         )
+    if config_path.exists() and not config_path.is_file():
+        raise SystemExit(f"error: {config_path} is not a regular file; refusing to write")
     withheld = env_override and _inside_work_tree(config_path)
     if withheld:
         print(
@@ -210,6 +210,8 @@ def deploy(
     original = config_path.read_text(encoding="utf-8") if config_path.exists() else f"{AGENT}:\n"
     merged = merge_coding_instructions(original, rules)
     if merged == original:
+        if not dry_run:
+            render_prompts.record_deployed(repo_root, "hermes-config", config_path, merged)
         print(f"unchanged hermes: {config_path}")
         json_record(harness="hermes", action="unchanged", path=str(config_path))
         return 0
@@ -223,7 +225,8 @@ def deploy(
         return 0
     backup_existing(config_path, backup_dir)
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(merged, encoding="utf-8", newline="\n")
+    render_prompts.atomic_write(config_path, merged)
+    render_prompts.record_deployed(repo_root, "hermes-config", config_path, merged)
     print(f"updated hermes: {config_path}")
     json_record(harness="hermes", action="updated", path=str(config_path))
     return 0
