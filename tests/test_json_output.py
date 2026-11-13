@@ -353,6 +353,30 @@ def test_direct_entrypoints_reject_old_python(env, script, prog, args, json_outp
         assert proc.stdout == ""
 
 
+@pytest.mark.parametrize("wrapper", ["sync-ai-prompts", "render-agents", "render-invariants", "render-hermes", "update"])
+@pytest.mark.parametrize("shell", ["bash", "pwsh"])
+def test_launchers_follow_symlink_chains(env, tmp_path, wrapper, shell):
+    if os.name == "nt" and shell == "bash":
+        pytest.skip("native Windows launchers use PowerShell")
+    executable = shutil.which(shell)
+    if executable is None:
+        pytest.skip(f"{shell} is not installed")
+    suffix = ".ps1" if shell == "pwsh" else ""
+    directory = tmp_path / "linked launchers"
+    directory.mkdir()
+    first = directory / f"first{suffix}"
+    first.symlink_to(SCRIPTS / f"{wrapper}{suffix}")
+    entry = directory / f"entry{suffix}"
+    entry.symlink_to(first.name)
+    env["AGENTS_PYTHON"] = sys.executable
+    command = [executable, str(entry), "--help"] if shell == "bash" else [
+        executable, "-NoProfile", "-File", str(entry), "--help",
+    ]
+    proc = subprocess.run(command, env=env, capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    assert "usage:" in proc.stdout and "--repo-root" in proc.stdout
+
+
 @pytest.mark.parametrize("wrapper", ["sync-ai-prompts", "render-agents", "render-hermes", "render-invariants", "update"])
 @pytest.mark.parametrize("shell", ["bash", "pwsh"])
 def test_launcher_errors_have_mode_and_records(env, tmp_path, wrapper, shell):

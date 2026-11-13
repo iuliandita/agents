@@ -1,22 +1,22 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "Relative hook and Hermes output and backup directories resolve under --repo-root; unmanaged hook previews change action and CRLF output requires updating.",
+      "breaking": "Relative hook and Hermes artifact directories resolve under --repo-root; unmanaged hook previews change action and CRLF output requires updating.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "311fbe598a748955a2796e4451442059396250b42b26102e04b29ce89449a3fe",
+      "fingerprint": "cc8e08a92e58b6978fbf119b72625eb4aae9f8923aa89d7fdcb18b20ad4798f2",
       "migration": "Back up configs and consumers; upgrade with absolute directory overrides to retain locations and recognize the unmanaged action; roll back by restoring backups and the previous checkout.",
-      "note": "Record repository-relative hook and Hermes artifact directories alongside ownership previews and LF normalization."
+      "note": "Record Bash and PowerShell launcher symlink resolution together with relative artifact paths and hook preview changes."
     },
     "harnesses": {
-      "breaking": "Relative output and backup paths resolve under --repo-root; Windows drive-qualified PI_CONFIG_DIR stays under home; CRLF prompts and malformed optional blocks no longer pass checks.",
+      "breaking": "Relative artifact paths resolve under --repo-root; Windows drive-qualified PI_CONFIG_DIR stays under home; CRLF prompts and malformed optional blocks no longer pass checks.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "4f8d00e2ca40a48ae05859e10c294124e16ec747fbfc3b82de333b710addc2a6",
+      "fingerprint": "bc2ff882d40115b796919ed7525c0f0c9cd32d194cac3812b46a134c29fdf9bc",
       "migration": "Back up artifacts and sources; upgrade with absolute directory overrides to retain existing locations and paired optional markers; roll back by restoring backups and the previous checkout.",
-      "note": "Record repository-relative artifact directories, Windows omp config paths, fence-aware sections, and stricter render shape validation."
+      "note": "Record symlink-aware prompt launchers, repository-relative artifacts, Windows config roots, and strict render checks."
     },
     "maintenance": {
       "breaking": "none",
