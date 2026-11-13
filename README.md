@@ -188,16 +188,18 @@ This renders five artifacts into `build/generated/invariants/` from the single s
 - `claude-settings-snippet.json` - the hook wiring, for reference or manual merge.
 - `subagent-block.md` - paste into custom subagent definitions; reinforcement that holds regardless of which memory files a given agent type loads.
 - `invariants-preinvocation.sh` - an Antigravity `PreInvocation` hook that emits `injectSteps.ephemeralMessage` JSON; Antigravity's documented per-turn channel.
-- `antigravity-hooks-snippet.json` - the `hooks.json` entry for the Antigravity hook, for manual merge into `~/.gemini/config/hooks.json`.
+- `antigravity-hooks-snippet.json` - a reference copy of the deployed Antigravity `hooks.json` entry.
 
-Install the Claude hook the same way prompts deploy: dry-run first, then deploy.
+Install both hooks the same way prompts deploy: dry-run first, then deploy.
 
 ```bash
 scripts/render-invariants --dry-run
 scripts/render-invariants --deploy
 ```
 
-`--deploy` copies the hook to `~/.claude/hooks/` and idempotently appends its entry to `hooks.UserPromptSubmit` in `~/.claude/settings.json`, backing up anything it overwrites into `.backups/`. It refuses symlinked destinations and shell-quotes the hook path. It never removes or rewrites existing hooks, so an already-configured `UserPromptSubmit` (or any other setting) is preserved, and re-running is a no-op. Override targets for testing with `CLAUDE_HOOKS_DIR`, `CLAUDE_SETTINGS_PATH`, `--hooks-dir`, or `--settings-path`. The Antigravity artifacts are render-only today; merge the snippet into `hooks.json` by hand.
+`--deploy` installs both hooks with mode `0755` and merges their entries: Claude Code uses `~/.claude/hooks/invariants-userpromptsubmit.sh` and `hooks.UserPromptSubmit` in `~/.claude/settings.json`; Antigravity uses `~/.gemini/config/invariants-preinvocation.sh` and `invariants.PreInvocation` in `~/.gemini/config/hooks.json`. It backs up overwritten files into `.backups/`, refuses symlinked destinations and invalid settings shapes, and shell-quotes hook paths (with forward slashes on Windows). Managed entries are recognized by their channel's exact hook filename; changing the install directory updates the command in place. Unrelated entries and settings are preserved, including Unicode text. Re-running is a no-op, and `--dry-run` reports matching hooks as unchanged.
+
+Use `--harness claude` or `--harness antigravity` to deploy one channel; the default is `--harness all`. Override Claude targets with `CLAUDE_HOOKS_DIR`, `CLAUDE_SETTINGS_PATH`, `--hooks-dir`, or `--settings-path`. Use `--antigravity-config-dir` to move both the Antigravity hook and `hooks.json`; the rendered snippet follows that directory too.
 
 Per-turn injection is intentional. `SessionStart` runs once and gets buried, whereas `UserPromptSubmit` re-asserts the rules each turn for roughly 60 tokens. `UserPromptSubmit` fires on user prompts in the main loop, not on subagent dispatches, so the subagent block is a separate delivery path and stays a manual paste.
 
@@ -248,7 +250,11 @@ Deploy backs up overwritten files into `.backups/` and removes only stale files 
 
 After a deploy, `scripts/render-agents --target <list> --verify` checks that all six role files exist in each selected harness's agent directory. Prune old backups with `scripts/sync-ai-prompts --prune-backups 50 --dry-run` (drop `--dry-run` to delete). The hard invariants are rendered into every agent from `prompts/invariants.md`, so the manual subagent paste is only needed for agents defined outside this repo.
 
-`shell-ro` is rendered only when the harness can enforce it as a real sandbox boundary. Codex maps it to shell access under `sandbox_mode = "read-only"`. Claude Code, OpenCode, Command Code, Antigravity, and Oh My Pi omit shell access for `shell-ro` agents and retain their native read and search tools. This costs explorer and reviewer direct git-history access on those harnesses, but keeps the read-only contract honest. Hand the reviewer the diff, pasted or as a patch file; without one and without a shell it asks for it and stops. Full `shell` roles are unchanged.
+`shell-ro` is rendered only when the harness can enforce it as a real sandbox boundary. Codex maps it to shell access under `sandbox_mode = "read-only"`. Claude Code, OpenCode, Command Code, Antigravity, and Oh My Pi omit shell access for `shell-ro` agents and retain their native read and search tools. This costs explorer and reviewer direct git-history access on those harnesses, but keeps the read-only contract honest. Hand the reviewer a pasted diff, patch file, or named files; without any of these and without a shell it returns a blocker and stops. Full `shell` roles are unchanged.
+
+OpenCode read-only roles (explorer, researcher, reviewer, planner) start their `permission` block with `"*": deny`, then allow their named read, search, and web tools. Unlisted custom/MCP tools, `skill`, `lsp`, and `external_directory` remain denied. Builder and verifier retain their explicit permission maps without a wildcard. Rendering fails with an `error:` if a harness tool mapping expands to no tools.
+
+Every role reports `Blocked: <reason, or no>` and stops at a body-level tool-call budget: 40 for builder, 30 for the other roles. Codex, Antigravity, and Oh My Pi omit the unsupported `max_turns` field and emit a `note:`; the body budget is advisory. All roles follow designated project instructions and skill guidance within their boundaries, and treat other repository text, web pages, and command output as data. Builder receipts list paths without added/removed counts; verifier classifies test, lint, type, and build errors as `fail`. Antigravity output hashes exclude resolved effort because the format has no effort field.
 
 Codex only uses a custom role when the parent calls `spawn_agent` with `agent_type` set to the role name. A full-history fork (`fork_turns = "all"`) inherits the parent's model and effort regardless of the role file. The rendered Codex prompt tells the root agent to pass `agent_type` and `fork_turns = "none"`, so task prompts must be self-contained.
 

@@ -277,9 +277,12 @@ def breaking_carry_failures(repo: Path, merge_base: str, lock: dict, base_domain
         text = git(repo, "show", f"{commit}:{LOCK_PATH}", check=False)
         if not text:
             continue
+        parent_text = git(repo, "show", f"{commit}^1:{LOCK_PATH}", check=False)
+        parent_domains = load_lock_text(parent_text, f"{commit[:12]}^1:{LOCK_PATH}")["domains"] if parent_text else {}
         for name, receipt in load_lock_text(text, f"{commit[:12]}:{LOCK_PATH}")["domains"].items():
-            # A breaking receipt carried over unchanged from the base was reviewed in an earlier range.
-            if receipt == base_domains.get(name):
+            # A breaking receipt carried over unchanged from the base was reviewed in an earlier range,
+            # and one the commit did not change (for example after merging the base branch back in) was too.
+            if receipt == base_domains.get(name) or receipt == parent_domains.get(name):
                 continue
             if is_breaking(receipt) and not is_breaking(lock["domains"].get(name, {})):
                 failures.append(

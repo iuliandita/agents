@@ -1,14 +1,12 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "Update no longer accepts the retired target.",
+      "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
-        "INSTALL.md"
+        "README.md"
       ],
-      "fingerprint": "a74212abea55305ffaa98781132113258e6dc5ce456801e9cce8078e3b96238f",
-      "migration": "Back up saved commands, upgrade by removing the target, and roll back to the previous release if needed.",
-      "note": "Remove the retired target from update selection."
+      "fingerprint": "9f42817ab12b78fe614937999c2b57a6483525f575842386b3cb7d20f6832a30",
+      "note": "INSTALL and README cover both invariants hook channels, the update step per harness, and the new JSON targets"
     },
     "harnesses": {
       "breaking": "none",
@@ -20,17 +18,21 @@
     },
     "maintenance": {
       "breaking": "none",
-      "docs": [],
-      "fingerprint": "f28526bfd799bcaec3ad07aed2a8121635401f68b7a18a855834b5b429b6da07",
-      "no_impact": "Comment names Renovate instead of Dependabot; no behavior change."
+      "docs": [
+        "CHANGELOG.md"
+      ],
+      "fingerprint": "03ff2325b2cdb162a6958c95e4916eb2b159f234fc309f3a3f7de9277839d524",
+      "note": "MAINTENANCE explains that only receipt-changing commits count for the breaking carry check"
     },
     "models-agents": {
       "breaking": "none",
       "docs": [
-        "INSTALL.md"
+        "CHANGELOG.md",
+        "README.md",
+        "docs/harness-contract.md"
       ],
-      "fingerprint": "81ac3411f253ff51b45086923bb42f37e2f2ee7c3789d1e4f5d69cc719b12f1c",
-      "note": "changelog and INSTALL json table cover reviewer, planner, line caps, and per-section byte sizes"
+      "fingerprint": "280377bfb8a2b5add3558a1b928eccd41f27debf85a6d2b443fafc94c08c1bc1",
+      "note": "Document deny-all read-only roles, body tool budgets, blocker output, empty expansion errors, and unsupported turn-cap notices."
     },
     "overlays-trust": {
       "breaking": "none",
