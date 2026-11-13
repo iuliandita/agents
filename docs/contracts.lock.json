@@ -1,51 +1,44 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "Existing unmanaged hook scripts require --adopt, and backup pruning now retains recognized backups per source path.",
+      "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
-        "INSTALL.md",
         "SECURITY.md"
       ],
       "fingerprint": "b6f7f9146231176d731a81aa8c5639199901d0f769542d3eee9daf78c49222f2",
-      "migration": "Back up hook scripts and shared settings, upgrade by reviewing unmanaged hooks and passing --adopt once, then inspect the manifest and per-source backup retention. Roll back by restoring affected backups and checking out the previous version before redeploying.",
       "note": "Installer recovery covers hook adoption, private backups, atomic shared-config writes, workflow bundle retention, and Hermes overlay boundaries."
     },
     "harnesses": {
-      "breaking": "Existing unmanaged prompt targets require --adopt, and environment-selected worktree targets no longer receive overlays.",
+      "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
         "INSTALL.md"
       ],
       "fingerprint": "d4319563cf7328ec5b679a4b3d5a986f32654ffd7c1b4784a7705a8760ec98ca",
-      "migration": "Back up existing prompt targets, upgrade by reviewing unmanaged files and using --adopt once, then verify overlay withholding. Roll back by restoring the affected backup and checking out the previous version before redeploying.",
       "note": "Recovery guidance covers prompt ownership adoption, environment-selected worktree overlay withholding, and incremental deployment manifests."
     },
     "maintenance": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "docs/MAINTENANCE.md"
       ],
-      "fingerprint": "03ff2325b2cdb162a6958c95e4916eb2b159f234fc309f3a3f7de9277839d524",
-      "note": "MAINTENANCE explains that only receipt-changing commits count for the breaking carry check"
+      "fingerprint": "f3d3d9f5b63bf646479fc9c696b51e7d6689df4efb44fa5871bea8ffe1ece14b",
+      "note": "domain table lists all relevant maintenance documentation"
     },
     "models-agents": {
-      "breaking": "Existing unmanaged role files require --adopt before replacement.",
+      "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
         "INSTALL.md"
       ],
       "fingerprint": "15847bc35b42832f31a94868c4d51d37db042e65baa52ba30df16be19f113cac",
-      "migration": "Back up existing role directories, upgrade by reviewing unmanaged roles and passing --adopt once, then verify generated headers. Roll back by restoring the affected backups and checking out the previous version before redeploying.",
       "note": "Role recovery guidance explains generated-header ownership, opt-in adoption, atomic replacement, and manifest records per role file."
     },
     "overlays-trust": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "docs/MAINTENANCE.md"
       ],
       "fingerprint": "be20fa75f41844776af6a19da44d55651ea5fa80eee2836865c8e5e026e74e24",
-      "note": "MAINTENANCE explains the scan skips dependency trees and gitignored files but keeps the prompts overlays"
+      "note": "maintenance documentation describes overlay leak scanning behavior"
     },
     "prompts": {
       "breaking": "none",
@@ -56,11 +49,12 @@
       "note": "Changelog covers confirmation scope, subagent blockers, rendered effort, Codex context cap, and warning-free prompt limits."
     },
     "workflow-templates": {
-      "baseline": true,
       "breaking": "none",
-      "docs": [],
-      "fingerprint": "aba0b21a75c06a3808af72828ab46a498411f7c78033aacdad66a053b4cc46bd",
-      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+      "docs": [
+        "CHANGELOG.md"
+      ],
+      "fingerprint": "227257baff9aa30b4512eecba718234fda73a0b30063e2d0cd957f8b3d5d5128",
+      "note": "consolidation clearing handles final unterminated path safely"
     }
   },
   "schema": 1

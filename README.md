@@ -69,7 +69,7 @@ The rules are opinionated and shaped by 20+ years in IT and DevOps, production i
 - Deploys rendered files to resolved global paths with backups.
 - Renders six reusable subagent roles from `agents/` into six harness formats.
 - Provides opt-in shared and local project instruction templates and a portable context-consolidation skill.
-- Lints public prompt sources, including `prompts/private.example.md`, for private paths, token-like secrets, missing harness fragments, and non-ASCII drift.
+- Lints public prompt sources, including `prompts/private.example.md`, for private paths, token-like secrets, missing harness fragments, and non-ASCII drift. The core has a 100-line cap and each harness fragment has a 20-line cap.
 
 ## How it works
 
@@ -84,11 +84,17 @@ flowchart LR
     render -->|"--deploy"| native["subagent files in each<br>harness's native format"]
 ```
 
+`sync-ai-prompts` accepts `--stamp` and `--out-dir` for rendered output. `render-agents`, `render-invariants`, and `render-hermes` also accept `--out-dir`.
+
 ## Layout
 
 ```text
 agents/                   # tool-agnostic subagent sources
 prompts/
+  models.json             # tracked model defaults
+  models.local.example.json # local model override template
+  deploy-targets.txt      # optional gitignored deployment targets
+  private-harnesses.txt   # optional gitignored private-overlay trust list
   core.md                 # shared rules
   invariants.md           # non-negotiable rules for hook/subagent reinforcement
   local.example.md        # tracked template for the local overlay

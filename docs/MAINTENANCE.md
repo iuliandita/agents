@@ -23,13 +23,13 @@ The plain check verifies that every domain's receipt matches its current sources
 
 | Domain | Covers | Docs it can cite |
 |---|---|---|
-| prompts | core prompt, invariants, harness fragments | README, INSTALL, surfaces, CHANGELOG |
+| prompts | core prompt, invariants, harness fragments | README, INSTALL, surfaces, harness contract, CHANGELOG |
 | models-agents | role sources, model tiers, agent renderer | README, INSTALL, harness contract, CHANGELOG |
-| harnesses | harness registry and the prompt launcher | README, INSTALL, harness contract, surfaces, legacy harnesses, CHANGELOG |
-| deployment | update, invariants, Hermes, runtime, workflow installer | README, INSTALL, SECURITY, CHANGELOG |
-| overlays-trust | overlay templates, leak lint, source scan, `.gitignore` | README, INSTALL, SECURITY, CHANGELOG |
+| harnesses | harness registry and the prompt launcher | README, INSTALL, harness contract, surfaces, legacy harnesses, CONTRIBUTING, CHANGELOG |
+| deployment | update, invariants, Hermes, runtime, workflow installer | README, INSTALL, SECURITY, CONTRIBUTING, harness contract, surfaces, CHANGELOG |
+| overlays-trust | overlay templates, leak lint, source scan, `.gitignore` | README, INSTALL, SECURITY, this file, CHANGELOG |
 | workflow-templates | `skills/` and `templates/` | README, INSTALL, CHANGELOG |
-| maintenance | `scripts/check_*.py` | this file, README, CHANGELOG |
+| maintenance | `scripts/check_*.py` | this file, README, INSTALL, CONTRIBUTING, AGENTS, CHANGELOG |
 
 `.github/`, `tests/`, and docs are outside the domains. Action pins have Renovate and actionlint, tests are not user facing, and docs are the obligation itself. New source files count once staged; untracked scratch files are ignored. Change sources and rerun the renderers; never hand-edit rendered output.
 
