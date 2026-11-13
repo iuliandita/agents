@@ -5,7 +5,11 @@
     "lint",
     "test",
     "secrets",
-    "zizmor"
+    "zizmor",
+    "markdown",
+    "links",
+    "macos-setup",
+    "windows-setup"
   ],
   "installers": [
     {

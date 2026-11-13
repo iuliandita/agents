@@ -30,6 +30,16 @@ def isolated_environment(tmp_path, monkeypatch):
     templates = tmp_path / "git-templates"
     templates.mkdir()
     monkeypatch.setenv("GIT_TEMPLATE_DIR", str(templates))
+    # Scripts run against the real checkout would otherwise read its gitignored overlays.
+    overlays = tmp_path / "isolated-overlays"
+    overlays.mkdir()
+    monkeypatch.setenv("AGENTS_OVERLAY_DIR", str(overlays))
+
+
+@pytest.fixture
+def checkout_overlays(monkeypatch):
+    """For a test that builds its own tmp checkout and writes overlay files into its prompts/."""
+    monkeypatch.delenv("AGENTS_OVERLAY_DIR")
 
 
 WINDOWS_POSIX_TESTS = {

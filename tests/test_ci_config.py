@@ -223,3 +223,13 @@ def test_documented_skill_installer_covers_every_bundled_skill(tmp_path):
     expected = {target / source.relative_to(repo / "skills") for source in (repo / "skills").rglob("SKILL.md")}
     assert expected
     assert {Path(action["path"]) for action in actions} == expected
+
+
+def test_ci_links_job_runs_the_documented_lychee_command():
+    repo = Path(__file__).resolve().parents[1]
+    steps = load_workflow("ci.yml")["jobs"]["links"]["steps"]
+    command = next(step["run"] for step in steps if step["name"] == "Check links").strip()
+
+    assert command.startswith("lychee --config lychee.toml ")
+    for doc in ("AGENTS.md", "CONTRIBUTING.md"):
+        assert command in (repo / doc).read_text(encoding="utf-8").splitlines(), doc

@@ -171,14 +171,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Check links
-        run: |
-          mapfile -t markdown_files < <(
-            {
-              printf '%s\n' AGENTS.md CHANGELOG.md CONTRIBUTING.md INSTALL.md README.md SECURITY.md
-              find docs -type f -name '*.md' -not -path 'docs/local/*' -not -path 'docs/superpowers/*' -not -path '*/node_modules/*'
-            } | sort -u
-          )
-          lychee --config lychee.toml "${markdown_files[@]}"
+        run: lychee --config lychee.toml AGENTS.md CHANGELOG.md CONTRIBUTING.md INSTALL.md README.md SECURITY.md 'docs/**/*.md'
 
   macos-setup:
     name: macos-setup

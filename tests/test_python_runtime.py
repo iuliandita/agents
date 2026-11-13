@@ -112,7 +112,10 @@ def test_prompt_dry_run_needs_no_site_packages(runtime):
     checkout, bin_dir, _ = runtime
     shutil.copytree(
         REPO / "prompts", checkout / "prompts",
-        ignore=shutil.ignore_patterns("private.md", "models.local.json", "private-patterns.txt"),
+        ignore=shutil.ignore_patterns(
+            "local.md", "private.md", "models.local.json", "private-patterns.txt",
+            "private-harnesses.txt", "deploy-targets.txt",
+        ),
     )
     interpreter = bin_dir / "python3"
     interpreter.write_text(f'#!/bin/sh\nexec {shlex.quote(sys.executable)} -S "$@"\n')

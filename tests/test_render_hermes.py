@@ -200,6 +200,7 @@ def overlay_repo(tmp_path):
     return repo
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_render_rules_adds_local_and_withholds_untrusted_private(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("AGENTS_PRIVATE_HARNESSES", raising=False)
     rules = rh.render_rules(overlay_repo(tmp_path))
@@ -208,12 +209,14 @@ def test_render_rules_adds_local_and_withholds_untrusted_private(tmp_path, monke
     assert "withheld from hermes" in capsys.readouterr().err
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_render_rules_includes_private_when_trusted(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "hermes")
     rules = rh.render_rules(overlay_repo(tmp_path))
     assert rules.index("local layer") < rules.index("private layer")
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 @pytest.mark.parametrize("override", ["HERMES_CONFIG_PATH", "HERMES_HOME", None])
 @pytest.mark.parametrize("git_marker", ["directory", "file", "absent"])
 def test_environment_config_withholds_overlays_only_inside_work_tree(tmp_path, monkeypatch, capsys, override, git_marker):
@@ -252,6 +255,7 @@ def test_work_tree_detection_resolves_parent_symlinks(tmp_path):
     assert rh._inside_work_tree(alias / "new" / "config.yaml")
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_hermes_replace_failure_preserves_config_and_private_preview(tmp_path, monkeypatch):
     repo = overlay_repo(tmp_path)
     config = tmp_path / "config.yaml"
@@ -281,6 +285,7 @@ def test_hermes_directory_target_refused(tmp_path):
     with pytest.raises(SystemExit, match="not a regular file"):
         rh.deploy(REPO, config, tmp_path / "backups", False)
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_dry_run_flags_unmanaged_coding_instructions(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("AGENTS_PRIVATE_HARNESSES", raising=False)
     config = tmp_path / "config.yaml"

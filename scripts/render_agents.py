@@ -38,6 +38,7 @@ from render_prompts import (
     backup_existing,
     json_record,
     omp_agent_dir,
+    overlay_dir,
     read_bytes_or_none,
     record_deployed,
     require_owned,
@@ -324,7 +325,7 @@ def load_model_defaults(repo_root: Path) -> dict:
 
 
 def load_overrides(repo_root: Path) -> dict:
-    path = repo_root.joinpath(*MODELS_LOCAL_PATH)
+    path = overlay_dir(repo_root) / MODELS_LOCAL_PATH[-1]
     return load_models_file(path)
 
 

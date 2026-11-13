@@ -1,23 +1,22 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "Hook, Hermes, and workflow writes refuse linked ancestors; relative hook and Hermes artifacts follow --repo-root; unmanaged hook previews change action and CRLF output requires updating.",
+      "breaking": "none",
       "docs": [
         "CHANGELOG.md",
         "INSTALL.md"
       ],
-      "fingerprint": "67bb753c313080ab0926d46ab10f33bcddf5b302b43ff60e8fbebb9952fd05a1",
-      "migration": "Back up configs and consumers; upgrade using real paths, absolute directory overrides for existing locations, and the unmanaged preview action; roll back by restoring backups and the previous checkout.",
-      "note": "Updater help lists PI_CONFIG_DIR; INSTALL drops the removed not-rendered status; keeps ancestor-link refusal, launcher resolution, hook previews, LF normalization."
+      "fingerprint": "9bbfd8d1fcd550114d00ba801b213f9f3daa8807cd2f41b25ce83cb4d3dea6fd",
+      "note": "Document that AGENTS_OVERLAY_DIR also moves deploy-targets.txt and the Hermes overlay lookup."
     },
     "harnesses": {
-      "breaking": "Selected AGENTS.md artifacts always use harness subdirectories; relative artifacts follow --repo-root; writes refuse linked ancestors; Windows drive-qualified PI_CONFIG_DIR stays under home; CRLF prompts and malformed optional blocks no longer pass checks.",
+      "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "INSTALL.md"
       ],
-      "fingerprint": "ffb801aebef904abb3decc56a9cb64b6802b6e889338eb357959a2cf80d73d71",
-      "migration": "Back up artifacts, sources, and consumers; upgrade by updating selected artifact paths, using absolute overrides for old locations, real destination paths, and paired optional markers; roll back by restoring backups, consumers, and the previous checkout.",
-      "note": "Record canonical private check directories and JSON usage errors for invalid paths, while preserving user-selected ancestor checks and stable selected-render paths."
+      "fingerprint": "ce6fe431dea9c3160f703e8acded745ab352f26f8bef37a6a2994e0f41496cc3",
+      "note": "Document the AGENTS_OVERLAY_DIR override for local.md, private.md, and the private trust list."
     },
     "maintenance": {
       "breaking": "none",
@@ -28,30 +27,35 @@
       "note": "domain table lists all relevant maintenance documentation"
     },
     "models-agents": {
-      "breaking": "Role writes refuse linked ancestors; malformed quoted fields fail; relative role directories follow --repo-root; CRLF roles require replacement, unreadable targets fail, and max_turns notices identify a harness.",
+      "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "INSTALL.md",
+        "README.md",
+        "docs/harness-contract.md"
       ],
-      "fingerprint": "7552a5eb7aabb3648514306a7d1e8d5ad927ee154ffcf70ee5de7ccb6a7f684e",
-      "migration": "Back up roles and consumers; upgrade using real paths, escaped descriptions, and absolute directory overrides to retain locations; roll back by restoring backups and the previous checkout.",
-      "note": "Record canonical private role-check directories and JSON path usage errors alongside shared target helpers, quoted-description decoding, and target diagnostics."
+      "fingerprint": "dfaaa226518f8eb86307cf517d2fe882d1cac0f9ee228d581a85318ea217f5ec",
+      "note": "Document the Command Code cheap tier pinned to high for DeepSeek and AGENTS_OVERLAY_DIR for models.local.json."
     },
     "overlays-trust": {
       "breaking": "none",
       "docs": [
+        "CHANGELOG.md",
+        "INSTALL.md",
         "docs/MAINTENANCE.md"
       ],
-      "fingerprint": "be20fa75f41844776af6a19da44d55651ea5fa80eee2836865c8e5e026e74e24",
-      "note": "maintenance documentation describes overlay leak scanning behavior"
+      "fingerprint": "a007dac746f6703f1e05659a232986fe66f1529f3558793ba6528dc9685cbb06",
+      "note": "Document AGENTS_OVERLAY_DIR for the leak linter patterns file, the scan of md.example templates, and negations that remove a check."
     },
     "prompts": {
       "breaking": "none",
       "docs": [
         "CHANGELOG.md",
-        "README.md"
+        "README.md",
+        "docs/harness-contract.md"
       ],
-      "fingerprint": "9f1d6f0600bb8efa4b1fa2c234f95582b2ca9c736eb1f11989941972c18ec378",
-      "note": "Name Fable as the opt-in megamind tier in the Claude ladder and the README tier list."
+      "fingerprint": "f2a935a11e2465c4218f0737e9fdfa2688199654966d661316b249735c4d3638",
+      "note": "Record the Command Code effort levels DeepSeek V4.1 Flash accepts and the pinned cheap tier."
     },
     "workflow-templates": {
       "breaking": "none",
