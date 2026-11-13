@@ -3,12 +3,17 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 import unicodedata
 from bisect import bisect_right
 from dataclasses import dataclass
 from pathlib import Path
 
+
+# Dependency and VCS trees hold third-party text, never authored prompts, so they are
+# skipped at any depth (the markdownlint tool installs node_modules under .github/tools).
+VENDORED_DIRS = {".git", ".venv", "__pycache__", "node_modules", "venv"}
 
 EXCLUDED_DIRS = {
     ".git",
@@ -160,13 +165,35 @@ def is_prompt_source(path: Path) -> bool:
     return any(str(path).endswith(suffix) for suffix in PROMPT_SUFFIXES)
 
 
+def ignored_paths(root: Path) -> tuple[str, ...]:
+    """Gitignored paths under root (directories end in '/'); empty outside a git checkout."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--others", "--ignored", "--exclude-standard", "--directory"],
+            capture_output=True, text=True, check=False, timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ()
+    return tuple(result.stdout.splitlines()) if result.returncode == 0 else ()
+
+
+def is_ignored(rel: str, ignored: tuple[str, ...]) -> bool:
+    # Overlays under prompts/ are gitignored but deployed, so they are always scanned.
+    if rel.startswith("prompts/"):
+        return False
+    return any(rel == entry or (entry.endswith("/") and rel.startswith(entry)) for entry in ignored)
+
+
 def iter_prompt_sources(root: Path) -> list[Path]:
     paths: list[Path] = []
+    ignored = ignored_paths(root)
     for path in root.rglob("*"):
         # Exclusions match repo-relative parts only; matching absolute parts
         # would skip the whole repo when it is cloned under e.g. a build/ dir.
         rel_parts = path.relative_to(root).parts
-        if rel_parts[0] in EXCLUDED_DIRS:
+        if rel_parts[0] in EXCLUDED_DIRS or VENDORED_DIRS.intersection(rel_parts[:-1]):
+            continue
+        if ignored and is_ignored("/".join(rel_parts), ignored):
             continue
         if len(rel_parts) == 1 and path.name in EXCLUDED_FILES:
             continue
