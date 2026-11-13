@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- Prompt rules now align on destructive-action confirmation, subagent blockers, and secrets. Harness notes keep runtime checks and config paths, describe rendered effort values, and require a Codex context cap of at least 40 KiB. Public prompts drop repeated rules and optional routing policy; the line-limit test rejects lint warnings (#204).
+
 - Roles and pipeline (#198).
   - The planner returns `Need the goal: <what is missing>.` instead of asking.
   - The reviewer reviews named files when no diff is given, and puts its `Coverage: partial` line after the findings line.
