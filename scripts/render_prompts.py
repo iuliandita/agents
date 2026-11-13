@@ -195,10 +195,6 @@ class Harness(NamedTuple):
     max_bytes: int | None = None
     native_env_var: str = ""
     native_filename: str = ""
-    # Core `## ` sections this harness does not carry; rendering fails if one is renamed or removed.
-    omit_sections: tuple[str, ...] = ()
-    # No deploy path: an external tool reads the file rendered under build/generated/.
-    consumed_from_build: bool = False
 
 
 # Seven supported harnesses and one generic project-level target. Paths,
@@ -330,8 +326,6 @@ def harness_display_names() -> list[str]:
 
 
 def default_target_label(harness: Harness, home: str = "~") -> str:
-    if harness.consumed_from_build:
-        return f"none (rendered to build/generated/{harness.output_name})"
     if harness.target_template is None:
         return f"manual override via {harness.env_var}"
     return harness.target_template.format(home=home)
@@ -408,8 +402,6 @@ def omp_is_profile_derived(home: str | Path | None, env: dict[str, str] | os._En
 
 def target_path(harness: str, home: str | Path | None = None, env: dict[str, str] | None = None) -> Path | None:
     item = harness_by_name(harness)
-    if item.consumed_from_build:
-        return None
     values = os.environ if env is None else env
     if item.env_var in values and values[item.env_var]:
         return Path(values[item.env_var]).expanduser()
@@ -477,21 +469,6 @@ def markdown_headings(lines: list[str]) -> dict[int, tuple[int, str]]:
     return headings
 
 
-def drop_sections(core: str, names: tuple[str, ...]) -> str:
-    """Remove `## name` sections from core; a missing name fails the render instead of passing silently."""
-    lines = core.splitlines(keepends=True)
-    for name in names:
-        headings = markdown_headings(lines)
-        starts = [index for index, heading in headings.items() if heading == (2, name)]
-        if not starts:
-            raise SystemExit(f"error: omitted core section {name!r} not found in prompts/core.md")
-        if len(starts) > 1:
-            raise SystemExit(f"error: omitted core section {name!r} appears more than once in prompts/core.md")
-        end = next((index for index, (level, _) in headings.items() if index > starts[0] and level <= 2), len(lines))
-        del lines[starts[0] : end]
-    return "".join(lines)
-
-
 def render_document(
     fragment: str,
     core: str,
@@ -499,9 +476,8 @@ def render_document(
     stamp: str | None = None,
     enabled_optional: frozenset[str] = frozenset({"subagents"}),
     local: str = "",
-    omit_sections: tuple[str, ...] = (),
 ) -> str:
-    core = drop_sections(apply_optional_blocks(core, enabled_optional), omit_sections)
+    core = apply_optional_blocks(core, enabled_optional)
     if stamp is not None:
         provenance = f"on {stamp}"
     else:
@@ -718,7 +694,6 @@ def render_for(
         stamp=stamp,
         enabled_optional=frozenset(harness.optional_blocks),
         local=overlays.local if with_overlays else "",
-        omit_sections=harness.omit_sections,
     )
 
 
@@ -950,12 +925,8 @@ def deploy(
         print(notice, file=sys.stderr)
 
     for harness in skipped:
-        if harness.consumed_from_build:
-            print(f"skipping {harness.name}: render-only target, read from build/generated/{harness.output_name}")
-            json_record(harness=harness.name, action="skipped", path=None, reason="render-only")
-        else:
-            print(f"skipping {harness.name}: manual target requires {harness.env_var}")
-            json_record(harness=harness.name, action="skipped", path=None, reason=f"manual; set {harness.env_var}")
+        print(f"skipping {harness.name}: manual target requires {harness.env_var}")
+        json_record(harness=harness.name, action="skipped", path=None, reason=f"manual; set {harness.env_var}")
 
     collisions = target_collisions(resolved)
     if collisions:
@@ -1045,7 +1016,7 @@ def prune_backups(backup_dir: Path, keep: int, dry_run: bool) -> int:
     return 0
 
 
-def status(repo_root: Path, selected: list[str] | None, stamp: str | None, out_dir: Path | None = None) -> int:
+def status(repo_root: Path, selected: list[str] | None, stamp: str | None) -> int:
     """Report whether each deployed file matches a fresh render, or was edited locally."""
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
     overlays = load_overlays(repo_root)
@@ -1057,22 +1028,6 @@ def status(repo_root: Path, selected: list[str] | None, stamp: str | None, out_d
             repo_root, harness, core, overlays, stamp,
             with_overlays=target_overlays(harness, dest) if dest is not None else global_target(harness),
         )
-        if harness.consumed_from_build:
-            built = (out_dir or repo_root / "build" / "generated") / harness.output_name
-            if not built.exists():
-                print(f"{harness.name}: not rendered ({built})")
-                state = "not-rendered"
-            elif built.read_text(encoding="utf-8", errors="replace") == rendered:
-                print(f"{harness.name}: rendered file in sync ({built})")
-                json_record(harness=harness.name, state="in-sync", path=str(built))
-                continue
-            else:
-                print(f"{harness.name}: rendered file differs from a fresh render ({built})")
-                state = "drift"
-            # A bare --status must not fail for users who never render this target.
-            json_record(harness=harness.name, state=state, path=str(built))
-            drift += 1 if selected else 0
-            continue
         if dest is None:
             print(f"{harness.name}: manual target ({harness.env_var})")
             json_record(harness=harness.name, state="manual", path=None)
@@ -1168,7 +1123,7 @@ def run(args: argparse.Namespace) -> int:
         return check_render_shape(args.repo_root, args.target)
 
     if args.status:
-        return status(args.repo_root, args.target, args.stamp, args.out_dir)
+        return status(args.repo_root, args.target, args.stamp)
 
     if args.prune_backups is not None:
         return prune_backups(args.backup_dir, args.prune_backups, dry_run=args.dry_run)

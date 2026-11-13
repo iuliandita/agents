@@ -266,7 +266,6 @@ def test_optional_blocks_reject_leftover_markers(block):
 def test_heading_detection_ignores_fenced_content(fence):
     code = f"{fence}text\n# code heading\n## B\n`\n{fence}\n"
     core = f"# Core\n## A\n{code}## B\nkeep\n"
-    assert renderer.drop_sections(core, ("A",)) == "# Core\n## B\nkeep\n"
     sizes = renderer.section_sizes(core)
     assert [name for name, _ in sizes] == ["Core"]
     assert sum(size for _, size in sizes) == len(core.encode("utf-8"))
@@ -320,24 +319,6 @@ def test_generic_target_drops_the_subagent_delegation_block(tmp_path):
     assert "## Delegation" not in generic["generic"].read_text(encoding="utf-8")
     assert "## Delegation" in claude["claude"].read_text(encoding="utf-8")
 
-
-def test_drop_sections_removes_only_the_named_section_and_fails_loud_when_missing():
-    core = "# Core\n\n## A\n- a\n\n## B\n- b\n\n## C\n- c\n"
-
-    assert renderer.drop_sections(core, ("B",)) == "# Core\n\n## A\n- a\n\n## C\n- c\n"
-    with pytest.raises(SystemExit, match="'Renamed' not found"):
-        renderer.drop_sections(core, ("Renamed",))
-    with pytest.raises(SystemExit, match="more than once"):
-        renderer.drop_sections(core + "\n## B\n- again\n", ("B",))
-
-
-def test_omitted_sections_are_dropped_after_optional_blocks():
-    core = "# Core\n\n## A\n- a\n\n<!-- optional:subagents -->\n## Delegation\n- d\n<!-- /optional:subagents -->\n## Scope\n- s\n"
-
-    rendered = renderer.render_document("## F\n", core, stamp="x", enabled_optional=frozenset(), omit_sections=("A",))
-
-    assert "## A" not in rendered and "optional" not in rendered.split("\n", 3)[3]
-    assert "## Delegation" not in rendered and "## Scope" in rendered
 
 
 PRESENT_PINS = {

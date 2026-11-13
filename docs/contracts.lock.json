@@ -10,13 +10,13 @@
       "note": "Record hook, Hermes, and workflow destination ancestor-link refusal including Windows junctions and backup directories."
     },
     "harnesses": {
-      "breaking": "Writes refuse linked ancestors; relative artifacts resolve under --repo-root; Windows drive-qualified PI_CONFIG_DIR stays under home; CRLF prompts and malformed optional blocks no longer pass checks.",
+      "breaking": "Writes refuse linked ancestors; relative artifacts follow --repo-root; Windows drive-qualified PI_CONFIG_DIR stays under home; CRLF prompts and malformed optional blocks no longer pass checks.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "9cfc2df93b8e81250755682feea814c6a0d1fa8ea2ff68230fb5c183afc56c0e",
+      "fingerprint": "f6c878589f5588d0f8ba75265544e6f2eb2ff3d3dd4868853b8ab6a964bff104",
       "migration": "Back up artifacts and sources; upgrade using real paths instead of linked ancestors, absolute overrides for existing locations, and paired optional markers; roll back by restoring backups and the previous checkout.",
-      "note": "Record ancestor symlink and junction refusal alongside repository-relative artifacts, Windows config roots, and strict render checks."
+      "note": "Record removal of unused section omission and build-only states; retain optional blocks, ancestor-link checks, relative artifacts, and strict render validation."
     },
     "maintenance": {
       "breaking": "none",
