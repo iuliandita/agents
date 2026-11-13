@@ -3,10 +3,10 @@
     "deployment": {
       "breaking": "none",
       "docs": [
-        "INSTALL.md"
+        "SECURITY.md"
       ],
-      "fingerprint": "65412893402ccf324829771168a90099640169ecd8efc0bf4fea1c131b193714",
-      "note": "Hermes installation covers structural merge refusals, symlink safety, worktree overlay withholding, and native Windows defaults"
+      "fingerprint": "c9512b11783eedd77084122c09049937ca9434342c9e9352b66acff22dd9c8d0",
+      "note": "Document allowed tracking branches, narrowing the updater allow-list, no-pull trust, and upstream signature limits."
     },
     "harnesses": {
       "breaking": "none",
