@@ -11,18 +11,12 @@
       "note": "Remove the retired target from update selection."
     },
     "harnesses": {
-      "breaking": "Saved commands selecting the retired target fail.",
+      "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
-        "INSTALL.md",
-        "README.md",
-        "docs/harness-contract.md",
-        "docs/legacy-harnesses.md",
-        "docs/surfaces.md"
+        "INSTALL.md"
       ],
-      "fingerprint": "3a84a0bee8ed1271c8bb04b23fc87ef6836e9b10f09d508298bc37f9cc19da27",
-      "migration": "Back up saved commands, upgrade by removing the target, and roll back to the previous release if needed.",
-      "note": "Remove the retired harness target from the registry and active documentation; list it under legacy harnesses."
+      "fingerprint": "09d2fddc2d5020153500f7eabb553a880f96c2d5cd5c20445bec9a2bd2f9e75d",
+      "note": "changelog and INSTALL json table cover reviewer, planner, line caps, and per-section byte sizes"
     },
     "maintenance": {
       "breaking": "none",
@@ -31,23 +25,20 @@
       "no_impact": "Comment names Renovate instead of Dependabot; no behavior change."
     },
     "models-agents": {
-      "breaking": "Scripts that read ERROR: or notice: lines from render-agents stdout no longer match, and the Codex mid tier (builder) now renders gpt-6.1-terra instead of gpt-6.1-sol, which needs Codex CLI 0.159.0 or later.",
+      "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "INSTALL.md"
       ],
-      "fingerprint": "e1ad342cafcea70316641a105c87b2d4cd1e3055ee451272d9ac01bc9656ff4e",
-      "migration": "Back up deployed Codex role files and read render-agents errors and notes from stderr. To upgrade, redeploy; to keep builder on Sol, set mid to gpt-6.1-sol under codex.tiers in prompts/models.local.json first. Roll back by checking out v4.3.0 and redeploying.",
-      "note": "Record the stderr prefixes for render-agents, the Codex mid tier move to gpt-6.1-terra, and the --json contract as breaking; INSTALL.md and the harness contract already document them."
+      "fingerprint": "81ac3411f253ff51b45086923bb42f37e2f2ee7c3789d1e4f5d69cc719b12f1c",
+      "note": "changelog and INSTALL json table cover reviewer, planner, line caps, and per-section byte sizes"
     },
     "overlays-trust": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
-        "INSTALL.md",
-        "README.md"
+        "INSTALL.md"
       ],
-      "fingerprint": "ad18f5f014b58f4ec199b627cb6f46e2e03400945ae49f7a2f054bfa31b685ce",
-      "note": "Remove the retired fragment-specific lint limit."
+      "fingerprint": "b35504a86a836ac65f5f8f7dbe342e6b24a8d327d97c9469567f40794537b397",
+      "note": "changelog and INSTALL json table cover reviewer, planner, line caps, and per-section byte sizes"
     },
     "prompts": {
       "breaking": "none",

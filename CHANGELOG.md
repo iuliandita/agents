@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- Roles and pipeline (#198).
+  - The planner returns `Need the goal: <what is missing>.` instead of asking.
+  - The reviewer reviews named files when no diff is given, and puts its `Coverage: partial` line after the findings line.
+  - The prompt linter and the tests share one line cap: 100 for core and 20 for a harness fragment.
+  - `sync-ai-prompts --deploy` and `--dry-run` report a `bytes` object per harness in `--json`, with the total and a list of rendered sections.
+
 - Core prompt and harness notes: removed rules that contradicted each other (#194).
   - Model routing now has one stated precedence, and the Claude and Codex ladders drop prices and version numbers.
   - The Claude auto-mode note no longer reads as skipping confirmation.
