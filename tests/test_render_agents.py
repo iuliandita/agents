@@ -1184,11 +1184,11 @@ def test_opencode_role_permissions_deny_unknown_tools_only_for_read_only_roles(r
 @pytest.mark.parametrize("max_turns", [None, 30])
 def test_unsupported_max_turns_is_noticed(harness, max_turns, capsys):
     role = spec(max_turns=max_turns)
-    _, notices = ra.render_harness([role], harness, {}, INVARIANTS, DEFAULTS)
+    _, notices = ra.render_harness([role, replace(role, name="second")], harness, {}, INVARIANTS, DEFAULTS)
     ra.print_notices(notices)
     output = capsys.readouterr().err
     if max_turns is not None and harness in {"codex", "antigravity", "omp"}:
-        assert f"note: {harness}/sample: max_turns=30 is not supported" in output
+        assert output.count(f"note: {harness}: max_turns is not supported") == 1
         assert "tool-call budget is advisory" in output
     else:
         assert "max_turns" not in output

@@ -696,14 +696,14 @@ def render_harness(
     for spec in specs:
         resolved = resolve(spec, harness, overrides, defaults)
         notices.extend(resolved.notices)
-        if spec.max_turns is not None and harness in {"codex", "antigravity", "omp"}:
-            notices.append(
-                f"{harness}/{spec.name}: max_turns={spec.max_turns} is not supported; "
-                "omitting it; the role body tool-call budget is advisory"
-            )
         models.append(resolved.model)
         text = RENDERERS[harness](spec, resolved, invariants)
         rendered[spec.name + EXTENSIONS[harness]] = text
+    if harness in {"codex", "antigravity", "omp"} and any(spec.max_turns is not None for spec in specs):
+        notices.append(
+            f"{harness}: max_turns is not supported; omitting it for all roles; "
+            "the role body tool-call budget is advisory"
+        )
     if all(model is None for model in models):
         message = (
             f"{harness}: every tier renders as inherit; define tiers in prompts/models.json "

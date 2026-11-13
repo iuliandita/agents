@@ -40,6 +40,25 @@ def run_json(env, script, *args):
     return proc.returncode, data
 
 
+@pytest.mark.parametrize("harness,filename", [
+    ("claude", "invariants-userpromptsubmit.sh"),
+    ("antigravity", "invariants-preinvocation.sh"),
+])
+@pytest.mark.parametrize("adopt", [False, True])
+def test_invariants_dry_run_reports_unmanaged_hook(env, tmp_path, harness, filename, adopt):
+    hook = tmp_path / filename
+    hook.write_text("user hook\n", encoding="utf-8")
+    code, data = run_json(
+        env, "render_invariants.py", "--dry-run", "--harness", harness,
+        "--hooks-dir", str(tmp_path), "--settings-path", str(tmp_path / "settings.json"),
+        "--antigravity-config-dir", str(tmp_path), *( ["--adopt"] if adopt else []),
+    )
+    assert code == 0 and data["mode"] == "deploy"
+    assert data["actions"][0]["action"] == ("would-install" if adopt else "would-replace-unmanaged")
+    assert hook.read_text(encoding="utf-8") == "user hook\n"
+    assert not (tmp_path / "settings.json").exists()
+
+
 def test_prompts_list_targets(env):
     code, data = run_json(env, "render_prompts.py", "--list-targets", "--harness", "claude,codex")
     assert code == 0
