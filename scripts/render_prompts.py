@@ -757,6 +757,10 @@ def deploy(
         rendered = render_for(repo_root, harness, core, overlays, stamp)
         enforce_budget(harness, rendered)
         deployed[harness.name] = dest
+        layer_bytes = {
+            "total": len(rendered.encode("utf-8")),
+            "sections": [{"name": label, "bytes": count} for label, count in section_sizes(rendered)],
+        }
         if dry_run:
             existing = dest.read_text(encoding="utf-8", errors="replace") if dest.exists() else None
             if existing is not None and PROMPT_MARKER not in existing:
@@ -768,17 +772,17 @@ def deploy(
             else:
                 print(f"would update {harness.name}: {dest}")
                 action = "would-update"
-            json_record(harness=harness.name, action=action, path=str(dest))
+            json_record(harness=harness.name, action=action, path=str(dest), bytes=layer_bytes)
             continue
         dest.parent.mkdir(parents=True, exist_ok=True)
         if dest.exists() and dest.read_text(encoding="utf-8", errors="replace") == rendered:
             print(f"unchanged {harness.name}: {dest}")
-            json_record(harness=harness.name, action="unchanged", path=str(dest))
+            json_record(harness=harness.name, action="unchanged", path=str(dest), bytes=layer_bytes)
         else:
             backup_existing(dest, backup_dir)
             dest.write_text(rendered, encoding="utf-8", newline="\n")
             print(f"updated {harness.name}: {dest}")
-            json_record(harness=harness.name, action="updated", path=str(dest))
+            json_record(harness=harness.name, action="updated", path=str(dest), bytes=layer_bytes)
         manifest[harness.name] = {"path": str(dest), "hash": content_hash(rendered)}
 
     if not dry_run:

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import lint_prompts as linter
 import render_prompts as renderer
 
 
@@ -450,9 +451,9 @@ def test_prompt_line_limits_are_enforced():
     core_lines = (repo / "prompts" / "core.md").read_text(encoding="utf-8").splitlines()
     harness_paths = sorted((repo / "prompts" / "harnesses").glob("*.md"))
 
-    assert len(core_lines) <= 100
+    assert len(core_lines) <= linter.CORE_MAX_LINES
     for path in harness_paths:
-        assert len(path.read_text(encoding="utf-8").splitlines()) <= 20, path
+        assert len(path.read_text(encoding="utf-8").splitlines()) <= linter.HARNESS_MAX_LINES, path
 
     result = subprocess.run(
         [sys.executable, "scripts/lint_prompts.py"],

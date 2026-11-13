@@ -29,10 +29,10 @@ DEFAULT_LOCAL_MARKERS = (
     "company.internal",
 )
 
-CORE_WARN_LINES = 105
-CORE_MAX_LINES = 110
-HARNESS_WARN_LINES = 20
-HARNESS_MAX_LINES = 24
+CORE_WARN_LINES = 98
+CORE_MAX_LINES = 100
+HARNESS_WARN_LINES = 18
+HARNESS_MAX_LINES = 20
 PRIVATE_EXAMPLE_WARN_LINES = 30
 PRIVATE_EXAMPLE_MAX_LINES = 40
 # Tracked templates for the gitignored overlays; both are linted like public prompt sources.

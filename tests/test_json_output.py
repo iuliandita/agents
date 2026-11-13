@@ -59,7 +59,9 @@ def test_prompts_dry_run_deploy_and_status(env, tmp_path):
     env["CLAUDE_AGENTS_PATH"] = str(tmp_path / "CLAUDE.md")
     code, data = run_json(env, "render_prompts.py", "--dry-run", "--harness", "claude")
     assert code == 0 and data["mode"] == "deploy" and data["dry_run"] is True
+    sizes = data["actions"][0].pop("bytes")
     assert data["actions"] == [{"harness": "claude", "action": "would-update", "path": str(tmp_path / "CLAUDE.md")}]
+    assert sizes["total"] == sum(section["bytes"] for section in sizes["sections"])
     assert not (tmp_path / "CLAUDE.md").exists()
 
     code, data = run_json(env, "render_prompts.py", "--deploy", "--harness", "claude", "--backup-dir", str(tmp_path / "b"))

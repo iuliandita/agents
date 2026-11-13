@@ -452,7 +452,7 @@ Exit codes are the same for every command: 0 done, 1 failed, 2 usage error, 3 a 
 | `scripts/sync-ai-prompts` | `list-targets` | `targets` | `name`, `display`, `support`, `path` (null when none), `target` |
 | | `check` | `checked` | `harness` |
 | | `status` | `harnesses` | `harness`, `state` (`in-sync`, `drift`, `local-edits`, `not-deployed`, `not-rendered`, `manual`), `path` |
-| | `deploy` (`--deploy` or `--dry-run`; adds `dry_run`) | `actions` | `harness`, `action` (`updated`, `unchanged`, `would-update`, `would-replace-unmanaged`, `skipped`), `path`, and `reason` when skipped |
+| | `deploy` (`--deploy` or `--dry-run`; adds `dry_run`) | `actions` | `harness`, `action` (`updated`, `unchanged`, `would-update`, `would-replace-unmanaged`, `skipped`), `path`, `bytes` (`total`, and `sections` as a list of `name` and `bytes` for the harness notes, core, and overlays) when rendered, and `reason` when skipped |
 | | `prune-backups` (adds `keep`, `dry_run`) | `backups` | `path`, `action` (`removed`, `would-remove`) |
 | | `render` | `rendered` | `harness`, `path` |
 | `scripts/render-agents` | `list-targets` | `targets` | `name`, `display`, `path`, `env_var` |
