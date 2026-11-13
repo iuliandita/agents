@@ -15,6 +15,17 @@ this repo consumes it. The agent renderer reads invariants.md directly.
 """
 from __future__ import annotations
 
+import sys
+
+if sys.version_info < (3, 11):
+    import json
+
+    message = "error: render-invariants: Python 3.11+ is required; see INSTALL.md."
+    print(message, file=sys.stderr)
+    if "--json" in sys.argv[1:]:
+        print(json.dumps({"ok": False, "errors": [message], "warnings": [], "notes": [], "mode": None, "records": []}))
+    raise SystemExit(3)
+
 import argparse
 import json
 import os
@@ -26,7 +37,7 @@ from typing import NamedTuple
 
 from render_prompts import (
     EXIT_CODES_HELP, JsonArgumentParser, atomic_write, backup_existing, json_record,
-    record_deployed, require_owned, run_json,
+    record_deployed, require_owned, run_json, run_plain,
 )
 
 
@@ -337,6 +348,7 @@ Environment:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     repo_root = Path(__file__).resolve().parents[1]
     parser = JsonArgumentParser(
+        allow_abbrev=False,
         description="Render and install hard-invariants reinforcement artifacts.",
         epilog=HELP_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -390,7 +402,7 @@ def run(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if not args.json:
-        return run(args)
+        return run_plain(lambda: run(args), "render-invariants")
     if args.deploy or args.dry_run:
         return run_json(lambda: run(args), "render-invariants", "actions", mode="deploy", dry_run=args.dry_run)
     return run_json(lambda: run(args), "render-invariants", "rendered", mode="render")

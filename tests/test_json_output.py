@@ -1,5 +1,7 @@
+import importlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -89,9 +91,9 @@ def test_prompts_prune_backups(env, tmp_path):
 
 def test_prompts_errors_and_usage(env):
     code, data = run_json(env, "render_prompts.py", "--check", "--harness", "nope")
-    assert code == 1 and "unknown harness: nope" in data["errors"][0]
+    assert code == 2 and "unknown harness: nope" in data["errors"][0]
     code, data = run_json(env, "render_prompts.py", "--deploy")
-    assert code == 1 and "--deploy requires --target" in data["errors"][0]
+    assert code == 2 and "--deploy requires --target" in data["errors"][0]
     proc = run(env, "render_prompts.py", "--json", "--bogus")
     data = json.loads(proc.stdout)
     assert proc.returncode == 2 and data["ok"] is False and "unrecognized arguments" in data["errors"][0]
@@ -175,4 +177,155 @@ def test_update_detect_and_steps(env, tmp_path):
 def test_update_failure_is_reported(env, tmp_path):
     (tmp_path / "home").mkdir()
     code, data = run_json(env, "update.py", "--harness", "nope", "--no-pull")
-    assert code == 1 and "unknown" in data["errors"][0]
+    assert code == 2 and "unknown" in data["errors"][0]
+
+
+ENTRYPOINTS = (
+    ("render_prompts.py", "sync-ai-prompts", []),
+    ("render_agents.py", "render-agents", []),
+    ("render_hermes.py", "render-hermes", []),
+    ("render_invariants.py", "render-invariants", []),
+    ("update.py", "update", ["--detect"]),
+    ("install_workflow.py", "install_workflow", ["--skills-dir", "unused"]),
+)
+
+
+@pytest.mark.parametrize("script,prog,args", ENTRYPOINTS)
+@pytest.mark.parametrize("json_output", [False, True])
+@pytest.mark.parametrize("failure", [PermissionError("denied"), RuntimeError("failed"),
+                                    UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid")])
+def test_unexpected_errors_preserve_records_and_hide_tracebacks(script, prog, args, json_output, failure, monkeypatch, capsys):
+    module = importlib.import_module(script.removesuffix(".py"))
+    renderer = importlib.import_module("render_prompts")
+
+    def fail(_args):
+        renderer.json_record(action="completed")
+        raise failure
+
+    monkeypatch.setattr(module, "run", fail)
+    code = module.main([*args, *(["--json"] if json_output else [])])
+    output = capsys.readouterr()
+    assert code == 1
+    assert output.err == f"error: {prog}: {failure}\n"
+    assert "Traceback" not in output.err
+    if json_output:
+        data = json.loads(output.out)
+        assert output.out.count("\n") == 1
+        assert data["ok"] is False and data["mode"] is not None
+        assert data["errors"] == [output.err.strip()]
+        key = "harnesses" if script == "update.py" else "actions" if script == "install_workflow.py" else "rendered"
+        assert data[key] == [{"action": "completed"}]
+    else:
+        assert output.out == ""
+
+
+@pytest.mark.parametrize("script", ["render_prompts.py", "render_hermes.py"])
+def test_unreadable_core_has_one_json_object(env, tmp_path, script):
+    # A directory cannot be read as core text, even when tests run as root.
+    (tmp_path / "prompts" / "core.md").mkdir(parents=True)
+    proc = run(env, script, "--json", "--repo-root", str(tmp_path), "--out-dir", str(tmp_path / "out"))
+    data = json.loads(proc.stdout)
+    assert proc.returncode == 1 and proc.stdout.count("\n") == 1
+    assert data["mode"] == "render" and data["rendered"] == []
+    assert "core.md" in data["errors"][0] and "Traceback" not in proc.stderr
+    assert proc.stderr.startswith("error:")
+
+
+@pytest.mark.parametrize("script,args,message", [
+    ("render_prompts.py", ["--deploy"], "--deploy requires --target"),
+    ("render_agents.py", ["--deploy"], "--deploy requires --target"),
+    ("render_prompts.py", ["--target", "nope"], "unknown harness"),
+    ("render_agents.py", ["--target", "nope"], "unknown agent harness"),
+    ("render_prompts.py", ["--target", ","], "no harness names"),
+    ("render_agents.py", ["--target", ","], "no harness names"),
+    ("render_prompts.py", ["--prune-backups", "-1"], "non-negative count"),
+    ("update.py", ["--no-pull"], "no deploy targets"),
+    ("update.py", ["--targets", "nope", "--no-pull"], "unknown"),
+    ("update.py", ["--targets", ",", "--no-pull"], "lists no harnesses"),
+])
+@pytest.mark.parametrize("json_output", [False, True])
+def test_usage_errors_exit_two(env, tmp_path, script, args, message, json_output):
+    proc = run(env, script, *(["--json"] if json_output else []), "--repo-root", str(tmp_path), *args)
+    assert proc.returncode == 2
+    assert message in proc.stderr and "Traceback" not in proc.stderr
+    if json_output:
+        data = json.loads(proc.stdout)
+        assert data["ok"] is False and "mode" in data
+        key = "steps" if script == "update.py" else "backups" if "--prune-backups" in args else "actions" if "--deploy" in args else "rendered"
+        assert data[key] == []
+    else:
+        assert proc.stdout == ""
+
+
+@pytest.mark.parametrize("script,args", [
+    ("render_prompts.py", ["--check", "--deploy"]),
+    ("render_prompts.py", ["--status", "--deploy"]),
+    ("render_prompts.py", ["--list-targets", "--check"]),
+    ("render_prompts.py", ["--prune-backups", "1", "--deploy"]),
+    ("render_prompts.py", ["--check", "--dry-run"]),
+    ("render_agents.py", ["--check", "--deploy"]),
+    ("render_agents.py", ["--verify", "--deploy"]),
+    ("render_agents.py", ["--list-targets", "--check"]),
+    ("render_agents.py", ["--verify", "--dry-run"]),
+    ("update.py", ["--detect", "--dry-run"]),
+    *[(script, [*args, "--js"]) for script, _prog, args in ENTRYPOINTS],
+])
+@pytest.mark.parametrize("json_output", [False, True])
+def test_parser_errors_have_consistent_output(env, script, args, json_output):
+    proc = run(env, script, *(["--json"] if json_output else []), *args)
+    assert proc.returncode == 2 and proc.stderr.startswith("error:")
+    assert "Traceback" not in proc.stderr
+    if json_output:
+        data = json.loads(proc.stdout)
+        assert proc.stdout.count("\n") == 1 and data["ok"] is False
+        assert data["mode"] is None and data["records"] == []
+        assert data["errors"] == [proc.stderr.strip()]
+    else:
+        assert proc.stdout == ""
+
+
+@pytest.mark.parametrize("script,prog,args", ENTRYPOINTS[:4])
+def test_deploy_dry_run_still_works(env, tmp_path, script, prog, args):
+    extra = ["--harness", "claude"] if script != "render_hermes.py" else []
+    proc = run(env, script, "--json", "--deploy", "--dry-run", *extra)
+    data = json.loads(proc.stdout)
+    assert proc.returncode == 0, proc.stderr
+    assert data["mode"] == "deploy" and data["dry_run"] is True
+    assert data["actions"]
+    assert not Path(env["HOME"]).exists()
+
+
+@pytest.mark.parametrize("script,prog,args", ENTRYPOINTS)
+@pytest.mark.parametrize("json_output", [False, True])
+def test_direct_entrypoints_reject_old_python(env, script, prog, args, json_output):
+    probe = "import runpy, sys; sys.version_info = (3, 10, 0); sys.argv = sys.argv[1:]; runpy.run_path(sys.argv[0], run_name='__main__')"
+    proc = subprocess.run(
+        [sys.executable, "-c", probe, str(SCRIPTS / script), *(["--json"] if json_output else [])],
+        env=env, capture_output=True, text=True,
+    )
+    assert proc.returncode == 3 and proc.stderr.startswith(f"error: {prog}:")
+    assert "Python 3.11+" in proc.stderr and "Traceback" not in proc.stderr
+    if json_output:
+        data = json.loads(proc.stdout)
+        assert proc.stdout.count("\n") == 1 and data["ok"] is False
+        assert data["mode"] is None and data["records"] == []
+        assert data["errors"] == [proc.stderr.strip()]
+    else:
+        assert proc.stdout == ""
+
+
+@pytest.mark.parametrize("wrapper", ["sync-ai-prompts", "render-agents", "render-hermes", "render-invariants", "update"])
+@pytest.mark.parametrize("shell", ["bash", "pwsh"])
+def test_launcher_errors_have_mode_and_records(env, tmp_path, wrapper, shell):
+    executable = shutil.which(shell)
+    if executable is None:
+        pytest.skip(f"{shell} not installed")
+    env["AGENTS_PYTHON"] = str(tmp_path / "missing-python")
+    command = [executable, str(SCRIPTS / wrapper), "--json"] if shell == "bash" else [
+        executable, "-NoProfile", "-File", str(SCRIPTS / f"{wrapper}.ps1"), "--json",
+    ]
+    proc = subprocess.run(command, env=env, capture_output=True, text=True)
+    data = json.loads(proc.stdout)
+    assert proc.returncode == 3 and proc.stdout.count("\n") == 1
+    assert data["ok"] is False and data["mode"] is None and data["records"] == []
+    assert data["errors"] == [proc.stderr.strip()]
