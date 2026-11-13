@@ -254,7 +254,7 @@ def test_channel_refresh_preserves_settings_and_backs_up_files(tmp_path, channel
     settings_path.write_text(json.dumps(original, ensure_ascii=False), encoding="utf-8")
     backups = tmp_path / "backups"
 
-    ri.deploy(REPO, config, settings_path, backups, False, harness)
+    ri.deploy(REPO, config, settings_path, backups, False, harness, adopt=True)
 
     assert (hook.stat().st_mode & 0o777 == 0o755) or os.name == "nt"
     result = subprocess.run(["bash", str(hook)], capture_output=True, text=True, check=True)
