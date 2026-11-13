@@ -54,8 +54,8 @@
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "614ec802ad12fd90efadd03d3d36c5b9c0ff0bcccdd3513948f0c33155c95da8",
-      "note": "Tighten the marker and question rules and the Codex question-tool note to fit the Codex budget (#188); no rule, flag, path or overlay behavior changes."
+      "fingerprint": "49f452ff700220b697370897d71889b6f41163b76ccda7108ec0223563631b86",
+      "note": "changelog notes the core guideline to branch instead of committing to the default branch"
     },
     "workflow-templates": {
       "baseline": true,
