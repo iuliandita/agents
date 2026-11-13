@@ -198,7 +198,7 @@ def test_render_all_writes_selected_harnesses_to_output_dir(tmp_path):
 
     assert written == {
         "claude": tmp_path / "out" / "CLAUDE.md",
-        "codex": tmp_path / "out" / "AGENTS.md",
+        "codex": tmp_path / "out" / "codex" / "AGENTS.md",
     }
     assert "claude only" in written["claude"].read_text(encoding="utf-8")
     assert "shared" in written["codex"].read_text(encoding="utf-8")
@@ -224,17 +224,19 @@ def test_full_catalog_render_places_colliding_outputs_in_harness_subdirectories(
             assert path == tmp_path / "out" / harness / item.output_name
 
 
-def test_single_selected_agents_output_stays_top_level(tmp_path):
+def test_selected_output_path_matches_full_catalog_and_deduplicates_targets(tmp_path):
     repo = Path(__file__).resolve().parents[1]
 
     written = renderer.render_all(
         repo_root=repo,
         out_dir=tmp_path / "out",
-        selected=["codex"],
+        selected=["codex,codex", "codex"],
         stamp="2026-04-25",
     )
 
-    assert written["codex"] == tmp_path / "out" / "AGENTS.md"
+    assert written == {"codex": tmp_path / "out" / "codex" / "AGENTS.md"}
+    full = renderer.render_all(repo_root=repo, out_dir=tmp_path / "out", stamp="2026-04-25")
+    assert full["codex"] == written["codex"]
 
 
 def test_apply_optional_blocks_keeps_enabled_and_drops_disabled():
@@ -244,6 +246,66 @@ def test_apply_optional_blocks_keeps_enabled_and_drops_disabled():
     assert "B" not in renderer.apply_optional_blocks(text, frozenset())
     assert "A" in renderer.apply_optional_blocks(text, frozenset())
     assert "C" in renderer.apply_optional_blocks(text, frozenset())
+
+
+@pytest.mark.parametrize("enabled", [frozenset(), frozenset({"subagents"})])
+def test_optional_blocks_accept_empty_body(enabled):
+    assert renderer.apply_optional_blocks("A\n<!-- optional:subagents -->\n<!-- /optional:subagents -->\nB\n", enabled) == "A\nB\n"
+
+
+@pytest.mark.parametrize("block", [
+    "<!-- optional:subagents -->\nbody\n<!-- /optional:other -->\n",
+    "<!-- optional:UPPER -->\nbody\n<!-- /optional:UPPER -->\n",
+    "<!-- optional:subagents -->\nbody\n",
+    "<!-- /optional:subagents -->\n",
+])
+def test_optional_blocks_reject_leftover_markers(block):
+    with pytest.raises(SystemExit, match="optional block marker"):
+        renderer.apply_optional_blocks(block, frozenset())
+
+
+@pytest.mark.parametrize("fence", ["```", "~~~~"])
+def test_heading_detection_ignores_fenced_content(fence):
+    code = f"{fence}text\n# code heading\n## B\n`\n{fence}\n"
+    core = f"# Core\n## A\n{code}## B\nkeep\n"
+    sizes = renderer.section_sizes(core)
+    assert [name for name, _ in sizes] == ["Core"]
+    assert sum(size for _, size in sizes) == len(core.encode("utf-8"))
+
+
+@pytest.mark.parametrize("core", ["", " \n", "<!-- optional:subagents -->\nonly optional\n<!-- /optional:subagents -->\n"])
+def test_shape_check_rejects_empty_core(tmp_path, core):
+    repo = overlay_repo(tmp_path)
+    (repo / "prompts" / "core.md").write_text(core, encoding="utf-8")
+    with pytest.raises(SystemExit, match="core is empty"):
+        renderer.check_render_shape(repo, ["generic"])
+
+
+@pytest.mark.parametrize("corruption", ["header", "core", "optional"])
+def test_shape_check_detects_corrupt_output(tmp_path, monkeypatch, capsys, corruption):
+    repo = overlay_repo(tmp_path)
+    render = renderer.render_all
+
+    def corrupt(*args, **kwargs):
+        written = render(*args, **kwargs)
+        path = written["claude"]
+        text = path.read_text(encoding="utf-8")
+        if corruption == "header":
+            text = text.split("\n", 1)[1]
+        elif corruption == "core":
+            text = text.replace("shared", "lost body")
+        else:
+            text += "<!-- optional:leftover -->\n"
+        path.write_text(text, encoding="utf-8")
+        return written
+
+    monkeypatch.setattr(renderer, "render_all", corrupt)
+    if corruption == "optional":
+        with pytest.raises(SystemExit, match="optional block marker"):
+            renderer.check_render_shape(repo, ["claude"])
+    else:
+        assert renderer.check_render_shape(repo, ["claude"]) == 1
+        assert "error:" in capsys.readouterr().err
 
 
 def test_generic_target_drops_the_subagent_delegation_block(tmp_path):
@@ -259,24 +321,6 @@ def test_generic_target_drops_the_subagent_delegation_block(tmp_path):
     assert "## Delegation" not in generic["generic"].read_text(encoding="utf-8")
     assert "## Delegation" in claude["claude"].read_text(encoding="utf-8")
 
-
-def test_drop_sections_removes_only_the_named_section_and_fails_loud_when_missing():
-    core = "# Core\n\n## A\n- a\n\n## B\n- b\n\n## C\n- c\n"
-
-    assert renderer.drop_sections(core, ("B",)) == "# Core\n\n## A\n- a\n\n## C\n- c\n"
-    with pytest.raises(SystemExit, match="'Renamed' not found"):
-        renderer.drop_sections(core, ("Renamed",))
-    with pytest.raises(SystemExit, match="more than once"):
-        renderer.drop_sections(core + "\n## B\n- again\n", ("B",))
-
-
-def test_omitted_sections_are_dropped_after_optional_blocks():
-    core = "# Core\n\n## A\n- a\n\n<!-- optional:subagents -->\n## Delegation\n- d\n<!-- /optional:subagents -->\n## Scope\n- s\n"
-
-    rendered = renderer.render_document("## F\n", core, stamp="x", enabled_optional=frozenset(), omit_sections=("A",))
-
-    assert "## A" not in rendered and "optional" not in rendered.split("\n", 3)[3]
-    assert "## Delegation" not in rendered and "## Scope" in rendered
 
 
 PRESENT_PINS = {
@@ -724,6 +768,20 @@ def test_status_reports_drift_then_in_sync(tmp_path, monkeypatch, capsys):
     assert "in sync" in capsys.readouterr().out
 
 
+def test_crlf_prompts_show_drift_and_are_replaced(tmp_path, monkeypatch, capsys):
+    repo = overlay_repo(tmp_path)
+    destination = tmp_path / "CLAUDE.md"
+    monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(destination))
+    renderer.deploy(repo, ["claude"], None, False, tmp_path / "backups")
+    expected = destination.read_bytes()
+    destination.write_bytes(expected.replace(b"\n", b"\r\n"))
+    assert renderer.status(repo, ["claude"], None) == 1
+    renderer.deploy(repo, ["claude"], None, True, tmp_path / "backups")
+    assert f"would update claude: {destination}" in capsys.readouterr().out
+    renderer.deploy(repo, ["claude"], None, False, tmp_path / "backups")
+    assert destination.read_bytes() == expected
+
+
 def test_target_path_prefers_explicit_override_then_native_env(tmp_path):
     assert renderer.target_path("codex", home=tmp_path, env={"CODEX_HOME": "/native"}) == Path("/native/AGENTS.md")
     assert renderer.target_path(
@@ -994,6 +1052,17 @@ def test_omp_profile_derived_match_is_exact(tmp_path):
     assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / ".omp-alt" / "agent" / "AGENTS.md"
     env["PI_CODING_AGENT_DIR"] = derived + "/"
     assert renderer.target_path("omp", home=tmp_path, env=env) == Path(derived) / "AGENTS.md"
+
+
+@pytest.mark.parametrize("config,expected", [
+    (r"D:\config\omp", "config/omp"), (r"D:config\omp", "config/omp"),
+    (r"\\server\share\omp", "omp"),
+])
+def test_omp_windows_pi_config_dir_stays_under_home(tmp_path, monkeypatch, config, expected):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(renderer, "os", SimpleNamespace(name="nt"))
+    assert renderer.omp_config_root(tmp_path, {"PI_CONFIG_DIR": config}) == tmp_path / expected
 
 
 def test_omp_absolute_pi_config_dir_stays_under_home(tmp_path):

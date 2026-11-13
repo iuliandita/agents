@@ -191,7 +191,6 @@ def merge_coding_instructions(text: str, rules: str) -> str:
 
 def render_preview(repo_root: Path, out_dir: Path) -> Path:
     destination = out_dir / "hermes" / "coding_instructions.md"
-    destination.parent.mkdir(parents=True, exist_ok=True)
     render_prompts.atomic_write(destination, render_rules(repo_root), mode=0o600)
     return destination
 
@@ -202,11 +201,8 @@ _inside_work_tree = render_prompts._inside_work_tree
 def deploy(
     repo_root: Path, config_path: Path, backup_dir: Path, dry_run: bool, *, env_override: bool = False
 ) -> int:
-    if config_path.is_symlink():
-        raise SystemExit(
-            f"error: {config_path} is a symlink; refusing to write through it. "
-            "Move it aside or point HERMES_CONFIG_PATH at a regular file."
-        )
+    render_prompts.require_unlinked_path(config_path)
+    render_prompts.require_unlinked_path(backup_dir)
     if config_path.exists() and not config_path.is_file():
         raise SystemExit(f"error: {config_path} is not a regular file; refusing to write")
     withheld = env_override and _inside_work_tree(config_path)
@@ -219,7 +215,7 @@ def deploy(
     rules = render_rules(repo_root, with_overlays=not withheld)
     original = config_path.read_text(encoding="utf-8") if config_path.exists() else f"{AGENT}:\n"
     merged = merge_coding_instructions(original, rules)
-    if merged == original:
+    if config_path.exists() and config_path.read_bytes() == merged.encode("utf-8"):
         if not dry_run:
             render_prompts.record_deployed(repo_root, "hermes-config", config_path, merged)
         print(f"unchanged hermes: {config_path}")
@@ -263,13 +259,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--repo-root", type=Path, default=repo_root)
-    parser.add_argument("--out-dir", type=Path, default=repo_root / "build" / "generated")
+    parser.add_argument("--out-dir", type=Path, default=Path("build/generated"))
     parser.add_argument("--path", type=Path, help="Hermes config.yaml (default: $HERMES_HOME/config.yaml).")
     parser.add_argument("--deploy", action="store_true", help="Merge into Hermes config.yaml.")
     parser.add_argument("--dry-run", action="store_true", help="Print the target without writing.")
-    parser.add_argument("--backup-dir", type=Path, default=repo_root / ".backups", help="Directory for backups.")
+    parser.add_argument("--backup-dir", type=Path, default=Path(".backups"), help="Directory for backups.")
     parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
-    return parser.parse_args(argv)
+    return render_prompts.resolve_repo_paths(parser.parse_args(argv), parser)
 
 
 def run(args: argparse.Namespace) -> int:

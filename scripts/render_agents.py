@@ -38,10 +38,15 @@ from render_prompts import (
     backup_existing,
     json_record,
     omp_agent_dir,
+    read_bytes_or_none,
     record_deployed,
     require_owned,
+    require_unlinked_path,
+    resolve_repo_paths,
     run_json,
     run_plain,
+    selected_names,
+    target_collisions,
 )
 
 
@@ -104,11 +109,18 @@ def parse_frontmatter(text: str, source: Path) -> tuple[dict[str, str], str]:
         key, value = line.split(":", 1)
         key = key.strip()
         value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-            quote = value[0]
-            interior = value[1:-1]
-            if quote not in interior:
-                value = interior
+        if value.startswith('"'):
+            try:
+                decoded = json.loads(value)
+            except json.JSONDecodeError as exc:
+                raise SystemExit(f"error: {source}: invalid quoted frontmatter value for {key}: {exc}") from None
+            if not isinstance(decoded, str):
+                raise SystemExit(f"error: {source}: quoted frontmatter value for {key} must be a string")
+            value = decoded
+        elif value.startswith("'"):
+            if not re.fullmatch(r"'(?:[^']|'')*'", value):
+                raise SystemExit(f"error: {source}: invalid single-quoted frontmatter value for {key}; double embedded apostrophes")
+            value = value[1:-1].replace("''", "'")
         if key in fields:
             raise SystemExit(f"error: {source}: duplicate frontmatter key: {key}")
         fields[key] = value
@@ -356,8 +368,10 @@ def resolve(spec: AgentSpec, harness: str, overrides: dict, defaults: dict) -> R
     elif tier == "apex" and tiers.get("flagship") is not None:
         # A flagship object with a null model still carries its effort.
         entry_value = tiers["flagship"]
+        flagship = tier_model(entry_value)
+        fallback = f"flagship '{flagship}'" if flagship is not None else "flagship settings and inheriting the session model"
         notices.append(
-            f"{harness}/{spec.name}: no apex model configured; using flagship '{tier_model(entry_value)}'"
+            f"{harness}/{spec.name}: no apex model configured; using {fallback}"
         )
     elif tiers:
         notices.append(f"{harness}/{spec.name}: no {tier} model configured; inheriting the session model")
@@ -454,8 +468,7 @@ def generated_header(spec: AgentSpec, invariants: str, salt: str = "") -> str:
 
 
 def yaml_string(value: str) -> str:
-    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
-    return f'"{escaped}"'
+    return json.dumps(value, ensure_ascii=False)
 
 
 def markdown_body(spec: AgentSpec, invariants: str, salt: str = "") -> str:
@@ -655,17 +668,7 @@ def verify(repo_root: Path, selected: list[str] | None, env: dict[str, str] | No
 
 
 def selected_agent_harnesses(selected: list[str] | None) -> list[str]:
-    if not selected:
-        return list(AGENT_HARNESSES)
-    names: list[str] = []
-    for item in selected:
-        names.extend(part.strip() for part in item.split(",") if part.strip())
-    if not names:
-        raise UsageError("error: no harness names parsed from --target; nothing to do")
-    for name in names:
-        if name not in AGENT_HARNESSES:
-            raise UsageError(f"error: unknown agent harness: {name}. Supported: {', '.join(AGENT_HARNESSES)}")
-    return list(dict.fromkeys(names))
+    return selected_names(selected, list(AGENT_HARNESSES), "agent harness")
 
 
 def agent_target_dir(harness: str, home: Path | None = None, env: dict[str, str] | None = None) -> Path:
@@ -696,14 +699,14 @@ def render_harness(
     for spec in specs:
         resolved = resolve(spec, harness, overrides, defaults)
         notices.extend(resolved.notices)
-        if spec.max_turns is not None and harness in {"codex", "antigravity", "omp"}:
-            notices.append(
-                f"{harness}/{spec.name}: max_turns={spec.max_turns} is not supported; "
-                "omitting it; the role body tool-call budget is advisory"
-            )
         models.append(resolved.model)
         text = RENDERERS[harness](spec, resolved, invariants)
         rendered[spec.name + EXTENSIONS[harness]] = text
+    if harness in {"codex", "antigravity", "omp"} and any(spec.max_turns is not None for spec in specs):
+        notices.append(
+            f"{harness}: max_turns is not supported; omitting it for all roles; "
+            "the role body tool-call budget is advisory"
+        )
     if all(model is None for model in models):
         message = (
             f"{harness}: every tier renders as inherit; define tiers in prompts/models.json "
@@ -760,7 +763,7 @@ def check(repo_root: Path, selected: list[str] | None, allow_inherit: bool = Fal
     # differ by design.
     overrides = load_overrides(repo_root)
     with TemporaryDirectory() as temp_dir:
-        written = render_all(repo_root, Path(temp_dir), selected, overrides, allow_inherit)
+        written = render_all(repo_root, Path(temp_dir).resolve(), selected, overrides, allow_inherit)
         for harness, paths in written.items():
             for path in paths:
                 text = path.read_text(encoding="utf-8")
@@ -779,7 +782,7 @@ def check(repo_root: Path, selected: list[str] | None, allow_inherit: bool = Fal
 def read_text_or_none(path: Path) -> str | None:
     try:
         return path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
+    except FileNotFoundError:
         return None
 
 
@@ -818,7 +821,7 @@ def print_dry_run(harness: str, dest: Path, text: str) -> None:
     if existing is None:
         print(f"would create {harness}: {dest}")
         action = "would-create"
-    elif existing == text:
+    elif dest.read_bytes() == text.encode("utf-8"):
         print(f"unchanged {harness}: {dest}")
         action = "unchanged"
     elif generated_text(existing):
@@ -831,6 +834,7 @@ def print_dry_run(harness: str, dest: Path, text: str) -> None:
 
 
 def preflight_target(target: Path, files: dict[str, str], adopt: bool = False) -> None:
+    require_unlinked_path(target)
     if target.exists() and not target.is_dir():
         raise SystemExit(f"error: {target} exists and is not a directory")
     if not target.exists():
@@ -839,6 +843,7 @@ def preflight_target(target: Path, files: dict[str, str], adopt: bool = False) -
             raise SystemExit(f"error: {existing_parent} exists and is not a directory")
     for filename in files:
         dest = target / filename
+        require_unlinked_path(dest)
         if dest.is_symlink() or (dest.exists() and not dest.is_file()):
             raise SystemExit(f"error: {dest} is a symlink or not a regular file; move it aside")
         if dest.exists():
@@ -854,6 +859,7 @@ def deploy(
     allow_inherit: bool = False,
     adopt: bool = False,
 ) -> None:
+    require_unlinked_path(backup_dir)
     specs = load_agents(repo_root)
     check_override_agents(overrides, specs)
     invariants = read_invariants(repo_root)
@@ -870,13 +876,12 @@ def deploy(
         preflight_target(target, files, adopt or dry_run)
         deployments.append((harness, target, files, stale))
 
-    by_dir: dict[str, list[str]] = {}
-    for harness, target, _, _ in deployments:
-        # normcase folds case so Windows/macOS default filesystems cannot collide unseen.
-        by_dir.setdefault(os.path.normcase(str(target.expanduser().resolve(strict=False))), []).append(harness)
-    shared = {path: names for path, names in by_dir.items() if len(names) > 1}
+    shared = target_collisions({harness: target for harness, target, _, _ in deployments})
     if shared:
-        shared_dirs = "; ".join(f"{path} is shared by {', '.join(names)}" for path, names in sorted(shared.items()))
+        shared_dirs = "; ".join(
+            f"{path} is shared by {', '.join(names)}"
+            for path, names in sorted(shared.items(), key=lambda item: str(item[0]))
+        )
         raise SystemExit(
             f"error: agent deploy target collision: {shared_dirs}; "
             "select one harness with --target or point one *_AGENTS_DIR env var elsewhere"
@@ -897,7 +902,7 @@ def deploy(
             raise SystemExit(f"error: {target} exists and is not a directory")
         for filename, text in files.items():
             dest = target / filename
-            if read_text_or_none(dest) == text:
+            if read_bytes_or_none(dest) == text.encode("utf-8"):
                 record_deployed(repo_root, f"roles:{harness}:{filename}", dest, text)
                 print(f"unchanged {harness}: {dest}")
                 json_record(harness=harness, action="unchanged", path=str(dest))
@@ -947,7 +952,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--repo-root", type=Path, default=repo_root)
-    parser.add_argument("--out-dir", type=Path, default=repo_root / "build" / "agents")
+    parser.add_argument("--out-dir", type=Path, default=Path("build/agents"))
     parser.add_argument(
         "--target",
         "--harness",
@@ -972,12 +977,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Render harnesses with no tier map as session-model inheritance instead of failing.",
     )
-    parser.add_argument("--backup-dir", type=Path, default=repo_root / ".backups", help="Directory for deploy backups.")
+    parser.add_argument("--backup-dir", type=Path, default=Path(".backups"), help="Directory for deploy backups.")
     parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
     args = parser.parse_args(argv)
     if args.dry_run and (args.check or args.verify or args.list_targets):
         parser.error("--dry-run cannot be combined with --check, --verify, or --list-targets")
-    return args
+    return resolve_repo_paths(args, parser)
 
 
 def run(args: argparse.Namespace) -> int:

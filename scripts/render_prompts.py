@@ -18,11 +18,14 @@ import json
 import os
 import re
 import shutil
+import stat
 import tempfile
+from collections import Counter
+from collections.abc import Mapping
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from tempfile import TemporaryDirectory
-from typing import NamedTuple
+from typing import NamedTuple, TypeVar
 
 
 DEPLOYABLE = "deployable"
@@ -194,10 +197,6 @@ class Harness(NamedTuple):
     max_bytes: int | None = None
     native_env_var: str = ""
     native_filename: str = ""
-    # Core `## ` sections this harness does not carry; rendering fails if one is renamed or removed.
-    omit_sections: tuple[str, ...] = ()
-    # No deploy path: an external tool reads the file rendered under build/generated/.
-    consumed_from_build: bool = False
 
 
 # Seven supported harnesses and one generic project-level target. Paths,
@@ -329,8 +328,6 @@ def harness_display_names() -> list[str]:
 
 
 def default_target_label(harness: Harness, home: str = "~") -> str:
-    if harness.consumed_from_build:
-        return f"none (rendered to build/generated/{harness.output_name})"
     if harness.target_template is None:
         return f"manual override via {harness.env_var}"
     return harness.target_template.format(home=home)
@@ -343,16 +340,24 @@ def harness_target_rows(home: str = "~") -> list[tuple[str, str, str, str]]:
     return rows
 
 
-def selected_harnesses(selected: list[str] | None) -> list[Harness]:
+def selected_names(selected: list[str] | None, supported: list[str], label: str = "harness") -> list[str]:
     if not selected:
-        return list(HARNESSES)
+        return list(supported)
 
     names: list[str] = []
     for item in selected:
         names.extend(part.strip() for part in item.split(",") if part.strip())
     if not names:
         raise UsageError("error: no harness names parsed from --target; nothing to do")
-    return [harness_by_name(name) for name in names]
+    names = list(dict.fromkeys(names))
+    for name in names:
+        if name not in supported:
+            raise UsageError(f"error: unknown {label}: {name}. Supported: {', '.join(supported)}")
+    return names
+
+
+def selected_harnesses(selected: list[str] | None) -> list[Harness]:
+    return [harness_by_name(name) for name in selected_names(selected, harness_names())]
 
 
 OMP_PROFILE_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
@@ -374,7 +379,11 @@ def omp_config_root(home: str | Path | None, env: dict[str, str] | os._Environ[s
     """omp builds every path from $HOME/$PI_CONFIG_DIR, defaulting to ~/.omp."""
     home_path = Path.home() if home is None else Path(home)
     # Node's path.join appends an absolute PI_CONFIG_DIR under HOME; pathlib would replace it.
-    return home_path / (env.get("PI_CONFIG_DIR") or ".omp").lstrip("/\\")
+    config_dir = env.get("PI_CONFIG_DIR") or ".omp"
+    if os.name == "nt":
+        windows_path = PureWindowsPath(config_dir)
+        config_dir = windows_path.relative_to(windows_path.anchor).as_posix() if windows_path.anchor else windows_path.as_posix()
+    return home_path / config_dir.lstrip("/\\")
 
 
 def omp_profile_agent_dir(home: str | Path | None, env: dict[str, str] | os._Environ[str]) -> Path | None:
@@ -403,8 +412,6 @@ def omp_is_profile_derived(home: str | Path | None, env: dict[str, str] | os._En
 
 def target_path(harness: str, home: str | Path | None = None, env: dict[str, str] | None = None) -> Path | None:
     item = harness_by_name(harness)
-    if item.consumed_from_build:
-        return None
     values = os.environ if env is None else env
     if item.env_var in values and values[item.env_var]:
         return Path(values[item.env_var]).expanduser()
@@ -431,34 +438,45 @@ def target_path(harness: str, home: str | Path | None = None, env: dict[str, str
 
 
 OPTIONAL_BLOCK_RE = re.compile(
-    r"[ \t]*<!--\s*optional:([a-z0-9_-]+)\s*-->\n(.*?)\n[ \t]*<!--\s*/optional:\1\s*-->\n?",
-    re.DOTALL,
+    r"^[ \t]*<!--\s*optional:([a-z0-9_-]+)\s*-->[ \t]*\n(.*?)^[ \t]*<!--\s*/optional:\1\s*-->[ \t]*(?:\n|$)",
+    re.DOTALL | re.MULTILINE,
 )
+OPTIONAL_MARKER_RE = re.compile(r"<!--\s*/?optional\s*:", re.IGNORECASE)
+
+
+def require_no_optional_markers(text: str) -> None:
+    if OPTIONAL_MARKER_RE.search(text):
+        raise SystemExit("error: malformed or leftover optional block marker; check matching lower-case block names")
 
 
 def apply_optional_blocks(text: str, enabled: frozenset[str]) -> str:
     """Keep enabled optional blocks, drop the rest, and collapse left gaps."""
 
     def replace(match: re.Match[str]) -> str:
-        return match.group(2) + "\n" if match.group(1) in enabled else ""
+        return match.group(2) if match.group(1) in enabled else ""
 
     result = OPTIONAL_BLOCK_RE.sub(replace, text)
+    require_no_optional_markers(result)
     return re.sub(r"\n{3,}", "\n\n", result)
 
 
-def drop_sections(core: str, names: tuple[str, ...]) -> str:
-    """Remove `## name` sections from core; a missing name fails the render instead of passing silently."""
-    lines = core.splitlines(keepends=True)
-    for name in names:
-        heading = f"## {name}"
-        starts = [i for i, line in enumerate(lines) if line.rstrip() == heading]
-        if not starts:
-            raise SystemExit(f"error: omitted core section {name!r} not found in prompts/core.md")
-        if len(starts) > 1:
-            raise SystemExit(f"error: omitted core section {name!r} appears more than once in prompts/core.md")
-        end = next((i for i in range(starts[0] + 1, len(lines)) if lines[i].startswith(("## ", "# "))), len(lines))
-        del lines[starts[0] : end]
-    return "".join(lines)
+def markdown_headings(lines: list[str]) -> dict[int, tuple[int, str]]:
+    """ATX headings outside fenced code blocks, indexed by source line."""
+    headings: dict[int, tuple[int, str]] = {}
+    fence: str | None = None
+    for index, line in enumerate(lines):
+        if fence is not None:
+            if re.fullmatch(r" {0,3}" + re.escape(fence[0]) + r"{" + str(len(fence)) + r",}[ \t]*\n?", line):
+                fence = None
+            continue
+        opening = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        if opening and (opening[1][0] != "`" or "`" not in opening[2]):
+            fence = opening[1]
+            continue
+        heading = re.match(r"^(#{1,6})[ \t]+(.+?)\s*$", line)
+        if heading:
+            headings[index] = (len(heading[1]), heading[2])
+    return headings
 
 
 def render_document(
@@ -468,9 +486,8 @@ def render_document(
     stamp: str | None = None,
     enabled_optional: frozenset[str] = frozenset({"subagents"}),
     local: str = "",
-    omit_sections: tuple[str, ...] = (),
 ) -> str:
-    core = drop_sections(apply_optional_blocks(core, enabled_optional), omit_sections)
+    core = apply_optional_blocks(core, enabled_optional)
     if stamp is not None:
         provenance = f"on {stamp}"
     else:
@@ -488,6 +505,7 @@ def render_document(
     for overlay in (local, private):
         if overlay.strip():
             rendered += f"\n{overlay.rstrip()}\n"
+    require_no_optional_markers(rendered)
     return rendered
 
 
@@ -588,8 +606,35 @@ def target_overlays(harness: Harness, dest: Path) -> bool:
     return True
 
 
+def path_link_kind(path: Path) -> str | None:
+    if path.is_symlink():
+        return "symlink"
+    junction_check = getattr(path, "is_junction", None)
+    if junction_check is not None:
+        if junction_check():
+            return "junction"
+    elif os.name == "nt":
+        try:
+            metadata = path.lstat()
+        except FileNotFoundError:
+            return None
+        if metadata.st_reparse_tag == stat.IO_REPARSE_TAG_MOUNT_POINT:
+            return "junction"
+    return None
+
+
+def require_unlinked_path(path: Path) -> None:
+    """Inspect the lexical path before resolving links can hide an ancestor."""
+    absolute = path.expanduser().absolute()
+    for candidate in (*reversed(absolute.parents), absolute):
+        kind = path_link_kind(candidate)
+        if kind:
+            raise SystemExit(f"error: {candidate} is a {kind}; refusing to write through it; move it aside or select a regular path")
+
+
 def atomic_write(path: Path, text: str, *, mode: int | None = None) -> None:
     """Replace a file only after its complete contents are ready in the same directory."""
+    require_unlinked_path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     permissions = mode
     if permissions is None:
@@ -608,6 +653,24 @@ def atomic_write(path: Path, text: str, *, mode: int | None = None) -> None:
 
 def prompt_owned(text: str) -> bool:
     return text.startswith(f"<!-- {PROMPT_MARKER} ")
+
+
+def read_bytes_or_none(path: Path) -> bytes | None:
+    try:
+        return path.read_bytes()
+    except FileNotFoundError:
+        return None
+
+
+def resolve_repo_paths(args: argparse.Namespace, parser: argparse.ArgumentParser) -> argparse.Namespace:
+    try:
+        args.repo_root = args.repo_root.expanduser().absolute()
+        for name in ("out_dir", "backup_dir"):
+            path = getattr(args, name).expanduser()
+            setattr(args, name, path if path.is_absolute() else args.repo_root / path)
+    except (OSError, RuntimeError, ValueError) as exc:
+        parser.error(f"cannot resolve renderer paths: {exc}")
+    return args
 
 
 def require_owned(path: Path, owned: bool, adopt: bool) -> None:
@@ -644,7 +707,6 @@ def render_for(
         stamp=stamp,
         enabled_optional=frozenset(harness.optional_blocks),
         local=overlays.local if with_overlays else "",
-        omit_sections=harness.omit_sections,
     )
 
 
@@ -661,10 +723,12 @@ def section_sizes(rendered: str) -> list[tuple[str, int]]:
     """Byte size per top-level `# ` section; text before the first one is the harness notes."""
     sizes: list[tuple[str, int]] = []
     name, size = "harness notes", 0
-    for line in rendered.splitlines(keepends=True):
-        if line.startswith("# "):
+    lines = rendered.splitlines(keepends=True)
+    headings = markdown_headings(lines)
+    for index, line in enumerate(lines):
+        if index in headings and headings[index][0] == 1:
             sizes.append((name, size))
-            name, size = line[2:].strip(), 0
+            name, size = headings[index][1], 0
         size += len(line.encode("utf-8"))
     sizes.append((name, size))
     return [(label, count) for label, count in sizes if count]
@@ -695,9 +759,7 @@ def render_all(
     stamp: str | None = None,
 ) -> dict[str, Path]:
     harnesses = selected_harnesses(selected)
-    output_counts: dict[str, int] = {}
-    for harness in harnesses:
-        output_counts[harness.output_name] = output_counts.get(harness.output_name, 0) + 1
+    output_counts = Counter(harness.output_name for harness in HARNESSES)
     collisions = {name for name, count in output_counts.items() if count > 1}
 
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
@@ -719,16 +781,22 @@ def render_all(
 
 
 def check_render_shape(repo_root: Path, selected: list[str] | None = None) -> int:
+    core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
+    for harness in selected_harnesses(selected):
+        if not apply_optional_blocks(core, frozenset(harness.optional_blocks)).strip():
+            raise SystemExit(f"error: {harness.name}: core is empty after optional blocks")
     with TemporaryDirectory() as temp_dir:
-        out_dir = Path(temp_dir)
+        out_dir = Path(temp_dir).resolve()
         written = render_all(repo_root, out_dir, selected=selected, stamp="check")
-        paths = list(written.values())
-        if len(paths) != len(set(paths)):
-            print("error: render output paths collide; fix the harness output names", file=sys.stderr)
-            return 1
         for harness, path in written.items():
-            if not path.exists():
-                print(f"error: missing rendered output for {harness}: {path}; rerun the render", file=sys.stderr)
+            text = path.read_text(encoding="utf-8")
+            if not prompt_owned(text):
+                print(f"error: {harness}: missing generated header; rerun the render", file=sys.stderr)
+                return 1
+            require_no_optional_markers(text)
+            expected_core = apply_optional_blocks(core, frozenset(harness_by_name(harness).optional_blocks)).rstrip()
+            if expected_core not in text:
+                print(f"error: {harness}: rendered output is missing core content", file=sys.stderr)
                 return 1
             json_record(harness=harness)
         print("Render shape check passed")
@@ -747,8 +815,11 @@ def resolve_deploy_targets(harnesses: list[Harness]) -> tuple[dict[Harness, Path
     return resolved, skipped
 
 
-def target_collisions(resolved: dict[Harness, Path]) -> dict[Path, list[Harness]]:
-    by_key: dict[str, list[tuple[Path, Harness]]] = {}
+Target = TypeVar("Target")
+
+
+def target_collisions(resolved: Mapping[Target, Path]) -> dict[Path, list[Target]]:
+    by_key: dict[str, list[tuple[Path, Target]]] = {}
     for harness, dest in resolved.items():
         resolved_path = dest.expanduser().resolve(strict=False)
         # normcase folds case so Windows/macOS default filesystems cannot collide unseen.
@@ -779,6 +850,7 @@ BACKUP_RE = re.compile(
 def backup_existing(path: Path, backup_dir: Path) -> Path | None:
     if not path.exists() and not path.is_symlink():
         return None
+    require_unlinked_path(backup_dir)
     backup_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     backup_dir.chmod(0o700)
     source = os.path.normcase(os.path.abspath(path.expanduser()))
@@ -857,6 +929,7 @@ def deploy(
     backup_dir: Path,
     adopt: bool = False,
 ) -> dict[str, Path]:
+    require_unlinked_path(backup_dir)
     harnesses = selected_harnesses(selected)
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
     overlays = load_overlays(repo_root)
@@ -866,23 +939,15 @@ def deploy(
         print(notice, file=sys.stderr)
 
     for harness in skipped:
-        if harness.consumed_from_build:
-            print(f"skipping {harness.name}: render-only target, read from build/generated/{harness.output_name}")
-            json_record(harness=harness.name, action="skipped", path=None, reason="render-only")
-        else:
-            print(f"skipping {harness.name}: manual target requires {harness.env_var}")
-            json_record(harness=harness.name, action="skipped", path=None, reason=f"manual; set {harness.env_var}")
+        print(f"skipping {harness.name}: manual target requires {harness.env_var}")
+        json_record(harness=harness.name, action="skipped", path=None, reason=f"manual; set {harness.env_var}")
 
     collisions = target_collisions(resolved)
     if collisions:
         raise SystemExit(format_target_collision(collisions))
 
     for harness, dest in resolved.items():
-        if dest.is_symlink():
-            raise SystemExit(
-                f"error: {dest} is a symlink; refusing to write through it. "
-                f"Move it aside or point {harness.env_var} at a regular file."
-            )
+        require_unlinked_path(dest)
 
     prepared: list[tuple[Harness, Path, str]] = []
     for harness, dest in resolved.items():
@@ -902,11 +967,11 @@ def deploy(
             "sections": [{"name": label, "bytes": count} for label, count in section_sizes(rendered)],
         }
         if dry_run:
-            existing = dest.read_text(encoding="utf-8", errors="replace") if dest.exists() else None
-            if existing is not None and not prompt_owned(existing):
+            existing = read_bytes_or_none(dest)
+            if existing is not None and not prompt_owned(existing.decode("utf-8", errors="replace")):
                 print(f"would replace unmanaged {harness.name}: {dest} (not written by this repo; backed up first)")
                 action = "would-replace-unmanaged"
-            elif existing == rendered:
+            elif existing == rendered.encode("utf-8"):
                 print(f"unchanged {harness.name}: {dest}")
                 action = "unchanged"
             else:
@@ -915,7 +980,7 @@ def deploy(
             json_record(harness=harness.name, action=action, path=str(dest), bytes=layer_bytes)
             continue
         dest.parent.mkdir(parents=True, exist_ok=True)
-        if dest.exists() and dest.read_text(encoding="utf-8", errors="replace") == rendered:
+        if read_bytes_or_none(dest) == rendered.encode("utf-8"):
             print(f"unchanged {harness.name}: {dest}")
             json_record(harness=harness.name, action="unchanged", path=str(dest), bytes=layer_bytes)
         else:
@@ -965,7 +1030,7 @@ def prune_backups(backup_dir: Path, keep: int, dry_run: bool) -> int:
     return 0
 
 
-def status(repo_root: Path, selected: list[str] | None, stamp: str | None, out_dir: Path | None = None) -> int:
+def status(repo_root: Path, selected: list[str] | None, stamp: str | None) -> int:
     """Report whether each deployed file matches a fresh render, or was edited locally."""
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
     overlays = load_overlays(repo_root)
@@ -977,22 +1042,6 @@ def status(repo_root: Path, selected: list[str] | None, stamp: str | None, out_d
             repo_root, harness, core, overlays, stamp,
             with_overlays=target_overlays(harness, dest) if dest is not None else global_target(harness),
         )
-        if harness.consumed_from_build:
-            built = (out_dir or repo_root / "build" / "generated") / harness.output_name
-            if not built.exists():
-                print(f"{harness.name}: not rendered ({built})")
-                state = "not-rendered"
-            elif built.read_text(encoding="utf-8", errors="replace") == rendered:
-                print(f"{harness.name}: rendered file in sync ({built})")
-                json_record(harness=harness.name, state="in-sync", path=str(built))
-                continue
-            else:
-                print(f"{harness.name}: rendered file differs from a fresh render ({built})")
-                state = "drift"
-            # A bare --status must not fail for users who never render this target.
-            json_record(harness=harness.name, state=state, path=str(built))
-            drift += 1 if selected else 0
-            continue
         if dest is None:
             print(f"{harness.name}: manual target ({harness.env_var})")
             json_record(harness=harness.name, state="manual", path=None)
@@ -1002,14 +1051,14 @@ def status(repo_root: Path, selected: list[str] | None, stamp: str | None, out_d
             json_record(harness=harness.name, state="not-deployed", path=str(dest))
             drift += 1
             continue
-        current = dest.read_text(encoding="utf-8", errors="replace")
-        if current == rendered:
+        current = dest.read_bytes()
+        if current == rendered.encode("utf-8"):
             print(f"{harness.name}: in sync ({dest})")
             json_record(harness=harness.name, state="in-sync", path=str(dest))
             continue
         entry = manifest.get(harness.name, {})
         recorded = entry.get("hash") if entry.get("path") == str(dest) else None
-        if recorded and content_hash(current) != recorded:
+        if recorded and hashlib.sha256(current).hexdigest()[:16] != recorded:
             print(f"{harness.name}: local edits since deploy ({dest})")
             state = "local-edits"
         else:
@@ -1029,7 +1078,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--repo-root", type=Path, default=repo_root)
-    parser.add_argument("--out-dir", type=Path, default=repo_root / "build" / "generated")
+    parser.add_argument("--out-dir", type=Path, default=Path("build/generated"))
     parser.add_argument(
         "--target",
         "--harness",
@@ -1059,14 +1108,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--backup-dir",
         type=Path,
-        default=repo_root / ".backups",
+        default=Path(".backups"),
         help="Directory for deploy backups.",
     )
     parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
     args = parser.parse_args(argv)
     if args.dry_run and (args.check or args.status or args.list_targets):
         parser.error("--dry-run cannot be combined with --check, --status, or --list-targets")
-    return args
+    return resolve_repo_paths(args, parser)
 
 
 def run(args: argparse.Namespace) -> int:
@@ -1088,7 +1137,7 @@ def run(args: argparse.Namespace) -> int:
         return check_render_shape(args.repo_root, args.target)
 
     if args.status:
-        return status(args.repo_root, args.target, args.stamp, args.out_dir)
+        return status(args.repo_root, args.target, args.stamp)
 
     if args.prune_backups is not None:
         return prune_backups(args.backup_dir, args.prune_backups, dry_run=args.dry_run)

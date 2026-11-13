@@ -40,6 +40,125 @@ def run_json(env, script, *args):
     return proc.returncode, data
 
 
+@pytest.mark.parametrize("harness,filename", [
+    ("claude", "invariants-userpromptsubmit.sh"),
+    ("antigravity", "invariants-preinvocation.sh"),
+])
+@pytest.mark.parametrize("adopt", [False, True])
+def test_invariants_dry_run_reports_unmanaged_hook(env, tmp_path, harness, filename, adopt):
+    hook = tmp_path / filename
+    hook.write_text("user hook\n", encoding="utf-8")
+    code, data = run_json(
+        env, "render_invariants.py", "--dry-run", "--harness", harness,
+        "--hooks-dir", str(tmp_path), "--settings-path", str(tmp_path / "settings.json"),
+        "--antigravity-config-dir", str(tmp_path), *( ["--adopt"] if adopt else []),
+    )
+    assert code == 0 and data["mode"] == "deploy"
+    assert data["actions"][0]["action"] == ("would-install" if adopt else "would-replace-unmanaged")
+    assert hook.read_text(encoding="utf-8") == "user hook\n"
+    assert not (tmp_path / "settings.json").exists()
+
+
+@pytest.mark.parametrize("module_name,default_out", [
+    ("render_prompts", "build/generated"), ("render_agents", "build/agents"),
+    ("render_invariants", "build/generated/invariants"), ("render_hermes", "build/generated"),
+])
+@pytest.mark.parametrize("kind", ["default", "relative", "absolute"])
+def test_renderer_paths_follow_repo_root(tmp_path, module_name, default_out, kind):
+    module = importlib.import_module(module_name)
+    root = tmp_path / "other-repo"
+    extra = []
+    out, backup = root / default_out, root / ".backups"
+    if kind != "default":
+        out_arg = Path("artifacts") if kind == "relative" else tmp_path / "artifacts"
+        backup_arg = Path("saved") if kind == "relative" else tmp_path / "saved"
+        extra = ["--out-dir", str(out_arg), "--backup-dir", str(backup_arg)]
+        out, backup = root / out_arg, root / backup_arg
+    args = module.parse_args(["--repo-root", str(root), *extra])
+    assert args.out_dir == out
+    assert args.backup_dir == backup
+
+
+@pytest.mark.parametrize("script,args,override", [
+    ("render_prompts.py", ["--target", "claude"], "CLAUDE_AGENTS_PATH"),
+    ("render_agents.py", ["--target", "claude"], "CLAUDE_AGENTS_DIR"),
+    ("render_invariants.py", ["--harness", "claude"], None),
+    ("render_hermes.py", [], None),
+    ("install_workflow.py", [], None),
+])
+@pytest.mark.parametrize("kind", ["symlink", "junction"])
+def test_deploy_refuses_linked_ancestors(env, tmp_path, script, args, override, kind):
+    real = tmp_path / "real"
+    real.mkdir()
+    alias = tmp_path / "alias"
+    if kind == "junction":
+        if os.name != "nt":
+            pytest.skip("junctions require Windows")
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(alias), str(real)], check=True, capture_output=True)
+    else:
+        alias.symlink_to(real, target_is_directory=True)
+    target = alias / "missing" / "target"
+    extra = ["--deploy"]
+    if override:
+        env[override] = str(target)
+    elif script == "render_invariants.py":
+        extra += ["--hooks-dir", str(target), "--settings-path", str(tmp_path / "settings.json")]
+    elif script == "render_hermes.py":
+        extra += ["--path", str(target)]
+    else:
+        extra += ["--skills-dir", str(target)]
+    code, data = run_json(env, script, *args, *extra)
+    assert code == 1 and data["mode"] == "deploy"
+    assert kind in data["errors"][0] and "refusing to write" in data["errors"][0]
+    assert list(real.iterdir()) == []
+    assert not (tmp_path / "settings.json").exists()
+
+
+@pytest.mark.parametrize("module_name", ["render_prompts", "render_agents", "render_invariants", "render_hermes"])
+def test_render_does_not_resolve_away_linked_repo_ancestors(tmp_path, module_name):
+    real = tmp_path / "repo"
+    shutil.copytree(REPO / "prompts", real / "prompts", ignore=shutil.ignore_patterns("local.md", "private.md", "models.local.json"))
+    shutil.copytree(REPO / "agents", real / "agents")
+    alias = tmp_path / "alias"
+    alias.symlink_to(real, target_is_directory=True)
+    module = importlib.import_module(module_name)
+    args = module.parse_args(["--repo-root", str(alias)])
+    assert args.repo_root == alias
+    with pytest.raises(SystemExit, match="symlink"):
+        module.run(args)
+    assert not (real / "build").exists()
+
+
+@pytest.mark.parametrize("script", ["render_prompts.py", "render_agents.py", "render_invariants.py", "render_hermes.py"])
+@pytest.mark.parametrize("option", ["--repo-root", "--out-dir", "--backup-dir"])
+def test_path_resolution_errors_are_usage_errors(env, script, option):
+    proc = run(env, script, "--json", option, "~agents-no-such-user-224/output")
+    assert proc.returncode == 2 and "Traceback" not in proc.stderr
+    data = json.loads(proc.stdout)
+    assert data["mode"] is None and data["records"] == []
+    assert data["errors"][0].startswith("error:")
+    assert "cannot resolve renderer paths" in data["errors"][0]
+
+
+@pytest.mark.parametrize("module_name", ["render_prompts", "render_agents"])
+def test_check_resolves_its_private_temporary_directory(tmp_path, monkeypatch, module_name):
+    from contextlib import contextmanager
+
+    real = tmp_path / "temporary"
+    real.mkdir()
+    alias = tmp_path / "temporary-alias"
+    alias.symlink_to(real, target_is_directory=True)
+
+    @contextmanager
+    def temporary_directory():
+        yield str(alias)
+
+    module = importlib.import_module(module_name)
+    monkeypatch.setattr(module, "TemporaryDirectory", temporary_directory)
+    assert module.main(["--check", "--target", "claude"]) == 0
+    assert list(real.rglob("*.md"))
+
+
 def test_prompts_list_targets(env):
     code, data = run_json(env, "render_prompts.py", "--list-targets", "--harness", "claude,codex")
     assert code == 0
@@ -312,6 +431,30 @@ def test_direct_entrypoints_reject_old_python(env, script, prog, args, json_outp
         assert data["errors"] == [proc.stderr.strip()]
     else:
         assert proc.stdout == ""
+
+
+@pytest.mark.parametrize("wrapper", ["sync-ai-prompts", "render-agents", "render-invariants", "render-hermes", "update"])
+@pytest.mark.parametrize("shell", ["bash", "pwsh"])
+def test_launchers_follow_symlink_chains(env, tmp_path, wrapper, shell):
+    if os.name == "nt" and shell == "bash":
+        pytest.skip("native Windows launchers use PowerShell")
+    executable = shutil.which(shell)
+    if executable is None:
+        pytest.skip(f"{shell} is not installed")
+    suffix = ".ps1" if shell == "pwsh" else ""
+    directory = tmp_path / "linked launchers"
+    directory.mkdir()
+    first = directory / f"first{suffix}"
+    first.symlink_to(SCRIPTS / f"{wrapper}{suffix}")
+    entry = directory / f"entry{suffix}"
+    entry.symlink_to(first.name)
+    env["AGENTS_PYTHON"] = sys.executable
+    command = [executable, str(entry), "--help"] if shell == "bash" else [
+        executable, "-NoProfile", "-File", str(entry), "--help",
+    ]
+    proc = subprocess.run(command, env=env, capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    assert "usage:" in proc.stdout and "--repo-root" in proc.stdout
 
 
 @pytest.mark.parametrize("wrapper", ["sync-ai-prompts", "render-agents", "render-hermes", "render-invariants", "update"])

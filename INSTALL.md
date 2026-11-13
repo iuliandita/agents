@@ -514,7 +514,7 @@ Mode flags are mutually exclusive: choose one of `--check`, `--deploy`, `--statu
 |---|---|---|---|
 | `scripts/sync-ai-prompts` | `list-targets` | `targets` | `name`, `display`, `support`, `path` (null when none), `target` |
 | | `check` | `checked` | `harness` |
-| | `status` | `harnesses` | `harness`, `state` (`in-sync`, `drift`, `local-edits`, `not-deployed`, `not-rendered`, `manual`), `path` |
+| | `status` | `harnesses` | `harness`, `state` (`in-sync`, `drift`, `local-edits`, `not-deployed`, `manual`), `path` |
 | | `deploy` (`--deploy` or `--dry-run`; adds `dry_run`) | `actions` | `harness`, `action` (`updated`, `unchanged`, `would-update`, `would-replace-unmanaged`, `skipped`), `path`, `bytes` (`total`, and `sections` as a list of `name` and `bytes` for the harness notes, core, and overlays) when rendered, and `reason` when skipped |
 | | `prune-backups` (adds `keep`, `dry_run`) | `backups` | `path`, `action` (`removed`, `would-remove`) |
 | | `render` | `rendered` | `harness`, `path` |

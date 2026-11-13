@@ -19,7 +19,7 @@ from pathlib import Path
 import tempfile
 
 from render_agents import parse_frontmatter
-from render_prompts import EXIT_CODES_HELP, JsonArgumentParser, backup_existing, json_record, record_deployed, run_json, run_plain
+from render_prompts import EXIT_CODES_HELP, JsonArgumentParser, backup_existing, json_record, record_deployed, require_unlinked_path, run_json, run_plain
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKILL_NAME = "consolidate-agents-md"
@@ -29,13 +29,13 @@ def checked_path(path: Path, *, directory: bool = False) -> Path:
     path = path.expanduser().absolute()
     if ".." in path.parts:
         raise ValueError(f"Parent traversal is not supported: {path}")
+    try:
+        require_unlinked_path(path)
+    except SystemExit as exc:
+        raise ValueError(str(exc).removeprefix("error: ")) from None
     for ancestor in reversed(path.parents):
-        if ancestor.is_symlink():
-            raise ValueError(f"Symlink ancestor refused: {ancestor}")
         if ancestor.exists() and not ancestor.is_dir():
             raise ValueError(f"Ancestor is not a directory: {ancestor}")
-    if path.is_symlink():
-        raise ValueError(f"Symlink target refused: {path}")
     if path.exists() and not (path.is_dir() if directory else path.is_file()):
         raise ValueError(f"Target has the wrong file type: {path}")
     return path

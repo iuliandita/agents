@@ -44,10 +44,25 @@ def test_parse_frontmatter_strips_matching_quotes(tmp_path):
     assert fields["description"] == "Quoted: value"
 
 
-def test_parse_frontmatter_keeps_value_with_interior_matching_quote(tmp_path):
+def test_parse_frontmatter_rejects_unescaped_interior_quote(tmp_path):
     path = write_agent(tmp_path / "sample.md", description='"a" and "b"')
-    fields, _ = ra.parse_frontmatter(path.read_text(encoding="utf-8"), path)
-    assert fields["description"] == '"a" and "b"'
+    with pytest.raises(SystemExit, match="invalid quoted frontmatter"):
+        ra.load_agent(path)
+
+
+@pytest.mark.parametrize("description,expected", [
+    (r'"Say \"hi\" and C:\\tools"', 'Say "hi" and C:\\tools'),
+    ("'It''s a quoted description'", "It's a quoted description"),
+    ('plain: "quoted" and \\ path', 'plain: "quoted" and \\ path'),
+])
+@pytest.mark.parametrize("harness", ra.AGENT_HARNESSES)
+def test_description_round_trips_through_native_parser(tmp_path, description, expected, harness):
+    role = ra.load_agent(write_agent(tmp_path / "sample.md", description=description))
+    resolved = ra.resolve(role, harness, {}, DEFAULTS)
+    text = ra.RENDERERS[harness](role, resolved, INVARIANTS)
+    data = tomllib.loads(text) if harness == "codex" else yaml.safe_load(text.split("\n---\n", 1)[0][4:])
+    assert role.description == expected
+    assert data["description"] == expected
 
 
 @pytest.mark.parametrize(
@@ -366,14 +381,15 @@ INVARIANTS = "# Hard Invariants (non-negotiable)\n- Never add AI attribution to 
 
 def test_render_claude_frontmatter_and_body():
     text = ra.render_claude(spec(tools=("read", "search", "shell-ro"), max_turns=30), ra.resolve(spec(), "claude", {}, DEFAULTS), INVARIANTS)
-    fields, body = ra.parse_frontmatter(text, Path("claude/sample.md"))
+    head, body = text[4:].split("\n---\n", 1)
+    fields = yaml.safe_load(head)
     assert fields == {
         "name": "sample",
         "description": "Sample.",
         "tools": "Read, Grep, Glob",
         "model": "haiku",
         "effort": "low",
-        "maxTurns": "30",
+        "maxTurns": 30,
     }
     assert ra.GENERATED_MARKER in body
     assert "Never add AI attribution" in body
@@ -382,7 +398,7 @@ def test_render_claude_frontmatter_and_body():
 
 def test_render_claude_omits_model_when_inherit():
     resolved = ra.Resolved(model=None, effort="low", effort_key="effort", notices=[])
-    fields, _ = ra.parse_frontmatter(ra.render_claude(spec(), resolved, INVARIANTS), Path("x.md"))
+    fields = yaml.safe_load(ra.render_claude(spec(), resolved, INVARIANTS)[4:].split("\n---\n", 1)[0])
     assert "model" not in fields
 
 
@@ -487,10 +503,11 @@ def test_render_harness_fails_loud_when_every_model_inherits():
 
 def test_render_commandcode_tools_list():
     text = ra.render_commandcode(spec(tools=("read", "search", "web"), max_turns=30), ra.resolve(spec(), "commandcode", {}, DEFAULTS), INVARIANTS)
-    fields, body = ra.parse_frontmatter(text, Path("x.md"))
+    head, body = text[4:].split("\n---\n", 1)
+    fields = yaml.safe_load(head)
     assert fields["tools"] == "read_file, read_directory, grep, glob, web_fetch, web_search"
     assert fields["reasoningEffort"] == "low"
-    assert fields["maxTurns"] == "30"
+    assert fields["maxTurns"] == 30
     assert fields["model"] == "deepseek/deepseek-v4.1-flash"
     assert ra.GENERATED_MARKER in body
 
@@ -601,14 +618,16 @@ def test_check_passes_on_repo(capsys):
 def test_render_antigravity_frontmatter_and_tools():
     resolved = ra.resolve(spec(tier="cheap", tools=("read", "search", "shell-ro")), "antigravity", {}, DEFAULTS)
     text = ra.render_antigravity(spec(tools=("read", "search", "shell-ro")), resolved, INVARIANTS)
-    fields, body = ra.parse_frontmatter(text, Path("x.md"))
+    head, body = text[4:].split("\n---\n", 1)
+    fields = yaml.safe_load(head)
 
     assert fields["name"] == "sample"
-    assert fields["subagent"] == "true"
-    assert fields["mainAgent"] == "false"
+    assert fields["subagent"] is True
+    assert fields["mainAgent"] is False
     assert fields["model"] == "flash"
     assert "  - view_file" in text
     assert "  - grep_search" in text
+    assert fields["tools"] == ["view_file", "list_dir", "grep_search", "find_by_name"]
     assert "run_command" not in text
     assert ra.GENERATED_MARKER in body
 
@@ -724,6 +743,49 @@ def test_deploy_dry_run_writes_nothing(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "would create" in out
     assert "explorer.toml" in out
+
+
+@pytest.mark.parametrize("json_output", [False, True])
+def test_unreadable_dry_run_target_is_an_error(tmp_path, monkeypatch, capsys, json_output):
+    target = tmp_path / "unreadable.md"
+    read = Path.read_text
+
+    def unreadable(path, *args, **kwargs):
+        if path == target:
+            raise PermissionError("target cannot be read")
+        return read(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", unreadable)
+    import render_prompts
+
+    work = lambda: ra.print_dry_run("claude", target, "output") or 0
+    if json_output:
+        code = render_prompts.run_json(work, "render-agents", "actions", mode="deploy", dry_run=True)
+    else:
+        code = render_prompts.run_plain(work, "render-agents")
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "error: render-agents: target cannot be read" in captured.err
+    assert "would create" not in captured.out + captured.err
+    if json_output:
+        data = json.loads(captured.out)
+        assert data["ok"] is False and data["mode"] == "deploy" and data["actions"] == []
+
+
+@pytest.mark.parametrize("harness", ["claude", "codex"])
+def test_crlf_roles_are_replaced(tmp_path, monkeypatch, capsys, harness):
+    target = tmp_path / "roles"
+    target.mkdir()
+    monkeypatch.setenv(ra.TARGET_DIRS[harness][1], str(target))
+    role = ra.load_agents(REPO)[0]
+    files, _ = ra.render_harness([role], harness, {}, ra.read_invariants(REPO), DEFAULTS)
+    filename, text = next(iter(files.items()))
+    destination = target / filename
+    destination.write_bytes(text.replace("\n", "\r\n").encode("utf-8"))
+    ra.deploy(REPO, [harness], {}, True, tmp_path / "backups")
+    assert f"would replace {harness}: {destination}" in capsys.readouterr().out
+    ra.deploy(REPO, [harness], {}, False, tmp_path / "backups")
+    assert destination.read_bytes() == text.encode("utf-8")
 
 
 def test_deploy_dry_run_reports_unchanged_file(tmp_path, monkeypatch, capsys):
@@ -992,6 +1054,15 @@ def test_render_omp_apex_falls_back_to_slow_role_with_max_effort():
     assert resolved.effort == "max"
 
 
+def test_null_flagship_fallback_explains_session_inheritance():
+    defaults = {"codex": {"tiers": {"flagship": {"model": None, "effort": "high"}}}}
+    resolved = ra.resolve(spec(tier="apex"), "codex", {}, defaults)
+    assert resolved.model is None and resolved.effort == "high"
+    assert resolved.notices == [
+        "codex/sample: no apex model configured; using flagship settings and inheriting the session model",
+    ]
+
+
 def test_omp_reviewer_shadow_is_noticed():
     resolved = ra.resolve(spec(name="reviewer"), "omp", {}, DEFAULTS)
     assert any("shadows the built-in" in notice for notice in resolved.notices)
@@ -1184,11 +1255,11 @@ def test_opencode_role_permissions_deny_unknown_tools_only_for_read_only_roles(r
 @pytest.mark.parametrize("max_turns", [None, 30])
 def test_unsupported_max_turns_is_noticed(harness, max_turns, capsys):
     role = spec(max_turns=max_turns)
-    _, notices = ra.render_harness([role], harness, {}, INVARIANTS, DEFAULTS)
+    _, notices = ra.render_harness([role, replace(role, name="second")], harness, {}, INVARIANTS, DEFAULTS)
     ra.print_notices(notices)
     output = capsys.readouterr().err
     if max_turns is not None and harness in {"codex", "antigravity", "omp"}:
-        assert f"note: {harness}/sample: max_turns=30 is not supported" in output
+        assert output.count(f"note: {harness}: max_turns is not supported") == 1
         assert "tool-call budget is advisory" in output
     else:
         assert "max_turns" not in output
