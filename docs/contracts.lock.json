@@ -5,8 +5,8 @@
       "docs": [
         "README.md"
       ],
-      "fingerprint": "f26b5cb660be47daedb99811d374d420340b12b5f83c95a082ad641bdd75c783",
-      "note": "Document automatic Antigravity hook deployment, channel selection, managed path migration, and settings validation."
+      "fingerprint": "9f42817ab12b78fe614937999c2b57a6483525f575842386b3cb7d20f6832a30",
+      "note": "INSTALL and README cover both invariants hook channels, the update step per harness, and the new JSON targets"
     },
     "harnesses": {
       "breaking": "none",
