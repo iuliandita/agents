@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- Hermes merges recognize quoted keys and column-zero comments, refuse duplicate or lost keys and symlinked configs, and withhold overlays from environment-selected configs inside Git worktrees; installation docs include the native Windows default (#202).
+
 - Roles and pipeline (#198).
   - The planner returns `Need the goal: <what is missing>.` instead of asking.
   - The reviewer reviews named files when no diff is given, and puts its `Coverage: partial` line after the findings line.

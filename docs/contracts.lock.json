@@ -1,14 +1,12 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "Update no longer accepts the retired target.",
+      "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
         "INSTALL.md"
       ],
-      "fingerprint": "a74212abea55305ffaa98781132113258e6dc5ce456801e9cce8078e3b96238f",
-      "migration": "Back up saved commands, upgrade by removing the target, and roll back to the previous release if needed.",
-      "note": "Remove the retired target from update selection."
+      "fingerprint": "65412893402ccf324829771168a90099640169ecd8efc0bf4fea1c131b193714",
+      "note": "Hermes installation covers structural merge refusals, symlink safety, worktree overlay withholding, and native Windows defaults"
     },
     "harnesses": {
       "breaking": "none",
