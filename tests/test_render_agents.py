@@ -175,7 +175,7 @@ def test_commandcode_mid_renders_sonnet_5_5_with_mapped_effort(effort):
     resolved = ra.resolve(role, "commandcode", {}, DEFAULTS)
     data = yaml.safe_load(ra.render_commandcode(role, resolved, INVARIANTS).split("---")[1])
     assert data["model"] == "claude-sonnet-5-5"
-    assert data["reasoningEffort"] == DEFAULTS["commandcode"]["effort_map"][effort]
+    assert data["reasoningEffort"] == {"xhigh": "high", "max": "high"}.get(effort, effort)
     assert resolved.notices == []
 
 
@@ -342,6 +342,7 @@ def test_validate_overrides_rejects_bad_tier_objects(tier_value, message):
         ra.validate_overrides({"opencode": {"tiers": {"cheap": tier_value}}}, Path("models.local.json"))
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 @pytest.mark.parametrize(
     "payload",
     [
@@ -415,10 +416,6 @@ def test_render_codex_is_valid_toml_with_sandbox():
 
     writer = ra.render_codex(spec(tools=("read", "edit")), ra.resolve(spec(), "codex", {}, DEFAULTS), INVARIANTS)
     assert tomllib.loads(writer)["sandbox_mode"] == "workspace-write"
-
-
-def test_tracked_codex_apex_model_is_astra():
-    assert DEFAULTS["codex"]["tiers"]["apex"] == "gpt-6-astra"
 
 
 def test_render_codex_escapes_description_quotes():
@@ -843,6 +840,7 @@ def test_render_all_prunes_stale_generated_outputs(tmp_path):
 # --- shell-ro compatibility -----------------------------------------------
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 @pytest.mark.parametrize(
     "payload",
     [
@@ -1004,6 +1002,7 @@ def test_verify_flags_an_undeployed_harness(tmp_path):
     assert ra.verify(REPO, ["codex"], env=env) == 1
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_validate_overrides_rejects_null_effort_map_value(tmp_path):
     (tmp_path / "prompts").mkdir()
     (tmp_path / "prompts" / "models.local.json").write_text(

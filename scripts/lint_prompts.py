@@ -8,7 +8,7 @@ import sys
 from fnmatch import fnmatchcase
 from pathlib import Path
 
-from render_prompts import HARNESSES
+from render_prompts import HARNESSES, overlay_dir
 
 
 SECRET_PATTERNS = (
@@ -90,7 +90,7 @@ PATTERNS_EXAMPLE = Path("prompts") / "private-patterns.example.txt"
 def load_user_patterns(repo_root: Path) -> tuple[str, ...]:
     """The user's own markers: AGENTS_PRIVATE_PATTERNS plus prompts/private-patterns.txt."""
     patterns = split_env_patterns(os.environ.get("AGENTS_PRIVATE_PATTERNS", ""))
-    pattern_file = repo_root / "prompts" / "private-patterns.txt"
+    pattern_file = overlay_dir(repo_root) / "private-patterns.txt"
     if pattern_file.exists():
         for line in pattern_file.read_text(encoding="utf-8").splitlines():
             value = line.strip()

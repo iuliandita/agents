@@ -305,6 +305,7 @@ def test_main_stops_at_first_failing_step(tmp_path, monkeypatch, capsys, fail_at
         pass
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_overlay_summary_names_trust_source(tmp_path, monkeypatch):
     (tmp_path / "prompts").mkdir()
     (tmp_path / "prompts" / "private.md").write_text("secret\n", encoding="utf-8")

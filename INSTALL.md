@@ -302,6 +302,7 @@ precedence over environment defaults where supported.
 | `AGENTS_UPDATE_BRANCHES` | Comma-separated subset of `main,develop` allowed to pull; empty allows none. |
 | `AGENTS_PRIVATE_HARNESSES` | Private-overlay trust list; overrides `prompts/private-harnesses.txt`. |
 | `AGENTS_PRIVATE_PATTERNS` | Additional comma- or newline-separated private markers for the leak linter. |
+| `AGENTS_OVERLAY_DIR` | Directory read for the gitignored overlay files (`local.md`, `private.md`, `private-harnesses.txt`, `private-patterns.txt`, `deploy-targets.txt`, `models.local.json`) instead of `prompts/`; an absolute path. The prompt source scan does not read files there. The test suite sets it to an empty directory. |
 | `CLAUDE_AGENTS_PATH`, `CODEX_AGENTS_PATH`, `OPENCODE_AGENTS_PATH`, `COMMANDCODE_AGENTS_PATH` | Override the named harness's rules file. |
 | `ANTIGRAVITY_AGENTS_PATH`, `OMP_AGENTS_PATH`, `HERMES_AGENTS_PATH`, `GENERIC_AGENTS_PATH` | Override the named harness's rules file; Hermes here means project rules. |
 | `CLAUDE_AGENTS_DIR`, `CODEX_AGENTS_DIR`, `OPENCODE_AGENTS_DIR` | Override the named harness's role directory. |

@@ -48,6 +48,7 @@ HELP_EPILOG = """\
 Environment:
   AGENTS_PYTHON            Python 3.11+ executable the launcher runs (a path, not a command).
   AGENTS_PRIVATE_HARNESSES Comma-separated harnesses that receive prompts/private.md; 'all' for every one.
+  AGENTS_OVERLAY_DIR       Directory read for the gitignored overlay files instead of prompts/.
   <HARNESS>_AGENTS_PATH    Override one rules file: CLAUDE, CODEX, OPENCODE, COMMANDCODE, ANTIGRAVITY, OMP,
                            HERMES, or GENERIC. Manual targets need it before --deploy writes.
   CLAUDE_CONFIG_DIR, CODEX_HOME, OPENCODE_CONFIG_DIR, PI_CODING_AGENT_DIR
@@ -516,8 +517,19 @@ def read_fragment(repo_root: Path, harness: Harness) -> str:
     return path.read_text(encoding="utf-8")
 
 
+OVERLAY_DIR_ENV = "AGENTS_OVERLAY_DIR"
+
+
+def overlay_dir(repo_root: Path, env: dict[str, str] | None = None) -> Path:
+    # The gitignored overlay files live in prompts/ unless AGENTS_OVERLAY_DIR names another
+    # directory. The test suite points it at an empty one so no test reads a real overlay.
+    values = os.environ if env is None else env
+    override = values.get(OVERLAY_DIR_ENV, "").strip()
+    return Path(override).expanduser() if override else repo_root / "prompts"
+
+
 def read_overlay(repo_root: Path, name: str) -> str:
-    path = repo_root / "prompts" / name
+    path = overlay_dir(repo_root) / name
     if not path.exists():
         return ""
     return path.read_text(encoding="utf-8")
@@ -539,7 +551,7 @@ def private_harnesses(repo_root: Path, env: dict[str, str] | None = None) -> fro
     if override.strip():
         names = [part.strip() for part in override.replace(",", "\n").split() if part.strip()]
     else:
-        path = repo_root / "prompts" / PRIVATE_HARNESSES_FILE
+        path = overlay_dir(repo_root, values) / PRIVATE_HARNESSES_FILE
         if not path.exists():
             return frozenset()
         names = [

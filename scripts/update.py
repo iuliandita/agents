@@ -42,6 +42,7 @@ from render_prompts import (
     json_extra,
     json_record,
     load_overlays,
+    overlay_dir,
     run_json,
     run_plain,
     target_path,
@@ -95,7 +96,7 @@ def parse_names(raw: str) -> list[str]:
 
 def load_targets(repo_root: Path, cli: str | None, env: dict[str, str] | None = None) -> list[str]:
     values = os.environ if env is None else env
-    path = repo_root.joinpath(*TARGETS_FILE)
+    path = overlay_dir(repo_root, values) / TARGETS_FILE[-1]
     if cli is not None:
         names, source = parse_names(cli), "--targets"
     elif values.get(TARGETS_ENV, "").strip():
@@ -227,6 +228,7 @@ Environment:
   AGENTS_UPDATE_BRANCHES   Comma-separated subset of main,develop allowed to pull; default: main,develop.
                            The branch must track an upstream. An empty value allows no branches.
   AGENTS_PRIVATE_HARNESSES Comma-separated harnesses that receive prompts/private.md; 'all' for every one.
+  AGENTS_OVERLAY_DIR       Directory read for the gitignored overlay files instead of prompts/.
   GIT_SSH_COMMAND          Used for the pull; defaults to 'ssh -o BatchMode=yes' so it never prompts.
   The render steps also read their path and home overrides, so set them in a scheduled job:
   <HARNESS>_AGENTS_PATH, <HARNESS>_AGENTS_DIR, CLAUDE_CONFIG_DIR, CODEX_HOME, OPENCODE_CONFIG_DIR,

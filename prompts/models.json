@@ -41,9 +41,6 @@
   "commandcode": {
     "effort_key": "reasoningEffort",
     "effort_map": {
-      "low": "low",
-      "medium": "medium",
-      "high": "high",
       "xhigh": "high",
       "max": "high"
     },

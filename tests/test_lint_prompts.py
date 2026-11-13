@@ -16,6 +16,7 @@ def test_lint_file_flags_private_path_marker(tmp_path):
     assert failures == 1
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_load_private_patterns_from_file(tmp_path):
     repo = tmp_path / "repo"
     (repo / "prompts").mkdir(parents=True)
@@ -161,6 +162,7 @@ def test_main_flags_orphan_harness_fragment(tmp_path, capsys):
     assert "orphan fragment" in captured.err
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_main_lints_private_example_when_present(tmp_path, capsys):
     repo_root = tmp_path / "repo"
     scripts_dir = repo_root / "scripts"

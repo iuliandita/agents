@@ -245,6 +245,7 @@ Environment:
   HERMES_HOME              Hermes home; the config is <HERMES_HOME>/config.yaml.
   LOCALAPPDATA             On Windows, the default config is %LOCALAPPDATA%\\hermes\\config.yaml.
   AGENTS_PRIVATE_HARNESSES Comma-separated harnesses that receive prompts/private.md; 'all' for every one.
+  AGENTS_OVERLAY_DIR       Directory read for the gitignored overlay files instead of prompts/.
   HOME                     Resolves the default ~/.hermes/config.yaml.
 
 """ + EXIT_CODES_HELP

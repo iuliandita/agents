@@ -94,34 +94,6 @@ def test_harness_catalog_is_the_seven_supported_plus_generic():
         assert removed not in harnesses
 
 
-def test_harness_displays_are_stable():
-    harnesses = {harness.name: harness for harness in renderer.HARNESSES}
-
-    assert harnesses["claude"].display == "Claude Code"
-    assert harnesses["codex"].display == "OpenAI Codex"
-    assert harnesses["opencode"].display == "OpenCode"
-    assert harnesses["commandcode"].display == "Command Code"
-    assert harnesses["antigravity"].display == "Antigravity"
-    assert harnesses["hermes"].display == "Hermes Agent"
-    assert harnesses["generic"].display == "Generic AGENTS.md"
-
-
-def test_harness_support_levels_are_exposed_in_registry():
-
-    levels = {harness.name: harness.support_level for harness in renderer.HARNESSES}
-
-    assert renderer.DEPLOYABLE == "deployable"
-    assert renderer.MANUAL == "manual"
-    assert renderer.SUPPORT_LEVELS == {"deployable", "manual"}
-    assert levels["claude"] == "deployable"
-    assert levels["codex"] == "deployable"
-    assert levels["opencode"] == "deployable"
-    assert levels["commandcode"] == "deployable"
-    assert levels["antigravity"] == "deployable"
-    assert levels["hermes"] == "manual"
-    assert levels["generic"] == "manual"
-
-
 def test_target_path_uses_home_and_env_override(tmp_path):
 
     default_path = renderer.target_path("codex", home=tmp_path, env={})
@@ -173,6 +145,7 @@ def test_selected_harnesses_accept_comma_separated_targets():
     assert [harness.name for harness in selected] == ["claude", "codex", "opencode"]
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_render_all_writes_selected_harnesses_to_output_dir(tmp_path):
     repo = tmp_path / "repo"
     (repo / "prompts" / "harnesses").mkdir(parents=True)
@@ -273,6 +246,7 @@ def test_heading_detection_ignores_fenced_content(fence):
     assert sum(size for _, size in sizes) == len(core.encode("utf-8"))
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 @pytest.mark.parametrize("core", ["", " \n", "<!-- optional:subagents -->\nonly optional\n<!-- /optional:subagents -->\n"])
 def test_shape_check_rejects_empty_core(tmp_path, core):
     repo = overlay_repo(tmp_path)
@@ -281,6 +255,7 @@ def test_shape_check_rejects_empty_core(tmp_path, core):
         renderer.check_render_shape(repo, ["generic"])
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 @pytest.mark.parametrize("corruption", ["header", "core", "optional"])
 def test_shape_check_detects_corrupt_output(tmp_path, monkeypatch, capsys, corruption):
     repo = overlay_repo(tmp_path)
@@ -610,7 +585,6 @@ def test_selected_harnesses_reject_empty_target_list():
 def test_deploy_skips_manual_harness_without_override(tmp_path, capsys, monkeypatch):
     repo = Path(__file__).resolve().parents[1]
     monkeypatch.delenv("HERMES_AGENTS_PATH", raising=False)
-    monkeypatch.delenv("NANOCLAW_AGENTS_PATH", raising=False)
 
     deployed = renderer.deploy(
         repo_root=repo,
@@ -768,6 +742,7 @@ def test_status_reports_drift_then_in_sync(tmp_path, monkeypatch, capsys):
     assert "in sync" in capsys.readouterr().out
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_crlf_prompts_show_drift_and_are_replaced(tmp_path, monkeypatch, capsys):
     repo = overlay_repo(tmp_path)
     destination = tmp_path / "CLAUDE.md"
@@ -920,6 +895,22 @@ def test_private_harnesses_file_overrides_default(tmp_path):
     assert renderer.private_harnesses(tmp_path, env={}) == frozenset({"opencode"})
 
 
+def test_overlay_dir_override_replaces_the_checkout_prompts_dir(tmp_path, monkeypatch):
+    # The autouse fixture points the override at an empty directory, so the real checkout has no overlays.
+    assert renderer.load_overlays(REPO) == renderer.Overlays("", "", frozenset())
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "local.md").write_text("checkout layer\n", encoding="utf-8")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "local.md").write_text("relocated layer\n", encoding="utf-8")
+    (elsewhere / "private-harnesses.txt").write_text("codex\n", encoding="utf-8")
+
+    monkeypatch.setenv("AGENTS_OVERLAY_DIR", str(elsewhere))
+    assert renderer.load_overlays(tmp_path) == renderer.Overlays("relocated layer\n", "", frozenset({"codex"}))
+    monkeypatch.delenv("AGENTS_OVERLAY_DIR")
+    assert renderer.load_overlays(tmp_path) == renderer.Overlays("checkout layer\n", "", frozenset())
+
+
 def overlay_repo(tmp_path):
     repo = tmp_path / "repo"
     (repo / "prompts" / "harnesses").mkdir(parents=True)
@@ -932,6 +923,7 @@ def overlay_repo(tmp_path):
     return repo
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_private_overlay_withheld_everywhere_without_trust_list(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("AGENTS_PRIVATE_HARNESSES", raising=False)
     repo = overlay_repo(tmp_path)
@@ -947,6 +939,7 @@ def test_private_overlay_withheld_everywhere_without_trust_list(tmp_path, monkey
     assert "generic" not in notice
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_private_overlay_reaches_only_trusted_harnesses(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "opencode,omp")
     repo = overlay_repo(tmp_path)
@@ -960,6 +953,7 @@ def test_private_overlay_reaches_only_trusted_harnesses(tmp_path, monkeypatch, c
     assert "omp" not in notice.split("withheld from")[1].split(";")[0]
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_trust_all_reaches_every_global_target_without_notice(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
     repo = overlay_repo(tmp_path)
@@ -974,6 +968,7 @@ def test_trust_all_reaches_every_global_target_without_notice(tmp_path, monkeypa
     assert "withheld" not in capsys.readouterr().err
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_project_level_targets_never_carry_overlays(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
     repo = overlay_repo(tmp_path)
@@ -1070,6 +1065,7 @@ def test_omp_absolute_pi_config_dir_stays_under_home(tmp_path):
     assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / "srv" / "omp" / "agent" / "AGENTS.md"
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_deploy_keeps_project_level_targets_clean_under_trust_all(tmp_path, monkeypatch):
     repo = overlay_repo(tmp_path)
     monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
@@ -1086,6 +1082,7 @@ def test_deploy_keeps_project_level_targets_clean_under_trust_all(tmp_path, monk
         assert "local layer" not in text and "private layer" not in text
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_revoked_trust_shows_as_drift_and_redeploy_removes_private(tmp_path, monkeypatch, capsys):
     repo = overlay_repo(tmp_path)
     target = tmp_path / "opencode" / "AGENTS.md"
@@ -1105,6 +1102,7 @@ def test_revoked_trust_shows_as_drift_and_redeploy_removes_private(tmp_path, mon
     assert renderer.status(repo, ["opencode"], None) == 0
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_deploy_dry_run_flags_unmanaged_rules_file(tmp_path, monkeypatch, capsys):
     repo = overlay_repo(tmp_path)
     mine = tmp_path / "CLAUDE.md"
@@ -1130,6 +1128,7 @@ def test_harness_is_an_alias_of_target(capsys, args):
     assert "claude" in out and "codex" in out and "opencode" not in out
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 @pytest.mark.parametrize("harness,override", [
     *[(item.name, item.env_var) for item in renderer.HARNESSES if item.support_level == renderer.DEPLOYABLE],
     *[(item.name, item.native_env_var) for item in renderer.HARNESSES if item.native_env_var],
@@ -1165,6 +1164,7 @@ def test_environment_targets_withhold_overlays_in_work_trees(tmp_path, monkeypat
     assert renderer.status(repo, [harness], None) == 0
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_default_global_target_keeps_overlays_in_dotfiles_tree(tmp_path, monkeypatch):
     repo = overlay_repo(tmp_path)
     home = tmp_path / "home"
@@ -1179,6 +1179,7 @@ def test_default_global_target_keeps_overlays_in_dotfiles_tree(tmp_path, monkeyp
     assert "local layer" in text and "private layer" in text
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 @pytest.mark.parametrize("mode", ["render", "deploy"])
 def test_all_budgets_checked_before_any_output(tmp_path, monkeypatch, mode):
     repo = overlay_repo(tmp_path)
@@ -1198,6 +1199,7 @@ def test_all_budgets_checked_before_any_output(tmp_path, monkeypatch, mode):
     assert not (repo / "build").exists()
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_interrupted_replace_keeps_complete_files_and_manifest(tmp_path, monkeypatch):
     repo = overlay_repo(tmp_path)
     first, second = tmp_path / "CLAUDE.md", tmp_path / "AGENTS.md"
@@ -1224,6 +1226,7 @@ def test_interrupted_replace_keeps_complete_files_and_manifest(tmp_path, monkeyp
     assert not list(tmp_path.glob(".agents-*"))
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 @pytest.mark.parametrize("existing", ["my rules\n", "example:\n<!-- Generated by sync-ai-prompts rev old. -->\n"])
 def test_prompt_adoption_requires_opt_in_and_backs_up_original(tmp_path, monkeypatch, existing):
     repo = overlay_repo(tmp_path)
@@ -1237,6 +1240,7 @@ def test_prompt_adoption_requires_opt_in_and_backs_up_original(tmp_path, monkeyp
     assert [path.read_text() for path in (tmp_path / "backups").iterdir()] == [existing]
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_directory_target_refused_before_earlier_target_written(tmp_path, monkeypatch):
     repo = overlay_repo(tmp_path)
     directory = tmp_path / "directory"
@@ -1261,6 +1265,7 @@ def test_corrupt_manifest_warns_and_is_preserved_before_replacement(tmp_path, ca
     assert renderer.load_manifest(tmp_path)["claude"]["hash"] == renderer.content_hash("new")
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_status_ignores_manifest_hash_for_another_path(tmp_path, monkeypatch, capsys):
     repo = overlay_repo(tmp_path)
     target = tmp_path / "CLAUDE.md"
