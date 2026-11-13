@@ -45,8 +45,8 @@
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "49f452ff700220b697370897d71889b6f41163b76ccda7108ec0223563631b86",
-      "note": "changelog notes the core guideline to branch instead of committing to the default branch"
+      "fingerprint": "c5cf2fb0fe57c09353bb7ebb2303d2aa6b27c76a130dd7d89abd08278a6ee7ed",
+      "note": "changelog records the prompt diet and the pushed-history confirmation scope"
     },
     "workflow-templates": {
       "baseline": true,

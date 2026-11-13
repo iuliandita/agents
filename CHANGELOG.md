@@ -10,6 +10,9 @@ All notable changes to this project are documented here. Versions follow semanti
   - The prompt linter and the tests share one line cap: 100 for core and 20 for a harness fragment.
   - `sync-ai-prompts --deploy` and `--dry-run` report a `bytes` object per harness in `--json`, with the total and a list of rendered sections.
 
+- Core prompt and harness notes: tighter wording with the same behavior, and repeated paths and maintainer notes removed; the Codex render drops from 32,700 to 32,047 bytes (#196).
+  - Invariants: only rewriting pushed history needs confirmation, so a local rebase of an unpushed branch does not.
+
 - Core prompt and harness notes: removed rules that contradicted each other (#194).
   - Model routing now has one stated precedence, and the Claude and Codex ladders drop prices and version numbers.
   - The Claude auto-mode note no longer reads as skipping confirmation.
