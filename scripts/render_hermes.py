@@ -199,14 +199,14 @@ def deploy(
             f"error: {config_path} is a symlink; refusing to write through it. "
             "Move it aside or point HERMES_CONFIG_PATH at a regular file."
         )
-    with_overlays = not (env_override and _inside_work_tree(config_path))
-    if not with_overlays:
+    withheld = env_override and _inside_work_tree(config_path)
+    if withheld:
         print(
             "note: prompts/local.md and prompts/private.md withheld from hermes; "
             "environment-selected config resolves inside a git work tree",
             file=sys.stderr,
         )
-    rules = render_rules(repo_root, with_overlays=with_overlays)
+    rules = render_rules(repo_root, with_overlays=not withheld)
     original = config_path.read_text(encoding="utf-8") if config_path.exists() else f"{AGENT}:\n"
     merged = merge_coding_instructions(original, rules)
     if merged == original:

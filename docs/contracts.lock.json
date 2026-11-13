@@ -3,11 +3,10 @@
     "deployment": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
         "INSTALL.md"
       ],
-      "fingerprint": "78266272e89d800e1ce4c70226c5e1d58759458f157b4f9ca09d7cce8cfe0540",
-      "note": "Hermes installation covers structural merge refusals, symlink safety, worktree overlay withholding, and native Windows defaults."
+      "fingerprint": "65412893402ccf324829771168a90099640169ecd8efc0bf4fea1c131b193714",
+      "note": "Hermes installation covers structural merge refusals, symlink safety, worktree overlay withholding, and native Windows defaults"
     },
     "harnesses": {
       "breaking": "none",
