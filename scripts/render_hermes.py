@@ -191,7 +191,6 @@ def merge_coding_instructions(text: str, rules: str) -> str:
 
 def render_preview(repo_root: Path, out_dir: Path) -> Path:
     destination = out_dir / "hermes" / "coding_instructions.md"
-    destination.parent.mkdir(parents=True, exist_ok=True)
     render_prompts.atomic_write(destination, render_rules(repo_root), mode=0o600)
     return destination
 

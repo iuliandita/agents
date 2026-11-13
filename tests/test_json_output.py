@@ -114,6 +114,21 @@ def test_deploy_refuses_linked_ancestors(env, tmp_path, script, args, override, 
     assert not (tmp_path / "settings.json").exists()
 
 
+@pytest.mark.parametrize("module_name", ["render_prompts", "render_agents", "render_invariants", "render_hermes"])
+def test_render_does_not_resolve_away_linked_repo_ancestors(tmp_path, module_name):
+    real = tmp_path / "repo"
+    shutil.copytree(REPO / "prompts", real / "prompts", ignore=shutil.ignore_patterns("local.md", "private.md", "models.local.json"))
+    shutil.copytree(REPO / "agents", real / "agents")
+    alias = tmp_path / "alias"
+    alias.symlink_to(real, target_is_directory=True)
+    module = importlib.import_module(module_name)
+    args = module.parse_args(["--repo-root", str(alias)])
+    assert args.repo_root == alias
+    with pytest.raises(SystemExit, match="symlink"):
+        module.run(args)
+    assert not (real / "build").exists()
+
+
 def test_prompts_list_targets(env):
     code, data = run_json(env, "render_prompts.py", "--list-targets", "--harness", "claude,codex")
     assert code == 0

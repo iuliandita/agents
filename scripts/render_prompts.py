@@ -663,7 +663,7 @@ def read_bytes_or_none(path: Path) -> bytes | None:
 
 
 def resolve_repo_paths(args: argparse.Namespace) -> argparse.Namespace:
-    args.repo_root = args.repo_root.expanduser().resolve()
+    args.repo_root = args.repo_root.expanduser().absolute()
     for name in ("out_dir", "backup_dir"):
         path = getattr(args, name).expanduser()
         setattr(args, name, path if path.is_absolute() else args.repo_root / path)
