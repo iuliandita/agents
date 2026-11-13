@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 - Error contract: unexpected failures now report an error without a traceback and retain completed JSON records. Every JSON result includes a mode and records list, including parser and runtime failures; direct entry points reject Python older than 3.11 with exit 3. Breaking: invalid target selections, missing deploy targets, and negative backup counts now exit 2 instead of 1; conflicting modes and abbreviated options are rejected. Back up saved commands before upgrading, spell options in full, select one mode (keeping `--deploy --dry-run` valid), and handle usage failures as exit 2. Restore the saved commands and previous checkout to roll back (#217).
 
+- CI runs the full suite on Linux, macOS, and Windows, expands Python coverage, isolates test homes and Git config, verifies hashed dependencies, and requires tagged-commit checks before release. Windows setup includes virtual environments and runbook commands (#218).
+
 - Deploy safety: preflight all selected prompt and role renders, replace files atomically, record each completed file in the deploy manifest, and preserve corrupt manifests. Unmanaged prompt, role, and hook files now require `--adopt`; back up and review them before upgrading, or restore the affected backup and previous checkout to roll back. Environment-selected targets inside Git worktrees withhold local and private overlays; default global paths keep them. Backups use private permissions, bounded filenames, and retention per source path, including new workflow bundles (#216).
 
 - Correct documentation drift and the consolidation clear loop (#219).

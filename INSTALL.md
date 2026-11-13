@@ -62,7 +62,19 @@ now affects only the test suite, not installation.
 The bash wrappers are POSIX-only; on native Windows use the shipped PowerShell
 launchers. They resolve the same interpreter order as the bash launchers
 (`AGENTS_PYTHON`, then the checkout `.venv`, then `python`/`python3`, then the
-`py -3` launcher) and mirror their behavior:
+`py -3` launcher) and mirror their behavior. From the checkout root, first
+verify that `py -3` selects Python 3.11 or newer and create the environment:
+
+```powershell
+py -3 --version
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements-dev.txt --require-hashes
+```
+
+Activation is optional for the launchers, which find `.venv\Scripts\python.exe`
+automatically. Use the environment's executable directly if activation is disabled:
+`./.venv/Scripts/python.exe -m pytest -q`.
 
 ```powershell
 ./scripts/sync-ai-prompts.ps1 --check
@@ -120,12 +132,14 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
    not already set in the environment, since it overrides the file. If the user will edit or contribute
    to the repo, offer to list their private hosts and names in `prompts/private-patterns.txt` so lint
    catches them in any tracked file.
-6. **Preview**: `scripts/update --no-pull --dry-run`. It prints the effective overlay trust (`private
+6. **Preview**: `scripts/update --no-pull --dry-run` (`./scripts/update.ps1 --no-pull --dry-run` on
+   native Windows). It prints the effective overlay trust (`private
    overlay: sent to ...` and where the list came from), then every file it would write. Check: it ends with
    `update complete` and names only the confirmed targets. **ask** before continuing if any line says
    `would replace unmanaged`: that is content the user wrote (their own `CLAUDE.md`, `reviewer.md`, or
    Hermes `coding_instructions`), which deploy replaces after backing it up.
-7. **Deploy**: `scripts/update --no-pull`. Existing files are backed up to `.backups/` first. Check: it
+7. **Deploy**: `scripts/update --no-pull` (`./scripts/update.ps1 --no-pull` on native Windows).
+   Existing files are backed up to `.backups/` first. Check: it
    ends with `update complete`; its last steps are `--verify` (every role file present) and `--status`
    (every rules file in sync).
 8. **Schedule** a daily run. **ask** which scheduler, what time (local timezone), and how failures should
@@ -171,7 +185,8 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
    ```
 
    ```powershell
-   # Windows Task Scheduler (PowerShell 7); the inner quotes keep paths with spaces intact
+   # Windows step 8: schedule ./scripts/update.ps1 without --no-pull
+   # Task Scheduler (PowerShell 7); the inner quotes keep paths with spaces intact
    $script = "<checkout>\scripts\update.ps1"
    schtasks /Create /SC DAILY /ST 06:30 /TN agents-update /TR "pwsh -NoProfile -File `"$script`""
    ```
