@@ -37,7 +37,8 @@ the updater skips branch and upstream checks and trusts the checkout as it is.
 - The behavior of third-party agent harnesses themselves.
 - The contents of `prompts/local.md` and `prompts/private.md` after they are rendered and deployed; the
   overlays are local by design and are never committed. Which harnesses receive `private.md` is the
-  user's trust list.
+  user's trust list. Environment-selected prompt and Hermes config paths inside Git worktrees
+  withhold both overlays; default global paths retain them even in dotfiles worktrees.
 
 ## Disclosure Expectations
 

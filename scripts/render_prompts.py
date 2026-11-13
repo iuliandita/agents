@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -516,6 +517,64 @@ def global_target(harness: Harness) -> bool:
     return harness.support_level == DEPLOYABLE
 
 
+def _inside_work_tree(path: Path) -> bool:
+    resolved = path.expanduser().resolve()
+    return any((parent / ".git").exists() for parent in resolved.parents)
+
+
+def target_has_override(harness: Harness) -> bool:
+    if os.environ.get(harness.env_var):
+        return True
+    if harness.name == "omp":
+        if omp_profile(os.environ) is not None:
+            return True
+        native = os.environ.get(harness.native_env_var, "")
+        if native and not omp_is_profile_derived(None, os.environ, native):
+            return True
+        return bool(os.environ.get("PI_CONFIG_DIR"))
+    return bool(harness.native_env_var and os.environ.get(harness.native_env_var))
+
+
+def target_overlays(harness: Harness, dest: Path) -> bool:
+    if not global_target(harness):
+        return False
+    if target_has_override(harness) and _inside_work_tree(dest):
+        print(
+            f"note: prompts/local.md and prompts/private.md withheld from {harness.name}; "
+            "environment-selected target resolves inside a git work tree",
+            file=sys.stderr,
+        )
+        return False
+    return True
+
+
+def atomic_write(path: Path, text: str, *, mode: int | None = None) -> None:
+    """Replace a file only after its complete contents are ready in the same directory."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    permissions = mode
+    if permissions is None:
+        permissions = path.stat().st_mode & 0o777 if path.exists() else 0o600
+    fd, temporary = tempfile.mkstemp(prefix=".agents-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+            os.chmod(temporary, permissions)
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def prompt_owned(text: str) -> bool:
+    return text.startswith(f"<!-- {PROMPT_MARKER} ")
+
+
+def require_owned(path: Path, owned: bool, adopt: bool) -> None:
+    if not owned and not adopt:
+        raise SystemExit(f"error: {path} is unmanaged; refusing to replace it without --adopt (back up and review it first)")
+
+
 def withheld_notice(overlays: Overlays, names: list[str]) -> str | None:
     if not overlays.private.strip():
         return None
@@ -606,13 +665,15 @@ def render_all(
     notice = withheld_notice(overlays, [harness.name for harness in harnesses if global_target(harness)])
     if notice:
         print(notice, file=sys.stderr)
-    written: dict[str, Path] = {}
+    prepared: list[tuple[Harness, Path, str]] = []
     for harness in harnesses:
         dest = output_path(out_dir, harness, collisions)
-        dest.parent.mkdir(parents=True, exist_ok=True)
         rendered = render_for(repo_root, harness, core, overlays, stamp)
         enforce_budget(harness, rendered)
-        dest.write_text(rendered, encoding="utf-8", newline="\n")
+        prepared.append((harness, dest, rendered))
+    written: dict[str, Path] = {}
+    for harness, dest, rendered in prepared:
+        atomic_write(dest, rendered, mode=0o600)
         written[harness.name] = dest
     return written
 
@@ -670,26 +731,35 @@ def format_target_collision(collisions: dict[Path, list[Harness]]) -> str:
     )
 
 
-def backup_existing(path: Path, backup_dir: Path) -> None:
+BACKUP_RE = re.compile(
+    r"^.+?-\d{4}-\d{2}-\d{2}-(?P<source>.+?)(?:--(?P<hash>[a-f0-9]{16}))?(?:-(?P<count>[2-9]|[1-9][0-9]+))?\.bak$"
+)
+
+
+def backup_existing(path: Path, backup_dir: Path) -> Path | None:
     if not path.exists() and not path.is_symlink():
-        return
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    # Collapse separators, drive letters, and other unsafe characters so Windows
-    # paths (C:\...) produce a valid flat backup name.
-    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "-", str(path)).strip("-")
-    backup_stem = f"{path.stem}-{date.today().isoformat()}-{safe_name}"
+        return None
+    backup_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    backup_dir.chmod(0o700)
+    source = os.path.normcase(os.path.abspath(path.expanduser()))
+    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "-", source).strip("-")[:100]
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", path.stem)[:48]
+    digest = hashlib.sha256(os.fsencode(source)).hexdigest()[:16]
+    backup_stem = f"{stem}-{date.today().isoformat()}-{safe_name}--{digest}"
     backup = backup_dir / f"{backup_stem}.bak"
     counter = 2
     while backup.exists() or backup.is_symlink():
         backup = backup_dir / f"{backup_stem}-{counter}.bak"
         counter += 1
     if path.is_symlink() and not path.exists():
-        # Dangling symlink: copy the link itself; following it would crash.
-        shutil.copy2(path, backup, follow_symlinks=False)
-        return
-    # copy, not copy2: the backup's mtime must be when it was taken, or
-    # --prune-backups treats a fresh backup of an old file as the oldest.
-    shutil.copy(path, backup)
+        os.symlink(os.readlink(path), backup)
+    else:
+        # Create privately before copying so even a permissive umask cannot expose contents.
+        fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as stream:
+            with path.open("rb") as source_stream:
+                shutil.copyfileobj(source_stream, stream)
+    return backup
 
 
 def content_hash(text: str) -> str:
@@ -700,21 +770,43 @@ def manifest_path(repo_root: Path) -> Path:
     return repo_root / "build" / "deploy-manifest.json"
 
 
+def _manifest_data(path: Path) -> dict:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or any(
+        not isinstance(entry, dict)
+        or not isinstance(entry.get("path"), str)
+        or not isinstance(entry.get("hash"), str)
+        for entry in data.values()
+    ):
+        raise ValueError("invalid deployment records")
+    return data
+
+
 def load_manifest(repo_root: Path) -> dict:
     path = manifest_path(repo_root)
     if not path.exists():
         return {}
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        return _manifest_data(path)
+    except (OSError, ValueError) as exc:
+        print(f"warning: cannot read deploy manifest {path}: {exc}; treating it as empty", file=sys.stderr)
         return {}
-    return data if isinstance(data, dict) else {}
 
 
 def write_manifest(repo_root: Path, manifest: dict) -> None:
     path = manifest_path(repo_root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if path.exists():
+        try:
+            _manifest_data(path)
+        except (OSError, ValueError):
+            backup_existing(path, repo_root / ".backups")
+    atomic_write(path, json.dumps(manifest, indent=2, sort_keys=True) + "\n", mode=0o600)
+
+
+def record_deployed(repo_root: Path, key: str, path: Path, text: str) -> None:
+    manifest = load_manifest(repo_root)
+    manifest[key] = {"path": str(path), "hash": content_hash(text)}
+    write_manifest(repo_root, manifest)
 
 
 def deploy(
@@ -723,6 +815,7 @@ def deploy(
     stamp: str | None,
     dry_run: bool,
     backup_dir: Path,
+    adopt: bool = False,
 ) -> dict[str, Path]:
     harnesses = selected_harnesses(selected)
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
@@ -751,11 +844,18 @@ def deploy(
                 f"Move it aside or point {harness.env_var} at a regular file."
             )
 
-    manifest = load_manifest(repo_root)
-    deployed: dict[str, Path] = {}
+    prepared: list[tuple[Harness, Path, str]] = []
     for harness, dest in resolved.items():
-        rendered = render_for(repo_root, harness, core, overlays, stamp)
+        if dest.exists() and not dest.is_file():
+            raise SystemExit(f"error: {dest} is not a regular file; refusing to write")
+        rendered = render_for(repo_root, harness, core, overlays, stamp, with_overlays=target_overlays(harness, dest))
         enforce_budget(harness, rendered)
+        if dest.exists():
+            require_owned(dest, prompt_owned(dest.read_text(encoding="utf-8", errors="replace")), adopt or dry_run)
+        prepared.append((harness, dest, rendered))
+
+    deployed: dict[str, Path] = {}
+    for harness, dest, rendered in prepared:
         deployed[harness.name] = dest
         layer_bytes = {
             "total": len(rendered.encode("utf-8")),
@@ -763,7 +863,7 @@ def deploy(
         }
         if dry_run:
             existing = dest.read_text(encoding="utf-8", errors="replace") if dest.exists() else None
-            if existing is not None and PROMPT_MARKER not in existing:
+            if existing is not None and not prompt_owned(existing):
                 print(f"would replace unmanaged {harness.name}: {dest} (not written by this repo; backed up first)")
                 action = "would-replace-unmanaged"
             elif existing == rendered:
@@ -780,30 +880,34 @@ def deploy(
             json_record(harness=harness.name, action="unchanged", path=str(dest), bytes=layer_bytes)
         else:
             backup_existing(dest, backup_dir)
-            dest.write_text(rendered, encoding="utf-8", newline="\n")
+            atomic_write(dest, rendered, mode=0o600)
             print(f"updated {harness.name}: {dest}")
             json_record(harness=harness.name, action="updated", path=str(dest), bytes=layer_bytes)
-        manifest[harness.name] = {"path": str(dest), "hash": content_hash(rendered)}
-
-    if not dry_run:
-        write_manifest(repo_root, manifest)
+        record_deployed(repo_root, harness.name, dest, rendered)
     return deployed
 
 
 def prune_backups(backup_dir: Path, keep: int, dry_run: bool) -> int:
-    """Keep the newest `keep` backups, remove the rest. Dry-run reports only."""
+    """Keep the newest `keep` recognized backups per source. Dry-run reports only."""
     if keep < 0:
         raise SystemExit("error: --prune-backups requires a non-negative count")
     if not backup_dir.is_dir():
         print(f"no backups at {backup_dir}")
         return 0
-    files = [
-        path
-        for path in backup_dir.iterdir()
-        if (path.is_file() or path.is_symlink()) and path.name.endswith(".bak")
-    ]
-    files.sort(key=lambda path: path.lstat().st_mtime, reverse=True)
-    stale = files[keep:]
+    files = []
+    groups: dict[str, list[Path]] = {}
+    workflow_dirs = [path for path in backup_dir.glob("workflow-*") if path.is_dir() and not path.is_symlink()]
+    for directory in [backup_dir, *workflow_dirs]:
+        for path in directory.iterdir():
+            match = BACKUP_RE.fullmatch(path.name)
+            if match and (path.is_file() or path.is_symlink()):
+                files.append(path)
+                groups.setdefault(match["hash"] or match["source"], []).append(path)
+    stale = []
+    for group in groups.values():
+        group.sort(key=lambda path: path.lstat().st_mtime_ns, reverse=True)
+        stale.extend(group[keep:])
+    emptied = {path.parent for path in stale if path.parent != backup_dir}
     for path in stale:
         if dry_run:
             print(f"would remove {path}")
@@ -812,6 +916,10 @@ def prune_backups(backup_dir: Path, keep: int, dry_run: bool) -> int:
         path.unlink()
         print(f"removed {path}")
         json_record(path=str(path), action="removed")
+    if not dry_run:
+        for directory in emptied:
+            if not any(directory.iterdir()):
+                directory.rmdir()
     verb = "would prune" if dry_run else "pruned"
     print(f"{verb} {len(stale)} of {len(files)} backups in {backup_dir}")
     return 0
@@ -825,7 +933,10 @@ def status(repo_root: Path, selected: list[str] | None, stamp: str | None, out_d
     drift = 0
     for harness in selected_harnesses(selected):
         dest = target_path(harness.name)
-        rendered = render_for(repo_root, harness, core, overlays, stamp)
+        rendered = render_for(
+            repo_root, harness, core, overlays, stamp,
+            with_overlays=target_overlays(harness, dest) if dest is not None else global_target(harness),
+        )
         if harness.consumed_from_build:
             built = (out_dir or repo_root / "build" / "generated") / harness.output_name
             if not built.exists():
@@ -856,7 +967,8 @@ def status(repo_root: Path, selected: list[str] | None, stamp: str | None, out_d
             print(f"{harness.name}: in sync ({dest})")
             json_record(harness=harness.name, state="in-sync", path=str(dest))
             continue
-        recorded = manifest.get(harness.name, {}).get("hash")
+        entry = manifest.get(harness.name, {})
+        recorded = entry.get("hash") if entry.get("path") == str(dest) else None
         if recorded and content_hash(current) != recorded:
             print(f"{harness.name}: local edits since deploy ({dest})")
             state = "local-edits"
@@ -887,6 +999,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--stamp", help="Override generated date, useful for tests.")
     parser.add_argument("--deploy", action="store_true", help="Write rendered files to global harness paths.")
+    parser.add_argument("--adopt", action="store_true", help="Allow replacing unmanaged files after backing them up.")
     parser.add_argument("--dry-run", action="store_true", help="Print deploy targets without writing.")
     parser.add_argument(
         "--check",
@@ -899,7 +1012,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--prune-backups",
         type=int,
         metavar="KEEP",
-        help="Keep the newest KEEP backups under --backup-dir and remove the rest (combine with --dry-run to preview).",
+        help="Keep the newest KEEP backups per source path under --backup-dir and remove the rest (combine with --dry-run to preview).",
     )
     parser.add_argument(
         "--backup-dir",
@@ -942,7 +1055,7 @@ def run(args: argparse.Namespace) -> int:
         )
 
     if args.deploy or args.dry_run:
-        deploy(args.repo_root, args.target, args.stamp, args.dry_run, args.backup_dir)
+        deploy(args.repo_root, args.target, args.stamp, args.dry_run, args.backup_dir, args.adopt)
         return 0
 
     written = render_all(args.repo_root, args.out_dir, selected=args.target, stamp=args.stamp)

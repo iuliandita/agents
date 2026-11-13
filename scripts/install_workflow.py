@@ -9,7 +9,7 @@ from pathlib import Path
 import tempfile
 
 from render_agents import parse_frontmatter
-from render_prompts import EXIT_CODES_HELP, JsonArgumentParser, json_record, run_json
+from render_prompts import EXIT_CODES_HELP, JsonArgumentParser, backup_existing, json_record, record_deployed, run_json
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKILL_NAME = "consolidate-agents-md"
@@ -72,11 +72,10 @@ def run(args: argparse.Namespace) -> int:
 
         if overwritten:
             backup_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+            backup_root.chmod(0o700)
             backup_dir = Path(tempfile.mkdtemp(prefix="workflow-", dir=backup_root))
-            for index, target in enumerate(overwritten):
-                backup = backup_dir / f"{index}-{target.name}"
-                backup.write_bytes(target.read_bytes())
-                backup.chmod(0o600)
+            for target in overwritten:
+                backup = backup_existing(target, backup_dir)
                 print(f"Backup: {target} -> {backup}")
                 json_record(action="backup", path=str(target), backup=str(backup))
         for target in changed:
@@ -88,6 +87,7 @@ def run(args: argparse.Namespace) -> int:
                 os.replace(temporary, target)
             finally:
                 Path(temporary).unlink(missing_ok=True)
+            record_deployed(REPO_ROOT, f"workflow:{target}", target, content.decode("utf-8"))
             print(f"Installed: {target}")
             json_record(action="installed", path=str(target))
         print(f"Installed {len(changed)} change(s)")

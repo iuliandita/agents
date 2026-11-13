@@ -1,20 +1,25 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "none",
+      "breaking": "Existing unmanaged hook scripts require --adopt, and backup pruning now retains recognized backups per source path.",
       "docs": [
-        "README.md"
+        "CHANGELOG.md",
+        "INSTALL.md",
+        "SECURITY.md"
       ],
-      "fingerprint": "9f42817ab12b78fe614937999c2b57a6483525f575842386b3cb7d20f6832a30",
-      "note": "INSTALL and README cover both invariants hook channels, the update step per harness, and the new JSON targets"
+      "fingerprint": "b6f7f9146231176d731a81aa8c5639199901d0f769542d3eee9daf78c49222f2",
+      "migration": "Back up hook scripts and shared settings, upgrade by reviewing unmanaged hooks and passing --adopt once, then inspect the manifest and per-source backup retention. Roll back by restoring affected backups and checking out the previous version before redeploying.",
+      "note": "Installer recovery covers hook adoption, private backups, atomic shared-config writes, workflow bundle retention, and Hermes overlay boundaries."
     },
     "harnesses": {
-      "breaking": "none",
+      "breaking": "Existing unmanaged prompt targets require --adopt, and environment-selected worktree targets no longer receive overlays.",
       "docs": [
+        "CHANGELOG.md",
         "INSTALL.md"
       ],
-      "fingerprint": "09d2fddc2d5020153500f7eabb553a880f96c2d5cd5c20445bec9a2bd2f9e75d",
-      "note": "changelog and INSTALL json table cover reviewer, planner, line caps, and per-section byte sizes"
+      "fingerprint": "d4319563cf7328ec5b679a4b3d5a986f32654ffd7c1b4784a7705a8760ec98ca",
+      "migration": "Back up existing prompt targets, upgrade by reviewing unmanaged files and using --adopt once, then verify overlay withholding. Roll back by restoring the affected backup and checking out the previous version before redeploying.",
+      "note": "Recovery guidance covers prompt ownership adoption, environment-selected worktree overlay withholding, and incremental deployment manifests."
     },
     "maintenance": {
       "breaking": "none",
@@ -25,14 +30,14 @@
       "note": "MAINTENANCE explains that only receipt-changing commits count for the breaking carry check"
     },
     "models-agents": {
-      "breaking": "none",
+      "breaking": "Existing unmanaged role files require --adopt before replacement.",
       "docs": [
         "CHANGELOG.md",
-        "README.md",
-        "docs/harness-contract.md"
+        "INSTALL.md"
       ],
-      "fingerprint": "280377bfb8a2b5add3558a1b928eccd41f27debf85a6d2b443fafc94c08c1bc1",
-      "note": "Document deny-all read-only roles, body tool budgets, blocker output, empty expansion errors, and unsupported turn-cap notices."
+      "fingerprint": "15847bc35b42832f31a94868c4d51d37db042e65baa52ba30df16be19f113cac",
+      "migration": "Back up existing role directories, upgrade by reviewing unmanaged roles and passing --adopt once, then verify generated headers. Roll back by restoring the affected backups and checking out the previous version before redeploying.",
+      "note": "Role recovery guidance explains generated-header ownership, opt-in adoption, atomic replacement, and manifest records per role file."
     },
     "overlays-trust": {
       "breaking": "none",

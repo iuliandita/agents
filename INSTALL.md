@@ -491,13 +491,33 @@ Stop only the updater schedule you configured before recovering files. For the d
 systemd setup, use `systemctl --user disable --now agents-update.timer`; for cron, launchd or
 Task Scheduler, remove only this checkout's job. Keep unrelated jobs and settings.
 
-Deployments back up overwritten files in this checkout's `.backups/` directory by default.
-Use `--backup-dir` to select another backup directory.
-Match a backup to its original filename and deployment before restoring it; preserve the
-current file first. Restore only the affected prompt or role, then render/check the known-good
-checkout and preview its target paths before redeploying. `scripts/sync-ai-prompts --status`
-compares deployed rules with a fresh render; `scripts/render-agents --verify` checks only that
-role files exist, not their content, discovery or model compatibility.
+Deployments back up overwritten files in this checkout's `.backups/` directory by default;
+`install_workflow.py` uses `.backups/workflow-*/` bundles. The renderers accept `--backup-dir`.
+Backups plus `build/deploy-manifest.json` are the recovery path: the manifest records each
+completed file's path and content hash as it lands. Selected harnesses render and pass their
+budgets before writes begin, and individual files are replaced atomically. Deploying multiple
+components remains sequential, so a later failure can leave earlier components updated.
+Match a backup to the manifest's recorded path before restoring it; preserve the current file
+first. A corrupt manifest produces a warning and is backed up before replacement. Backup
+directories use mode 0700, backup files and new overlay-bearing outputs use 0600 on POSIX.
+Backup filenames include a bounded readable path and a source-path hash. `--prune-backups KEEP`
+on `sync-ai-prompts` retains KEEP backups per source, including recognized files in workflow
+bundles, and removes empty bundles; unrelated names and older workflow files without source
+identifiers are kept for manual recovery.
+
+Prompt, role, and hook deploys refuse existing files without their own generated header.
+To upgrade an unmanaged target, back up and review it, then pass `--adopt` to
+`sync-ai-prompts`, `render-agents`, or `render-invariants` for that deployment. Existing generated
+headers remain compatible. Shared settings and Hermes YAML retain their entry-level merge checks.
+Environment-selected prompt or Hermes config targets inside Git worktrees receive neither
+`local.md` nor `private.md`; the installer prints a `note:`. Default global paths keep overlays
+even when the home directory belongs to a dotfiles worktree. After upgrading, preview the target
+paths and verify the generated headers. To roll back, restore the affected backup and check out
+the previous version before redeploying; restore only the affected prompt or role. Render/check
+the known-good checkout and preview its target paths before redeploying.
+`scripts/sync-ai-prompts --status` compares deployed rules with a fresh render;
+`scripts/render-agents --verify` checks only that role files exist, not their content,
+discovery or model compatibility.
 
 There is no whole-suite uninstall command. To stop managing a hook, remove only its generated
 invariants entry from the relevant settings event and its corresponding hook file after keeping

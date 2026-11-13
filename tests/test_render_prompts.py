@@ -759,25 +759,25 @@ def test_backup_existing_flattens_windows_style_paths(tmp_path):
 def test_prune_backups_keeps_newest(tmp_path):
     backup_dir = tmp_path / "b"
     backup_dir.mkdir()
+    source = tmp_path / "AGENTS.md"
     for index in range(5):
-        path = backup_dir / f"x-{index}.bak"
-        path.write_text(str(index), encoding="utf-8")
+        source.write_text(str(index), encoding="utf-8")
+        path = renderer.backup_existing(source, backup_dir)
         os.utime(path, (1000 + index, 1000 + index))
 
     assert renderer.prune_backups(backup_dir, 2, dry_run=True) == 0
     assert len(list(backup_dir.iterdir())) == 5
-
     assert renderer.prune_backups(backup_dir, 2, dry_run=False) == 0
-    assert sorted(path.name for path in backup_dir.iterdir()) == ["x-3.bak", "x-4.bak"]
+    assert {path.read_text() for path in backup_dir.iterdir()} == {"3", "4"}
 
 
 def test_prune_backups_keeps_new_backup_of_old_file(tmp_path):
     backup_dir = tmp_path / "b"
     backup_dir.mkdir()
-    previous = backup_dir / "previous.bak"
-    previous.write_text("previous", encoding="utf-8")
-    os.utime(previous, (2000, 2000))
     old_source = tmp_path / "AGENTS.md"
+    old_source.write_text("previous", encoding="utf-8")
+    previous = renderer.backup_existing(old_source, backup_dir)
+    os.utime(previous, (2000, 2000))
     old_source.write_text("old", encoding="utf-8")
     os.utime(old_source, (1000, 1000))
 
@@ -804,14 +804,17 @@ def test_prune_backups_ignores_non_bak_files(tmp_path):
     backup_dir.mkdir()
     archive = backup_dir / "old-backups-archive.tar.gz"
     archive.write_text("x", encoding="utf-8")
+    source = tmp_path / "AGENTS.md"
+    unknown = backup_dir / "personal.bak"
+    unknown.write_text("keep", encoding="utf-8")
     for index in range(3):
-        path = backup_dir / f"x-{index}.bak"
-        path.write_text(str(index), encoding="utf-8")
+        source.write_text(str(index), encoding="utf-8")
+        path = renderer.backup_existing(source, backup_dir)
         os.utime(path, (1000 + index, 1000 + index))
 
     assert renderer.prune_backups(backup_dir, 1, dry_run=False) == 0
     assert archive.exists()
-    assert sorted(path.name for path in backup_dir.iterdir()) == ["old-backups-archive.tar.gz", "x-2.bak"]
+    assert {path.read_text() for path in backup_dir.iterdir()} == {"x", "keep", "2"}
 
 
 def test_render_document_header_has_no_git_revision_churn():
@@ -1040,7 +1043,7 @@ def test_deploy_dry_run_flags_unmanaged_rules_file(tmp_path, monkeypatch, capsys
     monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(mine))
     renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=True, backup_dir=tmp_path / "b")
     assert f"would replace unmanaged claude: {mine}" in capsys.readouterr().out
-    renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=False, backup_dir=tmp_path / "b")
+    renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=False, backup_dir=tmp_path / "b", adopt=True)
     capsys.readouterr()
     renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=True, backup_dir=tmp_path / "b")
     assert f"unchanged claude: {mine}" in capsys.readouterr().out
@@ -1056,3 +1059,188 @@ def test_harness_is_an_alias_of_target(capsys, args):
     assert renderer.main(["--list-targets", *args]) == 0
     out = capsys.readouterr().out
     assert "claude" in out and "codex" in out and "opencode" not in out
+
+
+@pytest.mark.parametrize("harness,override", [
+    *[(item.name, item.env_var) for item in renderer.HARNESSES if item.support_level == renderer.DEPLOYABLE],
+    *[(item.name, item.native_env_var) for item in renderer.HARNESSES if item.native_env_var],
+    ("omp", "PI_CONFIG_DIR"), ("omp", "OMP_PROFILE"), ("omp", "PI_PROFILE"),
+])
+@pytest.mark.parametrize("git_marker", ["directory", "file", None])
+def test_environment_targets_withhold_overlays_in_work_trees(tmp_path, monkeypatch, capsys, harness, override, git_marker):
+    repo = overlay_repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    if git_marker == "directory":
+        (home / ".git").mkdir()
+    elif git_marker == "file":
+        (home / ".git").write_text("gitdir: elsewhere\n")
+    monkeypatch.setattr(Path, "home", lambda: home)
+    for item in renderer.HARNESSES:
+        monkeypatch.delenv(item.env_var, raising=False)
+        if item.native_env_var:
+            monkeypatch.delenv(item.native_env_var, raising=False)
+    for key in ("PI_CONFIG_DIR", "OMP_PROFILE", "PI_PROFILE"):
+        monkeypatch.delenv(key, raising=False)
+    value = "custom" if override in {"PI_CONFIG_DIR", "OMP_PROFILE", "PI_PROFILE"} else str(home / "custom")
+    monkeypatch.setenv(override, value)
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
+    target = renderer.target_path(harness)
+    renderer.deploy(repo, [harness], None, False, tmp_path / "backups")
+    text = target.read_text()
+    assert ("local layer" in text) == (git_marker is None)
+    assert ("private layer" in text) == (git_marker is None)
+    if os.name != "nt":
+        assert target.stat().st_mode & 0o777 == 0o600
+    assert ("environment-selected target" in capsys.readouterr().err) == (git_marker is not None)
+    assert renderer.status(repo, [harness], None) == 0
+
+
+def test_default_global_target_keeps_overlays_in_dotfiles_tree(tmp_path, monkeypatch):
+    repo = overlay_repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / ".git").mkdir()
+    monkeypatch.setattr(Path, "home", lambda: home)
+    monkeypatch.delenv("CLAUDE_AGENTS_PATH", raising=False)
+    monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
+    renderer.deploy(repo, ["claude"], None, False, tmp_path / "backups")
+    text = (home / ".claude" / "CLAUDE.md").read_text()
+    assert "local layer" in text and "private layer" in text
+
+
+@pytest.mark.parametrize("mode", ["render", "deploy"])
+def test_all_budgets_checked_before_any_output(tmp_path, monkeypatch, mode):
+    repo = overlay_repo(tmp_path)
+    (repo / "prompts" / "harnesses" / "codex.md").write_text("x" * 33000)
+    first = tmp_path / "CLAUDE.md"
+    first.write_text("<!-- Generated by sync-ai-prompts rev old. -->\noriginal\n")
+    monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(first))
+    monkeypatch.setenv("CODEX_AGENTS_PATH", str(tmp_path / "AGENTS.md"))
+    before = first.read_bytes()
+    with pytest.raises(SystemExit, match="exceeds its"):
+        if mode == "deploy":
+            renderer.deploy(repo, ["claude", "codex"], None, False, tmp_path / "backups")
+        else:
+            renderer.render_all(repo, tmp_path / "out", ["claude", "codex"])
+    assert first.read_bytes() == before
+    assert not (tmp_path / "out").exists()
+    assert not (repo / "build").exists()
+
+
+def test_interrupted_replace_keeps_complete_files_and_manifest(tmp_path, monkeypatch):
+    repo = overlay_repo(tmp_path)
+    first, second = tmp_path / "CLAUDE.md", tmp_path / "AGENTS.md"
+    second.write_text("<!-- Generated by sync-ai-prompts rev old. -->\noriginal\n")
+    monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(first))
+    monkeypatch.setenv("CODEX_AGENTS_PATH", str(second))
+    replace = os.replace
+
+    def interrupt(source, destination):
+        if destination == second:
+            assert Path(source).parent == second.parent
+            raise OSError("interrupted second replace")
+        replace(source, destination)
+
+    monkeypatch.setattr(os, "replace", interrupt)
+    with pytest.raises(OSError, match="interrupted"):
+        renderer.deploy(repo, ["claude", "codex"], None, False, tmp_path / "backups")
+    assert first.read_text() == renderer.render_for(
+        repo, renderer.harness_by_name("claude"), (repo / "prompts" / "core.md").read_text(), renderer.load_overlays(repo),
+    )
+    assert second.read_text().endswith("original\n")
+    manifest = renderer.load_manifest(repo)
+    assert manifest == {"claude": {"path": str(first), "hash": renderer.content_hash(first.read_text())}}
+    assert not list(tmp_path.glob(".agents-*"))
+
+
+@pytest.mark.parametrize("existing", ["my rules\n", "example:\n<!-- Generated by sync-ai-prompts rev old. -->\n"])
+def test_prompt_adoption_requires_opt_in_and_backs_up_original(tmp_path, monkeypatch, existing):
+    repo = overlay_repo(tmp_path)
+    target = tmp_path / "CLAUDE.md"
+    target.write_text(existing)
+    monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(target))
+    with pytest.raises(SystemExit, match="--adopt"):
+        renderer.deploy(repo, ["claude"], None, False, tmp_path / "backups")
+    assert target.read_text() == existing
+    renderer.deploy(repo, ["claude"], None, False, tmp_path / "backups", adopt=True)
+    assert [path.read_text() for path in (tmp_path / "backups").iterdir()] == [existing]
+
+
+def test_directory_target_refused_before_earlier_target_written(tmp_path, monkeypatch):
+    repo = overlay_repo(tmp_path)
+    directory = tmp_path / "directory"
+    directory.mkdir()
+    first = tmp_path / "CLAUDE.md"
+    monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(first))
+    monkeypatch.setenv("CODEX_AGENTS_PATH", str(directory))
+    with pytest.raises(SystemExit, match="not a regular file"):
+        renderer.deploy(repo, ["claude", "codex"], None, False, tmp_path / "backups")
+    assert not first.exists()
+
+
+@pytest.mark.parametrize("corrupt", ["not json", "[]", '{"claude": 7}'])
+def test_corrupt_manifest_warns_and_is_preserved_before_replacement(tmp_path, capsys, corrupt):
+    path = renderer.manifest_path(tmp_path)
+    path.parent.mkdir()
+    path.write_text(corrupt)
+    assert renderer.load_manifest(tmp_path) == {}
+    assert "warning: cannot read deploy manifest" in capsys.readouterr().err
+    renderer.record_deployed(tmp_path, "claude", tmp_path / "CLAUDE.md", "new")
+    assert [backup.read_text() for backup in (tmp_path / ".backups").iterdir()] == [corrupt]
+    assert renderer.load_manifest(tmp_path)["claude"]["hash"] == renderer.content_hash("new")
+
+
+def test_status_ignores_manifest_hash_for_another_path(tmp_path, monkeypatch, capsys):
+    repo = overlay_repo(tmp_path)
+    target = tmp_path / "CLAUDE.md"
+    target.write_text("different content")
+    monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(target))
+    renderer.write_manifest(repo, {"claude": {"path": str(tmp_path / "elsewhere"), "hash": "old"}})
+    assert renderer.status(repo, ["claude"], None) == 1
+    output = capsys.readouterr().out
+    assert "drift from current render" in output and "local edits" not in output
+
+
+def test_backup_retention_groups_source_paths_and_recognizes_legacy_names(tmp_path):
+    backups = tmp_path / "backups"
+    for parent in ("one", "two"):
+        source = tmp_path / parent / "AGENTS.md"
+        source.parent.mkdir()
+        for index in range(3):
+            source.write_text(f"{parent}:{index}")
+            backup = renderer.backup_existing(source, backups)
+            os.utime(backup, ns=(index + 1, index + 1))
+    legacy = backups / "AGENTS-2026-01-01-tmp-legacy-AGENTS.md.bak"
+    legacy.write_text("legacy")
+    renderer.prune_backups(backups, 1, False)
+    assert {path.read_text() for path in backups.iterdir()} == {"one:2", "two:2", "legacy"}
+
+
+def test_long_backup_names_and_private_file_modes(tmp_path):
+    source = tmp_path / ("a" * 120) / ("b" * 120) / ("c" * 120 + ".md")
+    source.parent.mkdir(parents=True)
+    source.write_text("private")
+    source.chmod(0o644)
+    backups = tmp_path / "backups"
+    backups.mkdir(mode=0o755)
+    backup = renderer.backup_existing(source, backups)
+    assert len(os.fsencode(backup.name)) < 255
+    assert backup.read_text() == "private"
+    output = tmp_path / "output.md"
+    renderer.atomic_write(output, "private", mode=0o600)
+    if os.name != "nt":
+        assert backups.stat().st_mode & 0o777 == 0o700
+        assert backup.stat().st_mode & 0o777 == 0o600
+        assert output.stat().st_mode & 0o777 == 0o600
+
+
+def test_dangling_symlink_backup_has_fresh_time(tmp_path):
+    source = tmp_path / "dangling.md"
+    source.symlink_to("missing.md")
+    if os.utime in os.supports_follow_symlinks:
+        os.utime(source, ns=(1, 1), follow_symlinks=False)
+    backup = renderer.backup_existing(source, tmp_path / "backups")
+    assert backup.is_symlink() and os.readlink(backup) == "missing.md"
+    assert backup.lstat().st_mtime_ns > 1
