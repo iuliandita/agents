@@ -3,11 +3,9 @@
     "deployment": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
-        "INSTALL.md",
         "SECURITY.md"
       ],
-      "fingerprint": "5924ff204ca466ff7fe8a346e54090714c33051da9164f2efa27f68f8c31640e",
+      "fingerprint": "c9512b11783eedd77084122c09049937ca9434342c9e9352b66acff22dd9c8d0",
       "note": "Document allowed tracking branches, narrowing the updater allow-list, no-pull trust, and upstream signature limits."
     },
     "harnesses": {
