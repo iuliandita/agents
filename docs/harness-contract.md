@@ -28,6 +28,7 @@ pattern (`medium`), or it is not vendored (`n/a`).
 - The desktop Code tab runs the same engine and reads the same files; the Chat/Cowork tab does not
   (see `docs/surfaces.md`).
 - Skills and hooks are first-class; the `UserPromptSubmit` hook is the invariants channel.
+  `render-invariants --deploy --harness claude` installs the script and merges its settings entry.
 
 ### OpenAI Codex
 - Global rules `$CODEX_HOME/AGENTS.md` (default `~/.codex/AGENTS.md`), read as `AGENTS.override.md` then
@@ -67,6 +68,10 @@ pattern (`medium`), or it is not vendored (`n/a`).
   `~/.gemini/config/mcp_config.json`. Hooks `hooks.json` in `.agents/` or `~/.gemini/config/`
   (`PreToolUse`, `PostToolUse`, `PreInvocation`, `PostInvocation`, `Stop`); `PreInvocation` can return
   `injectSteps[].ephemeralMessage`, the invariants channel for this harness.
+  `render-invariants --deploy --harness antigravity` installs `invariants-preinvocation.sh` and
+  merges `invariants.PreInvocation` into global `hooks.json`, with backups and the same destination
+  and settings validation as Claude. `--antigravity-config-dir` relocates both files. With no
+  `--harness`, the invariants deploy selects both Claude and Antigravity.
 - Headless: `agy -p` with `--output-format text|json|stream-json`, `--effort`, `--continue`.
 - Custom subagents: `.agents/agents/<name>.md` (workspace) or `~/.gemini/config/agents/<name>.md`
   (global), YAML frontmatter `name`, `description`, `tools` (exact names; a misspelled tool can hang the
