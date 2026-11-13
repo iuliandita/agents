@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- Docs impact check: a breaking receipt that a commit did not change no longer fails the range, so merging the base branch into a feature branch no longer reports a stale breaking change (#212).
+
 - Invariants deployment now installs and refreshes both Claude and Antigravity hooks, validates settings before merging, preserves Unicode, and updates managed hook paths in place. `--harness` selects a channel and `--antigravity-config-dir` relocates Antigravity config (#203).
 
 - Updater: require an allowed branch with an upstream before pulling, allow narrowing with `AGENTS_UPDATE_BRANCHES`, and report Windows lock contention cleanly (#200).
