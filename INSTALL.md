@@ -475,7 +475,7 @@ Exit codes are the same for every command: 0 done, 1 failed, 2 usage error, 3 a 
 | | `verify` | `harnesses` | `harness`, `path`, `roles`, `missing` |
 | | `deploy` (adds `dry_run`) | `actions` | `harness`, `action` (`updated`, `unchanged`, `would-create`, `would-replace`, `would-replace-unmanaged`, `would-remove-stale`, `removed-stale`), `path` |
 | | `render` | `rendered` | `harness`, `path`, `agents` |
-| `scripts/render-invariants` | `deploy` (adds `dry_run`) | `actions` | `target` (`hook`, `settings`), `action` (`installed`, `merged`, `unchanged`, `would-install`, `would-merge`), `path` |
+| `scripts/render-invariants` | `deploy` (adds `dry_run`) | `actions` | `target` (`hook`, `settings`, `antigravity_hook`, `antigravity_settings`), `action` (`installed`, `merged`, `unchanged`, `would-install`, `would-merge`), `path` |
 | | `render` | `rendered` | `artifact`, `path` |
 | `scripts/render-hermes` | `deploy` (adds `dry_run`) | `actions` | `harness`, `action` (`updated`, `unchanged`, `would-update`, `would-replace-unmanaged`), `path` |
 | | `render` | `rendered` | `harness`, `path` |

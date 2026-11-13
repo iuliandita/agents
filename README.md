@@ -188,16 +188,18 @@ This renders five artifacts into `build/generated/invariants/` from the single s
 - `claude-settings-snippet.json` - the hook wiring, for reference or manual merge.
 - `subagent-block.md` - paste into custom subagent definitions; reinforcement that holds regardless of which memory files a given agent type loads.
 - `invariants-preinvocation.sh` - an Antigravity `PreInvocation` hook that emits `injectSteps.ephemeralMessage` JSON; Antigravity's documented per-turn channel.
-- `antigravity-hooks-snippet.json` - the `hooks.json` entry for the Antigravity hook, for manual merge into `~/.gemini/config/hooks.json`.
+- `antigravity-hooks-snippet.json` - a reference copy of the deployed Antigravity `hooks.json` entry.
 
-Install the Claude hook the same way prompts deploy: dry-run first, then deploy.
+Install both hooks the same way prompts deploy: dry-run first, then deploy.
 
 ```bash
 scripts/render-invariants --dry-run
 scripts/render-invariants --deploy
 ```
 
-`--deploy` copies the hook to `~/.claude/hooks/` and idempotently appends its entry to `hooks.UserPromptSubmit` in `~/.claude/settings.json`, backing up anything it overwrites into `.backups/`. It refuses symlinked destinations and shell-quotes the hook path. It never removes or rewrites existing hooks, so an already-configured `UserPromptSubmit` (or any other setting) is preserved, and re-running is a no-op. Override targets for testing with `CLAUDE_HOOKS_DIR`, `CLAUDE_SETTINGS_PATH`, `--hooks-dir`, or `--settings-path`. The Antigravity artifacts are render-only today; merge the snippet into `hooks.json` by hand.
+`--deploy` installs both hooks with mode `0755` and merges their entries: Claude Code uses `~/.claude/hooks/invariants-userpromptsubmit.sh` and `hooks.UserPromptSubmit` in `~/.claude/settings.json`; Antigravity uses `~/.gemini/config/invariants-preinvocation.sh` and `invariants.PreInvocation` in `~/.gemini/config/hooks.json`. It backs up overwritten files into `.backups/`, refuses symlinked destinations and invalid settings shapes, and shell-quotes hook paths (with forward slashes on Windows). Managed entries are recognized by their channel's exact hook filename; changing the install directory updates the command in place. Unrelated entries and settings are preserved, including Unicode text. Re-running is a no-op, and `--dry-run` reports matching hooks as unchanged.
+
+Use `--harness claude` or `--harness antigravity` to deploy one channel; the default is `--harness all`. Override Claude targets with `CLAUDE_HOOKS_DIR`, `CLAUDE_SETTINGS_PATH`, `--hooks-dir`, or `--settings-path`. Use `--antigravity-config-dir` to move both the Antigravity hook and `hooks.json`; the rendered snippet follows that directory too.
 
 Per-turn injection is intentional. `SessionStart` runs once and gets buried, whereas `UserPromptSubmit` re-asserts the rules each turn for roughly 60 tokens. `UserPromptSubmit` fires on user prompts in the main loop, not on subagent dispatches, so the subagent block is a separate delivery path and stays a manual paste.
 

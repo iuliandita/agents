@@ -62,10 +62,19 @@ def test_plan_orders_checks_deploys_and_verification(tmp_path):
         ["render_prompts.py", "--target", "claude,omp", "--deploy"],
         ["render_hermes.py", "--deploy"],
         ["render_agents.py", "--target", "claude,omp", "--deploy"],
-        ["render_invariants.py", "--deploy"],
+        ["render_invariants.py", "--harness", "claude", "--deploy"],
         ["render_agents.py", "--target", "claude,omp", "--verify"],
         ["render_prompts.py", "--target", "claude,omp", "--status"],
     ]
+
+
+@pytest.mark.parametrize(
+    ("targets", "harness"),
+    [(["antigravity"], "antigravity"), (["claude", "antigravity"], "all"), (["codex"], None)],
+)
+def test_plan_deploys_the_invariants_hooks_for_selected_harnesses(tmp_path, targets, harness):
+    steps = [step for step in scripts_and_flags(update.plan(tmp_path, targets, dry_run=False)) if step[0] == "render_invariants.py"]
+    assert steps == ([["render_invariants.py", "--harness", harness, "--deploy"]] if harness else [])
 
 
 def test_plan_dry_run_previews_without_verification(tmp_path):

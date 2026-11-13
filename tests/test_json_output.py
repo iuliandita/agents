@@ -116,7 +116,7 @@ def test_agents_modes(env, tmp_path):
 
 def test_invariants_modes(env, tmp_path):
     hooks, settings = tmp_path / "hooks", tmp_path / "settings.json"
-    args = ["--hooks-dir", str(hooks), "--settings-path", str(settings), "--backup-dir", str(tmp_path / "b")]
+    args = ["--harness", "claude", "--hooks-dir", str(hooks), "--settings-path", str(settings), "--backup-dir", str(tmp_path / "b")]
     code, data = run_json(env, "render_invariants.py", "--dry-run", *args)
     assert code == 0 and [a["action"] for a in data["actions"]] == ["would-install", "would-merge"]
     code, data = run_json(env, "render_invariants.py", "--deploy", *args)

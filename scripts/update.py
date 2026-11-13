@@ -3,7 +3,7 @@
 
 One command for first-time setup, manual refreshes, and a daily schedule. It pulls
 fast-forward only, refuses to run over local tracked edits, renders and checks, then
-deploys prompts, the Hermes merge, subagents, and the Claude invariants hook for the
+deploys prompts, the Hermes merge, subagents, and the Claude and Antigravity invariants hooks for the
 listed harnesses, and finishes with a drift check. Any failing step stops the run with
 a non-zero exit so a scheduler can report it.
 """
@@ -120,8 +120,10 @@ def plan(repo_root: Path, targets: list[str], dry_run: bool) -> list[list[str]]:
         steps.append([str(scripts / "render_hermes.py"), deploy_flag])
     if agent_targets:
         steps.append([str(scripts / "render_agents.py"), "--target", ",".join(agent_targets), deploy_flag])
-    if "claude" in targets:
-        steps.append([str(scripts / "render_invariants.py"), deploy_flag])
+    hook_targets = [name for name in ("claude", "antigravity") if name in targets]
+    if hook_targets:
+        harness = hook_targets[0] if len(hook_targets) == 1 else "all"
+        steps.append([str(scripts / "render_invariants.py"), "--harness", harness, deploy_flag])
     if not dry_run:
         if agent_targets:
             steps.append([str(scripts / "render_agents.py"), "--target", ",".join(agent_targets), "--verify"])

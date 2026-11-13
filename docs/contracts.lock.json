@@ -3,10 +3,10 @@
     "deployment": {
       "breaking": "none",
       "docs": [
-        "SECURITY.md"
+        "README.md"
       ],
-      "fingerprint": "c9512b11783eedd77084122c09049937ca9434342c9e9352b66acff22dd9c8d0",
-      "note": "Document allowed tracking branches, narrowing the updater allow-list, no-pull trust, and upstream signature limits."
+      "fingerprint": "9f42817ab12b78fe614937999c2b57a6483525f575842386b3cb7d20f6832a30",
+      "note": "INSTALL and README cover both invariants hook channels, the update step per harness, and the new JSON targets"
     },
     "harnesses": {
       "breaking": "none",
