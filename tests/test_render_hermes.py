@@ -21,6 +21,29 @@ def test_merge_inserts_into_existing_agent_block_preserving_comments():
     assert "_config_version: 44" in merged
 
 
+@pytest.mark.parametrize("comment", ["# settings\n", "\n# settings\n\n"])
+def test_merge_finds_existing_instructions_after_column_zero_comments(comment):
+    text = f"agent:\n  model: x\n{comment}  coding_instructions: old\nother: 1\n"
+
+    merged = rh.merge_coding_instructions(text, "new\n")
+
+    assert comment in merged
+    assert yaml.safe_load(merged) == {"agent": {"model": "x", "coding_instructions": "new\n"}, "other": 1}
+    assert merged.count("coding_instructions:") == 1
+
+
+@pytest.mark.parametrize("agent", ["agent", '"agent"', "'agent'"])
+@pytest.mark.parametrize("key", ["coding_instructions", '"coding_instructions"', "'coding_instructions'"])
+def test_merge_recognizes_quoted_keys(agent, key):
+    text = f"{agent}:\n    {key}: old\n    model: x\nother: 1\n"
+
+    merged = rh.merge_coding_instructions(text, "new\n")
+
+    assert merged.startswith(f"{agent}:\n")
+    assert yaml.safe_load(merged) == {"agent": {"coding_instructions": "new\n", "model": "x"}, "other": 1}
+    assert rh.merge_coding_instructions(merged, "new\n") == merged
+
+
 def test_merge_is_idempotent():
     once = rh.merge_coding_instructions("agent:\n  reasoning_effort: medium\n", "- rule\n")
     assert rh.merge_coding_instructions(once, "- rule\n") == once
@@ -52,9 +75,10 @@ def test_merge_keeps_sibling_keys_in_four_space_agent_block(existing):
     assert merged["other"] == 1
 
 
-def test_merge_refuses_inline_agent_value():
+@pytest.mark.parametrize("key", ["agent", '"agent"', "'agent'"])
+def test_merge_refuses_inline_agent_value(key):
     with pytest.raises(SystemExit, match="inline value"):
-        rh.merge_coding_instructions("agent: {model: opus}\n", "- rule\n")
+        rh.merge_coding_instructions(f"{key}: {{model: opus}}\n", "- rule\n")
 
 
 def test_merge_appends_agent_key_when_missing():
@@ -99,6 +123,62 @@ def test_deploy_dry_run_writes_nothing(tmp_path):
     assert not (tmp_path / "b").exists()
 
 
+@pytest.mark.parametrize("dry_run", [False, True])
+@pytest.mark.parametrize("dangling", [False, True])
+def test_deploy_refuses_symlinks_without_writing(tmp_path, dangling, dry_run):
+    target = tmp_path / "target.yaml"
+    original = "agent:\n  model: x\n"
+    if not dangling:
+        target.write_text(original, encoding="utf-8")
+    config = tmp_path / "config.yaml"
+    config.symlink_to(target)
+
+    with pytest.raises(SystemExit, match="error: .* is a symlink; refusing to write through it"):
+        rh.deploy(REPO, config, tmp_path / "backups", dry_run=dry_run)
+
+    assert config.is_symlink()
+    assert target.exists() is not dangling
+    if not dangling:
+        assert target.read_text(encoding="utf-8") == original
+    assert not (tmp_path / "backups").exists()
+
+
+@pytest.mark.parametrize(
+    "original",
+    [
+        'agent:\n  model: x\n"agent":\n  model: y\n',
+        '"agent":\n  coding_instructions: old\n  \'coding_instructions\': older\n',
+    ],
+)
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_deploy_refuses_duplicate_keys_without_writing(tmp_path, original, dry_run):
+    config = tmp_path / "config.yaml"
+    config.write_text(original, encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="error: duplicate agent or agent.coding_instructions keys"):
+        rh.deploy(REPO, config, tmp_path / "backups", dry_run=dry_run)
+
+    assert config.read_text(encoding="utf-8") == original
+    assert not (tmp_path / "backups").exists()
+
+
+def test_merge_refuses_loss_of_top_level_keys(monkeypatch):
+    # Simulate an overlong replacement range to exercise the post-merge guard.
+    monkeypatch.setattr(rh, "_block_end", lambda lines, start, min_indent: len(lines))
+
+    with pytest.raises(SystemExit, match="error: merge removed top-level keys: other"):
+        rh.merge_coding_instructions('agent:\n  coding_instructions: old\n"other": 1\n', "new\n")
+
+
+def test_structure_ignores_nested_keys_and_scalar_contents():
+    text = 'agent:\n  nested:\n    coding_instructions: keep\n  coding_instructions: |\n    agent:\n    coding_instructions: text\n"other": 1\n'
+
+    merged = rh.merge_coding_instructions(text, "agent:\ncoding_instructions: text\n")
+
+    assert yaml.safe_load(merged)["agent"]["nested"] == {"coding_instructions": "keep"}
+    assert rh._structure(merged) == (["agent", "other"], 1)
+
+
 def overlay_repo(tmp_path):
     repo = tmp_path / "repo"
     (repo / "prompts" / "harnesses").mkdir(parents=True)
@@ -121,6 +201,45 @@ def test_render_rules_includes_private_when_trusted(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "hermes")
     rules = rh.render_rules(overlay_repo(tmp_path))
     assert rules.index("local layer") < rules.index("private layer")
+
+
+@pytest.mark.parametrize("override", ["HERMES_CONFIG_PATH", "HERMES_HOME", None])
+@pytest.mark.parametrize("git_marker", ["directory", "file", "absent"])
+def test_environment_config_withholds_overlays_only_inside_work_tree(tmp_path, monkeypatch, capsys, override, git_marker):
+    repo = overlay_repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    if git_marker == "directory":
+        (home / ".git").mkdir()
+    elif git_marker == "file":
+        (home / ".git").write_text("gitdir: elsewhere\n", encoding="utf-8")
+    config = home / ".hermes" / "config.yaml"
+    monkeypatch.setattr(Path, "home", lambda: home)
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "hermes")
+    monkeypatch.delenv("HERMES_CONFIG_PATH", raising=False)
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    if override:
+        monkeypatch.setenv(override, str(config if override == "HERMES_CONFIG_PATH" else config.parent))
+    args = rh.parse_args(["--repo-root", str(repo), "--backup-dir", str(tmp_path / "backups")])
+    args.deploy = True
+
+    assert rh.run(args) == 0
+
+    rules = yaml.safe_load(config.read_text(encoding="utf-8"))["agent"]["coding_instructions"]
+    withheld = override is not None and git_marker != "absent"
+    assert ("local layer" in rules) is not withheld
+    assert ("private layer" in rules) is not withheld
+    assert ("note: prompts/local.md and prompts/private.md withheld from hermes" in capsys.readouterr().err) is withheld
+
+
+def test_work_tree_detection_resolves_parent_symlinks(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / ".git").mkdir()
+    alias = tmp_path / "alias"
+    alias.symlink_to(repo, target_is_directory=True)
+
+    assert rh._inside_work_tree(alias / "new" / "config.yaml")
 
 
 def test_dry_run_flags_unmanaged_coding_instructions(tmp_path, monkeypatch, capsys):

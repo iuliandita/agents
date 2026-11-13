@@ -38,25 +38,29 @@ def hermes_config_path(env: dict[str, str] | None = None) -> Path:
     return Path.home() / ".hermes" / "config.yaml"
 
 
-def render_rules(repo_root: Path) -> str:
+def render_rules(repo_root: Path, *, with_overlays: bool = True) -> str:
     harness = render_prompts.harness_by_name("hermes")
     overlays = render_prompts.load_overlays(repo_root)
-    notice = render_prompts.withheld_notice(overlays, [harness.name])
+    notice = render_prompts.withheld_notice(overlays, [harness.name]) if with_overlays else None
     if notice:
         print(notice, file=sys.stderr)
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
     # agent.coding_instructions is a global rules slot, unlike Hermes' project-file target.
-    return render_prompts.render_for(repo_root, harness, core, overlays, with_overlays=True)
+    return render_prompts.render_for(repo_root, harness, core, overlays, with_overlays=with_overlays)
+
+
+def _key_pattern(key: str) -> str:
+    return rf"(?:{key}|\"{key}\"|'{key}')\s*:"
 
 
 def _block_end(lines: list[str], start: int, min_indent: int) -> int:
-    """First index at or after start whose indent is <= min_indent (blanks peek ahead)."""
+    """First index whose indent is <= min_indent (blanks and comments peek ahead)."""
     index = start
     while index < len(lines):
         line = lines[index]
-        if line.strip() == "":
+        if not line.strip() or line.lstrip().startswith("#"):
             peek = index
-            while peek < len(lines) and lines[peek].strip() == "":
+            while peek < len(lines) and (not lines[peek].strip() or lines[peek].lstrip().startswith("#")):
                 peek += 1
             if peek < len(lines) and len(lines[peek]) - len(lines[peek].lstrip()) > min_indent:
                 index = peek
@@ -88,6 +92,41 @@ def _child_indent(lines: list[str], start: int, end: int) -> str:
     return INDENT
 
 
+def _structure(text: str) -> tuple[list[str], int]:
+    """Inspect block-mapping keys without a YAML dependency or scalar contents."""
+    top_keys: list[str] = []
+    coding_keys = 0
+    in_agent = False
+    child_indent = None
+    for line in text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        if indent == 0:
+            match = re.match(r'''^(?:"([^"]*)"|'((?:[^']|'')*)'|([^'"#][^:]*?))\s*:''', line)
+            key = next((group for group in match.groups() if group is not None), "").strip() if match else ""
+            if match:
+                top_keys.append(key)
+            in_agent = key == AGENT
+            child_indent = None
+        elif in_agent:
+            if child_indent is None:
+                child_indent = indent
+            if indent == child_indent and re.match(rf"^\s+{_key_pattern(KEY)}", line):
+                coding_keys += 1
+    return top_keys, coding_keys
+
+
+def _check_structure(original: str, merged: str) -> None:
+    before, _ = _structure(original)
+    after, coding_keys = _structure(merged)
+    if after.count(AGENT) > 1 or coding_keys > 1:
+        raise SystemExit(f"error: duplicate {AGENT} or {AGENT}.{KEY} keys; refusing to write")
+    missing = set(before) - set(after)
+    if missing:
+        raise SystemExit(f"error: merge removed top-level keys: {', '.join(sorted(missing))}; refusing to write")
+
+
 def merge_coding_instructions(text: str, rules: str) -> str:
     """Set agent.coding_instructions while preserving every other line verbatim."""
     lines = text.split("\n")
@@ -96,7 +135,7 @@ def merge_coding_instructions(text: str, rules: str) -> str:
 
     agent_index = None
     for index, line in enumerate(lines):
-        match = re.match(rf"^{AGENT}\s*:(.*)$", line)
+        match = re.match(rf"^{_key_pattern(AGENT)}(.*)$", line)
         if match is None:
             continue
         rest = match.group(1).strip()
@@ -123,7 +162,7 @@ def merge_coding_instructions(text: str, rules: str) -> str:
             (
                 index
                 for index in range(agent_index + 1, end)
-                if lines[index].startswith(f"{indent}{KEY}:")
+                if re.match(rf"^{re.escape(indent)}{_key_pattern(KEY)}", lines[index])
             ),
             None,
         )
@@ -136,6 +175,7 @@ def merge_coding_instructions(text: str, rules: str) -> str:
             lines[key_index:value_end] = block
 
     result = "\n".join(lines) + "\n"
+    _check_structure(text, result)
     return result
 
 
@@ -146,8 +186,27 @@ def render_preview(repo_root: Path, out_dir: Path) -> Path:
     return destination
 
 
-def deploy(repo_root: Path, config_path: Path, backup_dir: Path, dry_run: bool) -> int:
-    rules = render_rules(repo_root)
+def _inside_work_tree(path: Path) -> bool:
+    resolved = path.expanduser().resolve()
+    return any((parent / ".git").exists() for parent in resolved.parents)
+
+
+def deploy(
+    repo_root: Path, config_path: Path, backup_dir: Path, dry_run: bool, *, env_override: bool = False
+) -> int:
+    if config_path.is_symlink():
+        raise SystemExit(
+            f"error: {config_path} is a symlink; refusing to write through it. "
+            "Move it aside or point HERMES_CONFIG_PATH at a regular file."
+        )
+    with_overlays = not (env_override and _inside_work_tree(config_path))
+    if not with_overlays:
+        print(
+            "note: prompts/local.md and prompts/private.md withheld from hermes; "
+            "environment-selected config resolves inside a git work tree",
+            file=sys.stderr,
+        )
+    rules = render_rules(repo_root, with_overlays=with_overlays)
     original = config_path.read_text(encoding="utf-8") if config_path.exists() else f"{AGENT}:\n"
     merged = merge_coding_instructions(original, rules)
     if merged == original:
@@ -202,7 +261,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def run(args: argparse.Namespace) -> int:
     config_path = args.path or hermes_config_path()
     if args.deploy or args.dry_run:
-        return deploy(args.repo_root, config_path, args.backup_dir, args.dry_run)
+        env_override = args.path is None and bool(os.environ.get("HERMES_CONFIG_PATH") or os.environ.get("HERMES_HOME"))
+        return deploy(args.repo_root, config_path, args.backup_dir, args.dry_run, env_override=env_override)
     preview = render_preview(args.repo_root, args.out_dir)
     print(f"rendered hermes: {preview}")
     json_record(harness="hermes", path=str(preview))
