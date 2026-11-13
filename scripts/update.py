@@ -9,12 +9,22 @@ a non-zero exit so a scheduler can report it.
 """
 from __future__ import annotations
 
+import sys
+
+if sys.version_info < (3, 11):
+    import json
+
+    message = "error: update: Python 3.11+ is required; see INSTALL.md."
+    print(message, file=sys.stderr)
+    if "--json" in sys.argv[1:]:
+        print(json.dumps({"ok": False, "errors": [message], "warnings": [], "notes": [], "mode": None, "records": []}))
+    raise SystemExit(3)
+
 import argparse
 import contextlib
 import os
 import shutil
 import subprocess
-import sys
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -26,12 +36,14 @@ from render_prompts import (
     PRIVATE_HARNESSES_ENV,
     PRIVATE_HARNESSES_FILE,
     JsonArgumentParser,
+    UsageError,
     harness_by_name,
     harness_names,
     json_extra,
     json_record,
     load_overlays,
     run_json,
+    run_plain,
     target_path,
 )
 
@@ -92,16 +104,16 @@ def load_targets(repo_root: Path, cli: str | None, env: dict[str, str] | None = 
         lines = [line.split("#", 1)[0] for line in path.read_text(encoding="utf-8").splitlines()]
         names, source = parse_names("\n".join(lines)), str(path)
     else:
-        raise SystemExit(
+        raise UsageError(
             f"error: no deploy targets. Write them to {path} (one per line), set {TARGETS_ENV}, or pass --harness (alias --targets). "
             "Run with --detect to see which supported harnesses are installed."
         )
     if not names:
-        raise SystemExit(f"error: {source} lists no harnesses")
+        raise UsageError(f"error: {source} lists no harnesses")
     supported = [name for name in harness_names() if name != "generic"]
     unknown = [name for name in names if name not in supported]
     if unknown:
-        raise SystemExit(f"error: {source}: unknown or project-level harness {', '.join(unknown)}; supported: {', '.join(supported)}")
+        raise UsageError(f"error: {source}: unknown or project-level harness {', '.join(unknown)}; supported: {', '.join(supported)}")
     return list(dict.fromkeys(names))
 
 
@@ -227,6 +239,7 @@ Environment:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     repo_root = Path(__file__).resolve().parents[1]
     parser = JsonArgumentParser(
+        allow_abbrev=False,
         description="Pull, check, and redeploy prompts and subagents for saved targets.",
         epilog=HELP_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -240,9 +253,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="HARNESS",
         help=f"Comma-separated harnesses, repeatable; overrides {TARGETS_ENV} and prompts/deploy-targets.txt (--harness is an alias).",
     )
-    parser.add_argument("--detect", action="store_true", help="List supported harnesses installed on this machine and exit.")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--detect", action="store_true", help="List supported harnesses installed on this machine and exit.")
     parser.add_argument("--no-pull", action="store_true", help="Skip git pull (use the checkout as is).")
-    parser.add_argument("--dry-run", action="store_true", help="Pull and check, then preview deploys without writing.")
+    modes.add_argument("--dry-run", action="store_true", help="Pull and check, then preview deploys without writing.")
     parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
     return parser.parse_args(argv)
 
@@ -278,7 +292,7 @@ def run(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if not args.json:
-        return run(args)
+        return run_plain(lambda: run(args), "update")
     if args.detect:
         return run_json(lambda: run(args), "update", "harnesses", mode="detect")
     return run_json(

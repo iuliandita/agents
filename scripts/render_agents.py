@@ -7,12 +7,22 @@ invariants, and writes build/agents/<harness>/. Deploy is explicit.
 """
 from __future__ import annotations
 
+import sys
+
+if sys.version_info < (3, 11):
+    import json
+
+    message = "error: render-agents: Python 3.11+ is required; see INSTALL.md."
+    print(message, file=sys.stderr)
+    if "--json" in sys.argv[1:]:
+        print(json.dumps({"ok": False, "errors": [message], "warnings": [], "notes": [], "mode": None, "records": []}))
+    raise SystemExit(3)
+
 import argparse
 import hashlib
 import json
 import os
 import re
-import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +33,7 @@ from render_prompts import (
     CHECK_EXIT_NOTE,
     EXIT_CODES_HELP,
     JsonArgumentParser,
+    UsageError,
     atomic_write,
     backup_existing,
     json_record,
@@ -30,6 +41,7 @@ from render_prompts import (
     record_deployed,
     require_owned,
     run_json,
+    run_plain,
 )
 
 
@@ -649,10 +661,10 @@ def selected_agent_harnesses(selected: list[str] | None) -> list[str]:
     for item in selected:
         names.extend(part.strip() for part in item.split(",") if part.strip())
     if not names:
-        raise SystemExit("error: no harness names parsed from --target; nothing to do")
+        raise UsageError("error: no harness names parsed from --target; nothing to do")
     for name in names:
         if name not in AGENT_HARNESSES:
-            raise SystemExit(f"error: unknown agent harness: {name}. Supported: {', '.join(AGENT_HARNESSES)}")
+            raise UsageError(f"error: unknown agent harness: {name}. Supported: {', '.join(AGENT_HARNESSES)}")
     return list(dict.fromkeys(names))
 
 
@@ -929,6 +941,7 @@ Environment:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     repo_root = Path(__file__).resolve().parents[1]
     parser = JsonArgumentParser(
+        allow_abbrev=False,
         description="Render and deploy subagent definitions.",
         epilog=HELP_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -943,12 +956,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="HARNESS",
         help="Harness to select, repeatable or comma-separated (--harness is an alias).",
     )
-    parser.add_argument("--deploy", action="store_true", help="Write rendered agents to global harness directories.")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--deploy", action="store_true", help="Write rendered agents to global harness directories.")
     parser.add_argument("--adopt", action="store_true", help="Allow replacing unmanaged role files after backing them up.")
     parser.add_argument("--dry-run", action="store_true", help="Print deploy actions without writing.")
-    parser.add_argument("--check", action="store_true", help="Validate rendered output without persistent writes.")
-    parser.add_argument("--list-targets", action="store_true", help="List supported harnesses and target directories.")
-    parser.add_argument(
+    modes.add_argument("--check", action="store_true", help="Validate rendered output without persistent writes.")
+    modes.add_argument("--list-targets", action="store_true", help="List supported harnesses and target directories.")
+    modes.add_argument(
         "--verify",
         action="store_true",
         help="Confirm the rendered roles exist in each harness's agent directory (run after --deploy).",
@@ -960,10 +974,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--backup-dir", type=Path, default=repo_root / ".backups", help="Directory for deploy backups.")
     parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.dry_run and (args.check or args.verify or args.list_targets):
+        parser.error("--dry-run cannot be combined with --check, --verify, or --list-targets")
+    return args
 
 
 def run(args: argparse.Namespace) -> int:
+    selected_agent_harnesses(args.target)
     if args.list_targets:
         for harness in selected_agent_harnesses(args.target):
             print(f"{harness}\t{HARNESS_DISPLAY[harness]}\t{agent_target_dir(harness)}\t{TARGET_DIRS[harness][1]}")
@@ -979,7 +997,7 @@ def run(args: argparse.Namespace) -> int:
     if args.verify:
         return verify(args.repo_root, args.target)
     if args.deploy and not args.target:
-        raise SystemExit(
+        raise UsageError(
             "error: --deploy requires --target (for example --target claude,opencode). "
             "Use --dry-run without --target to preview every harness."
         )
@@ -997,7 +1015,7 @@ def run(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if not args.json:
-        return run(args)
+        return run_plain(lambda: run(args), PROG)
     if args.list_targets:
         return run_json(lambda: run(args), PROG, "targets", mode="list-targets")
     if args.check:

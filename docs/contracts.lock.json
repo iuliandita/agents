@@ -1,25 +1,24 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "Existing unmanaged hook scripts require --adopt, and backup pruning now retains recognized backups per source path.",
-      "docs": [
-        "CHANGELOG.md",
-        "INSTALL.md",
-        "SECURITY.md"
-      ],
-      "fingerprint": "b6f7f9146231176d731a81aa8c5639199901d0f769542d3eee9daf78c49222f2",
-      "migration": "Back up hook scripts and shared settings, upgrade by reviewing unmanaged hooks and passing --adopt once, then inspect the manifest and per-source backup retention. Roll back by restoring affected backups and checking out the previous version before redeploying.",
-      "note": "Installer recovery covers hook adoption, private backups, atomic shared-config writes, workflow bundle retention, and Hermes overlay boundaries."
-    },
-    "harnesses": {
-      "breaking": "Existing unmanaged prompt targets require --adopt, and environment-selected worktree targets no longer receive overlays.",
+      "breaking": "Invalid or missing targets and negative backup counts now exit 2 instead of 1; conflicting modes and abbreviated options are rejected.",
       "docs": [
         "CHANGELOG.md",
         "INSTALL.md"
       ],
-      "fingerprint": "d4319563cf7328ec5b679a4b3d5a986f32654ffd7c1b4784a7705a8760ec98ca",
-      "migration": "Back up existing prompt targets, upgrade by reviewing unmanaged files and using --adopt once, then verify overlay withholding. Roll back by restoring the affected backup and checking out the previous version before redeploying.",
-      "note": "Recovery guidance covers prompt ownership adoption, environment-selected worktree overlay withholding, and incremental deployment manifests."
+      "fingerprint": "eb5364a412cfc2650845a92513f810886f72367dcde2ccd018a50c5b2758858e",
+      "migration": "Back up saved commands, then upgrade by spelling options in full, selecting one mode while retaining deploy dry-run previews, and handling usage failures as exit 2. Roll back by restoring saved commands and checking out the previous version.",
+      "note": "Installation documents updater usage failures, direct Python version guards, runtime error records, and traceback-free failures."
+    },
+    "harnesses": {
+      "breaking": "Invalid or missing targets and negative backup counts now exit 2 instead of 1; conflicting modes and abbreviated options are rejected.",
+      "docs": [
+        "CHANGELOG.md",
+        "INSTALL.md"
+      ],
+      "fingerprint": "1d1f83fa0678afb89f6aca9895235d5b6bc84949414046d3bfa77c64a48e784a",
+      "migration": "Back up saved commands, then upgrade by spelling options in full, selecting one mode while retaining deploy dry-run previews, and handling usage failures as exit 2. Roll back by restoring saved commands and checking out the previous version.",
+      "note": "Installation documents exclusive prompt modes, full option spelling, usage exit two, and JSON records retained on failure."
     },
     "maintenance": {
       "breaking": "none",
@@ -30,14 +29,14 @@
       "note": "domain table lists all relevant maintenance documentation"
     },
     "models-agents": {
-      "breaking": "Existing unmanaged role files require --adopt before replacement.",
+      "breaking": "Invalid or missing targets and negative backup counts now exit 2 instead of 1; conflicting modes and abbreviated options are rejected.",
       "docs": [
         "CHANGELOG.md",
         "INSTALL.md"
       ],
-      "fingerprint": "15847bc35b42832f31a94868c4d51d37db042e65baa52ba30df16be19f113cac",
-      "migration": "Back up existing role directories, upgrade by reviewing unmanaged roles and passing --adopt once, then verify generated headers. Roll back by restoring the affected backups and checking out the previous version before redeploying.",
-      "note": "Role recovery guidance explains generated-header ownership, opt-in adoption, atomic replacement, and manifest records per role file."
+      "fingerprint": "70dcb1a0dd2372b2619e249ca868d68515577ae7eb7fe39a00b1b7a78eb806ac",
+      "migration": "Back up saved commands, then upgrade by spelling options in full, selecting one mode while retaining deploy dry-run previews, and handling usage failures as exit 2. Roll back by restoring saved commands and checking out the previous version.",
+      "note": "Installation documents agent target validation, mutually exclusive modes, runtime guards, and the complete JSON error contract."
     },
     "overlays-trust": {
       "breaking": "none",

@@ -1,13 +1,23 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import sys
+
+if sys.version_info < (3, 11):
+    import json
+
+    message = "error: sync-ai-prompts: Python 3.11+ is required; see INSTALL.md."
+    print(message, file=sys.stderr)
+    if "--json" in sys.argv[1:]:
+        print(json.dumps({"ok": False, "errors": [message], "warnings": [], "notes": [], "mode": None, "records": []}))
+    raise SystemExit(3)
+
 import argparse
 import hashlib
 import json
 import os
 import re
 import shutil
-import sys
 import tempfile
 from datetime import date
 from pathlib import Path
@@ -49,6 +59,17 @@ JSON_RECORDS: list[dict] | None = None
 JSON_EXTRA: dict[str, object] = {}
 
 
+class UsageError(SystemExit):
+    """Invalid command inputs, with the same message in human and JSON output."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(2)
+        self.message = message
+
+    def __str__(self) -> str:
+        return self.message
+
+
 def json_record(**fields: object) -> None:
     """Add one record to the --json result of the running command; a no-op without --json."""
     if JSON_RECORDS is not None:
@@ -71,11 +92,11 @@ class JsonArgumentParser(argparse.ArgumentParser):
         return super().parse_args(args, namespace)
 
     def error(self, message: str):  # type: ignore[override]
+        line = f"error: {self.prog}: {message}; run with --help for usage"
+        print(line, file=sys.stderr)
         if self.wants_json:
-            line = f"error: {self.prog}: {message}; run with --help for usage"
-            print(json.dumps({"ok": False, "errors": [line], "warnings": [], "notes": []}))
-            raise SystemExit(2)
-        super().error(message)
+            print(json.dumps({"ok": False, "errors": [line], "warnings": [], "notes": [], "mode": None, "records": []}))
+        raise SystemExit(2)
 
 
 class _Tee:
@@ -96,6 +117,18 @@ class _Tee:
         return "".join(self.chunks).splitlines()
 
 
+def run_plain(work, prog: str) -> int:
+    """Report unexpected failures without tracebacks; preserve intentional SystemExit messages."""
+    try:
+        return work()
+    except UsageError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    except Exception as exc:
+        print(f"error: {prog}: {exc}", file=sys.stderr)
+        return 1
+
+
 def run_json(work, prog: str, key: str, fail_message: str | None = None, **fixed: object) -> int:
     """Run work() with human output moved to stderr, then print the one --json object to stdout.
 
@@ -112,12 +145,18 @@ def run_json(work, prog: str, key: str, fail_message: str | None = None, **fixed
     code = 0
     try:
         code = work()
+    except UsageError as exc:
+        print(str(exc))
+        code = 2
     except SystemExit as exc:
         if isinstance(exc.code, str):
             print(exc.code)
             code = 1
         else:
             code = exc.code or 0
+    except Exception as exc:
+        print(f"error: {prog}: {exc}")
+        code = 1
     finally:
         sys.stdout, sys.stderr = real_stdout, real_stderr
         JSON_RECORDS = None
@@ -130,6 +169,7 @@ def run_json(work, prog: str, key: str, fail_message: str | None = None, **fixed
         "errors": errors,
         "warnings": [line for line in lines if line.startswith("warning:")],
         "notes": [line for line in lines if line.startswith("note:")],
+        "mode": None,
         **fixed,
         **JSON_EXTRA,
         key: records,
@@ -277,7 +317,7 @@ def harness_by_name(name: str) -> Harness:
         if harness.name == name:
             return harness
     supported = ", ".join(harness_names())
-    raise SystemExit(f"error: unknown harness: {name}. Supported: {supported}")
+    raise UsageError(f"error: unknown harness: {name}. Supported: {supported}")
 
 
 def harness_names() -> list[str]:
@@ -311,7 +351,7 @@ def selected_harnesses(selected: list[str] | None) -> list[Harness]:
     for item in selected:
         names.extend(part.strip() for part in item.split(",") if part.strip())
     if not names:
-        raise SystemExit("error: no harness names parsed from --target; nothing to do")
+        raise UsageError("error: no harness names parsed from --target; nothing to do")
     return [harness_by_name(name) for name in names]
 
 
@@ -890,7 +930,7 @@ def deploy(
 def prune_backups(backup_dir: Path, keep: int, dry_run: bool) -> int:
     """Keep the newest `keep` recognized backups per source. Dry-run reports only."""
     if keep < 0:
-        raise SystemExit("error: --prune-backups requires a non-negative count")
+        raise UsageError("error: --prune-backups requires a non-negative count")
     if not backup_dir.is_dir():
         print(f"no backups at {backup_dir}")
         return 0
@@ -983,6 +1023,7 @@ def status(repo_root: Path, selected: list[str] | None, stamp: str | None, out_d
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     repo_root = Path(__file__).resolve().parents[1]
     parser = JsonArgumentParser(
+        allow_abbrev=False,
         description="Render and deploy canonical agent prompt files.",
         epilog=HELP_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -998,17 +1039,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Harness to select, repeatable or comma-separated (--harness is an alias).",
     )
     parser.add_argument("--stamp", help="Override generated date, useful for tests.")
-    parser.add_argument("--deploy", action="store_true", help="Write rendered files to global harness paths.")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--deploy", action="store_true", help="Write rendered files to global harness paths.")
     parser.add_argument("--adopt", action="store_true", help="Allow replacing unmanaged files after backing them up.")
     parser.add_argument("--dry-run", action="store_true", help="Print deploy targets without writing.")
-    parser.add_argument(
+    modes.add_argument(
         "--check",
         action="store_true",
         help="Validate render output shape without writing persistent output.",
     )
-    parser.add_argument("--list-targets", action="store_true", help="List supported harnesses and output paths.")
-    parser.add_argument("--status", action="store_true", help="Report deployed files that differ from a fresh render.")
-    parser.add_argument(
+    modes.add_argument("--list-targets", action="store_true", help="List supported harnesses and output paths.")
+    modes.add_argument("--status", action="store_true", help="Report deployed files that differ from a fresh render.")
+    modes.add_argument(
         "--prune-backups",
         type=int,
         metavar="KEEP",
@@ -1021,7 +1063,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Directory for deploy backups.",
     )
     parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.dry_run and (args.check or args.status or args.list_targets):
+        parser.error("--dry-run cannot be combined with --check, --status, or --list-targets")
+    return args
 
 
 def run(args: argparse.Namespace) -> int:
@@ -1049,7 +1094,7 @@ def run(args: argparse.Namespace) -> int:
         return prune_backups(args.backup_dir, args.prune_backups, dry_run=args.dry_run)
 
     if args.deploy and not args.target:
-        raise SystemExit(
+        raise UsageError(
             "error: --deploy requires --target (for example --target claude,opencode). "
             "Use --dry-run without --target to preview every harness."
         )
@@ -1068,7 +1113,7 @@ def run(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if not args.json:
-        return run(args)
+        return run_plain(lambda: run(args), PROG)
     if args.list_targets:
         return run_json(lambda: run(args), PROG, "targets", mode="list-targets")
     if args.check:

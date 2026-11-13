@@ -14,7 +14,7 @@ done
 agents_runtime_error() {
   printf '%s\n' "error: $1" >&2
   if [[ "$agents_json" == 1 ]]; then
-    printf '{"ok": false, "errors": ["error: %s"], "warnings": [], "notes": []}\n' "$1"
+    printf '{"ok": false, "errors": ["error: %s"], "warnings": [], "notes": [], "mode": null, "records": []}\n' "$1"
   fi
   return 3
 }

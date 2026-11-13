@@ -12,14 +12,24 @@ targeted key edit instead of a full round-trip.
 """
 from __future__ import annotations
 
+import sys
+
+if sys.version_info < (3, 11):
+    import json
+
+    message = "error: render-hermes: Python 3.11+ is required; see INSTALL.md."
+    print(message, file=sys.stderr)
+    if "--json" in sys.argv[1:]:
+        print(json.dumps({"ok": False, "errors": [message], "warnings": [], "notes": [], "mode": None, "records": []}))
+    raise SystemExit(3)
+
 import argparse
 import os
 import re
-import sys
 from pathlib import Path
 
 import render_prompts
-from render_prompts import EXIT_CODES_HELP, JsonArgumentParser, backup_existing, json_record, run_json
+from render_prompts import EXIT_CODES_HELP, JsonArgumentParser, backup_existing, json_record, run_json, run_plain
 
 
 KEY = "coding_instructions"
@@ -247,6 +257,7 @@ Environment:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     repo_root = Path(__file__).resolve().parents[1]
     parser = JsonArgumentParser(
+        allow_abbrev=False,
         description="Merge the shared core into Hermes global rules.",
         epilog=HELP_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -275,7 +286,7 @@ def run(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if not args.json:
-        return run(args)
+        return run_plain(lambda: run(args), "render-hermes")
     if args.deploy or args.dry_run:
         return run_json(lambda: run(args), "render-hermes", "actions", mode="deploy", dry_run=args.dry_run)
     return run_json(lambda: run(args), "render-hermes", "rendered", mode="render")
