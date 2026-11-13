@@ -36,12 +36,15 @@ WINDOWS_POSIX_TESTS = {
     "test_render_prompts.py": {
         "test_sync_ai_prompts_check_mode_validates_render_shape",
         "test_sync_ai_prompts_dry_run_reports_manual_skips",
+        "test_cli_deploy_requires_target",
+        "test_backup_existing_flattens_windows_style_paths",
     },
     "test_render_agents.py": {"test_cli_agent_deploy_requires_target"},
     "test_render_invariants.py": {
         "test_antigravity_hook_emits_valid_preinvocation_json",
         "test_hook_is_executable_and_emits_invariants",
         "test_deploy_installs_hook_and_merges_settings",
+        "test_deploy_merges_into_existing_settings_without_clobber",
         "test_channel_refresh_preserves_settings_and_backs_up_files",
     },
     "test_install_workflow.py": {"test_overwrite_preserves_private_backups"},
@@ -57,10 +60,14 @@ WINDOWS_POSIX_TESTS = {
 def pytest_collection_modifyitems(items):
     if os.name != "nt":
         return
-    posix_only = pytest.mark.skip(reason="requires POSIX shell paths or Unix executable/permission bits")
+    posix_only = pytest.mark.skip(reason="requires POSIX shell paths, filenames, or Unix permission bits")
     for item in items:
         name = item.originalname or item.name
         if item.path.name == "test_python_runtime.py" and "runtime" in item.fixturenames:
             item.add_marker(posix_only)
         elif name in WINDOWS_POSIX_TESTS.get(item.path.name, set()):
             item.add_marker(posix_only)
+        elif (item.path.name == "test_render_hermes.py"
+              and name == "test_environment_config_withholds_overlays_only_inside_work_tree"
+              and item.callspec.params["override"] is None):
+            item.add_marker(pytest.mark.skip(reason="fixture assumes the Unix ~/.hermes default; Windows uses LOCALAPPDATA"))

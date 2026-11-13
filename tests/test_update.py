@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -171,7 +172,7 @@ def test_main_refuses_untrusted_checkout_before_steps(remote_checkout, monkeypat
 
     result = subprocess.run(
         [sys.executable, update.__file__, "--repo-root", str(checkout), "--targets", "hermes", "--dry-run"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=dict(os.environ),
     )
 
     assert result.returncode == 1
