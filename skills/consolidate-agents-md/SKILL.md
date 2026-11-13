@@ -26,7 +26,7 @@ This workflow is independent of the current harness.
 ## When NOT to use
 
 - Ordinary README/API documentation updates: use **update-docs** if available.
-- Temporary session handoffs: use **handoff** if available.
+- Temporary session handoffs: use **session-handoff** if available.
 - Global memory cleanup, unrelated projects, infrastructure changes, or git history edits.
 - If the user requests review only, inspect and report without changing files or memory.
 
@@ -159,7 +159,9 @@ in `"$backup/clear"` and run exactly this. No globs, no recursive deletes:
 
 ```sh
 sha256sum -c --status "$backup/sums" &&
-while IFS= read -r f; do rm -- "$f" || { echo "stopped at: $f" >&2; break; }; done < "$backup/clear"
+while IFS= read -r f || [ -n "$f" ]; do
+  rm -- "$f" && [ ! -e "$f" ] && [ ! -L "$f" ] || { echo "stopped at: $f" >&2; exit 1; }
+done < "$backup/clear"
 ```
 
 A checksum failure means a store changed since the backup: return to step 2.

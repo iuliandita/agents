@@ -27,7 +27,7 @@ fragment and follow the steps below.
 | Qwen Code | `prompts/harnesses/qwen.md` | Global memory is `~/.qwen/QWEN.md`. |
 | Roo Code | `prompts/harnesses/roo.md` | Global rules in `~/.roo/rules/`. |
 | Windsurf | `prompts/harnesses/windsurf.md` | Global rules at `~/.codeium/windsurf/memories/global_rules.md`, 6k cap. |
-| Warp | `prompts/harnesses/AGENTS.md` (generic fragment) | Global rules live in Warp Drive, not a file. |
+| Warp | Generic `prompts/harnesses/AGENTS.md` (still in use) | Global rules live in Warp Drive, not a file. |
 
 ## Re-adding a harness
 
@@ -37,7 +37,9 @@ fragment and follow the steps below.
    `confidence`.
 3. Record the path and precedence in `docs/harness-contract.md` and `docs/surfaces.md`.
 4. Update the harness tables in `README.md` and `INSTALL.md`.
-5. Add or update tests in `tests/test_render_prompts.py` and `tests/test_harness_docs.py`.
+5. Add detection aliases to `scripts/update.py:BINARIES` and update its environment help as needed.
+6. For role support, update `AGENT_HARNESSES`, tool mappings, `RENDERERS`, `EXTENSIONS`, `TARGET_DIRS`, `NATIVE_AGENT_HOMES` where applicable, and `HARNESS_DISPLAY` in `scripts/render_agents.py`; add model defaults in `prompts/models.json`.
+7. Add or update renderer and documentation tests, then accept the affected docs-impact receipts as described in `docs/MAINTENANCE.md`.
 
 Removing a harness from the registry never rewrites history and never deletes a deployed file; it only
 stops the repo from rendering or claiming it.

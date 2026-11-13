@@ -26,7 +26,7 @@ lychee --config lychee.toml AGENTS.md CHANGELOG.md CONTRIBUTING.md INSTALL.md RE
 scripts/sync-ai-prompts && scripts/render-agents
 ```
 
-CI also runs actionlint, gitleaks, zizmor, CodeQL, and the macOS and Windows launcher tests. The last line renders into `build/generated/`; it never deploys.
+CI also runs actionlint, gitleaks, zizmor, CodeQL, and the macOS and Windows launcher tests. The last line renders into `build/generated/` and `build/agents/`; it never deploys.
 
 ## Layout
 
