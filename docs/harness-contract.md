@@ -146,6 +146,21 @@ plain model string (both drop the pinned `max`). The old behavior needs `"effort
 and the previous map (`medium` to `medium`, `xhigh` and `max` to `high`). That the provider ignores the
 raw body key is inferred, not observed.
 
+## Command Code effort levels (2026-11-13)
+
+Read from the model catalog bundled with Command Code v1.88.5 (`reference/models.md` and
+`reference/custom-agents.md` in its knowledge directory); `cmd --help` and `cmd --list-models` do not
+print per-model levels. `--help` says only `--effort <level>` "depends on the model".
+
+- DeepSeek V4.1 Flash accepts `off`, `low`, `high`, and `max`, with no `medium`. GLM-5.3 Flash accepts
+  `low`, `high`, and `max`. Claude Sonnet 5.5 and Opus 5.5 accept `low` through `max`.
+- An agent file's `reasoningEffort` that the pinned model does not support falls back to the model
+  default instead of failing.
+
+The tracked cheap tier therefore pins `high` on DeepSeek V4.1 Flash, the same level OpenCode renders for
+that model, where the cheap roles' `medium` used to fall back silently. A `models.local.json` tier written
+as a plain model string drops the pin; use the object form with an `effort` the model accepts.
+
 ## Claude Haiku 5.5 (2026-10-08)
 
 The API model ID is `claude-haiku-5-5`, released 2026-10-07. Current Claude Code resolves `haiku` to

@@ -45,7 +45,10 @@
       "max": "high"
     },
     "tiers": {
-      "cheap": "deepseek/deepseek-v4.1-flash",
+      "cheap": {
+        "model": "deepseek/deepseek-v4.1-flash",
+        "effort": "high"
+      },
       "mid": "claude-sonnet-5-5",
       "flagship": "claude-opus-5-5"
     }

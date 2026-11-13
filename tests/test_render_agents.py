@@ -179,6 +179,12 @@ def test_commandcode_mid_renders_sonnet_5_5_with_mapped_effort(effort):
     assert resolved.notices == []
 
 
+def test_commandcode_cheap_tier_pins_an_effort_deepseek_accepts():
+    # Command Code's DeepSeek V4.1 Flash has no medium level; an unsupported one falls back silently.
+    resolved = ra.resolve(spec(tier="cheap", effort="medium"), "commandcode", {}, DEFAULTS)
+    assert (resolved.model, resolved.effort) == ("deepseek/deepseek-v4.1-flash", "high")
+
+
 @pytest.mark.parametrize(
     ("harness", "model"), [("codex", "custom-sol"), ("commandcode", "custom-sonnet")]
 )
@@ -503,7 +509,7 @@ def test_render_commandcode_tools_list():
     head, body = text[4:].split("\n---\n", 1)
     fields = yaml.safe_load(head)
     assert fields["tools"] == "read_file, read_directory, grep, glob, web_fetch, web_search"
-    assert fields["reasoningEffort"] == "low"
+    assert fields["reasoningEffort"] == "high"
     assert fields["maxTurns"] == 30
     assert fields["model"] == "deepseek/deepseek-v4.1-flash"
     assert ra.GENERATED_MARKER in body
