@@ -79,6 +79,41 @@ def test_renderer_paths_follow_repo_root(tmp_path, module_name, default_out, kin
     assert args.backup_dir == backup
 
 
+@pytest.mark.parametrize("script,args,override", [
+    ("render_prompts.py", ["--target", "claude"], "CLAUDE_AGENTS_PATH"),
+    ("render_agents.py", ["--target", "claude"], "CLAUDE_AGENTS_DIR"),
+    ("render_invariants.py", ["--harness", "claude"], None),
+    ("render_hermes.py", [], None),
+    ("install_workflow.py", [], None),
+])
+@pytest.mark.parametrize("kind", ["symlink", "junction"])
+def test_deploy_refuses_linked_ancestors(env, tmp_path, script, args, override, kind):
+    real = tmp_path / "real"
+    real.mkdir()
+    alias = tmp_path / "alias"
+    if kind == "junction":
+        if os.name != "nt":
+            pytest.skip("junctions require Windows")
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(alias), str(real)], check=True, capture_output=True)
+    else:
+        alias.symlink_to(real, target_is_directory=True)
+    target = alias / "missing" / "target"
+    extra = ["--deploy"]
+    if override:
+        env[override] = str(target)
+    elif script == "render_invariants.py":
+        extra += ["--hooks-dir", str(target), "--settings-path", str(tmp_path / "settings.json")]
+    elif script == "render_hermes.py":
+        extra += ["--path", str(target)]
+    else:
+        extra += ["--skills-dir", str(target)]
+    code, data = run_json(env, script, *args, *extra)
+    assert code == 1 and data["mode"] == "deploy"
+    assert kind in data["errors"][0] and "refusing to write" in data["errors"][0]
+    assert list(real.iterdir()) == []
+    assert not (tmp_path / "settings.json").exists()
+
+
 def test_prompts_list_targets(env):
     code, data = run_json(env, "render_prompts.py", "--list-targets", "--harness", "claude,codex")
     assert code == 0

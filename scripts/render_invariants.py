@@ -37,7 +37,7 @@ from typing import NamedTuple
 
 from render_prompts import (
     EXIT_CODES_HELP, JsonArgumentParser, atomic_write, backup_existing, json_record,
-    record_deployed, require_owned, resolve_repo_paths, run_json, run_plain,
+    record_deployed, require_owned, require_unlinked_path, resolve_repo_paths, run_json, run_plain,
 )
 
 
@@ -261,8 +261,7 @@ def prepare_deploy(
     command = shell_quote(str(hook_dest))
 
     for candidate in (hook_dest, settings_path):
-        if candidate.is_symlink():
-            raise SystemExit(f"error: {candidate} is a symlink; refusing to write through it")
+        require_unlinked_path(candidate)
         if candidate.exists() and not candidate.is_file():
             raise SystemExit(f"error: {candidate} is not a file; refusing to write")
 
@@ -293,6 +292,7 @@ def deploy(
     *,
     plan: HookPlan | None = None,
 ) -> None:
+    require_unlinked_path(backup_dir)
     hook_text, settings_text, changed, hook_unchanged, hook_unmanaged = plan or prepare_deploy(
         repo_root, hooks_dir, settings_path, harness, adopt or dry_run,
     )

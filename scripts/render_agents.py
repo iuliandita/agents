@@ -41,6 +41,7 @@ from render_prompts import (
     read_bytes_or_none,
     record_deployed,
     require_owned,
+    require_unlinked_path,
     resolve_repo_paths,
     run_json,
     run_plain,
@@ -841,6 +842,7 @@ def print_dry_run(harness: str, dest: Path, text: str) -> None:
 
 
 def preflight_target(target: Path, files: dict[str, str], adopt: bool = False) -> None:
+    require_unlinked_path(target)
     if target.exists() and not target.is_dir():
         raise SystemExit(f"error: {target} exists and is not a directory")
     if not target.exists():
@@ -849,6 +851,7 @@ def preflight_target(target: Path, files: dict[str, str], adopt: bool = False) -
             raise SystemExit(f"error: {existing_parent} exists and is not a directory")
     for filename in files:
         dest = target / filename
+        require_unlinked_path(dest)
         if dest.is_symlink() or (dest.exists() and not dest.is_file()):
             raise SystemExit(f"error: {dest} is a symlink or not a regular file; move it aside")
         if dest.exists():
@@ -864,6 +867,7 @@ def deploy(
     allow_inherit: bool = False,
     adopt: bool = False,
 ) -> None:
+    require_unlinked_path(backup_dir)
     specs = load_agents(repo_root)
     check_override_agents(overrides, specs)
     invariants = read_invariants(repo_root)

@@ -202,11 +202,8 @@ _inside_work_tree = render_prompts._inside_work_tree
 def deploy(
     repo_root: Path, config_path: Path, backup_dir: Path, dry_run: bool, *, env_override: bool = False
 ) -> int:
-    if config_path.is_symlink():
-        raise SystemExit(
-            f"error: {config_path} is a symlink; refusing to write through it. "
-            "Move it aside or point HERMES_CONFIG_PATH at a regular file."
-        )
+    render_prompts.require_unlinked_path(config_path)
+    render_prompts.require_unlinked_path(backup_dir)
     if config_path.exists() and not config_path.is_file():
         raise SystemExit(f"error: {config_path} is not a regular file; refusing to write")
     withheld = env_override and _inside_work_tree(config_path)

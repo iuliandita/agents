@@ -18,6 +18,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import tempfile
 from datetime import date
 from pathlib import Path, PureWindowsPath
@@ -619,8 +620,35 @@ def target_overlays(harness: Harness, dest: Path) -> bool:
     return True
 
 
+def path_link_kind(path: Path) -> str | None:
+    if path.is_symlink():
+        return "symlink"
+    junction_check = getattr(path, "is_junction", None)
+    if junction_check is not None:
+        if junction_check():
+            return "junction"
+    elif os.name == "nt":
+        try:
+            metadata = path.lstat()
+        except FileNotFoundError:
+            return None
+        if metadata.st_reparse_tag == stat.IO_REPARSE_TAG_MOUNT_POINT:
+            return "junction"
+    return None
+
+
+def require_unlinked_path(path: Path) -> None:
+    """Inspect the lexical path before resolving links can hide an ancestor."""
+    absolute = path.expanduser().absolute()
+    for candidate in (*reversed(absolute.parents), absolute):
+        kind = path_link_kind(candidate)
+        if kind:
+            raise SystemExit(f"error: {candidate} is a {kind}; refusing to write through it; move it aside or select a regular path")
+
+
 def atomic_write(path: Path, text: str, *, mode: int | None = None) -> None:
     """Replace a file only after its complete contents are ready in the same directory."""
+    require_unlinked_path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     permissions = mode
     if permissions is None:
@@ -833,6 +861,7 @@ BACKUP_RE = re.compile(
 def backup_existing(path: Path, backup_dir: Path) -> Path | None:
     if not path.exists() and not path.is_symlink():
         return None
+    require_unlinked_path(backup_dir)
     backup_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     backup_dir.chmod(0o700)
     source = os.path.normcase(os.path.abspath(path.expanduser()))
@@ -911,6 +940,7 @@ def deploy(
     backup_dir: Path,
     adopt: bool = False,
 ) -> dict[str, Path]:
+    require_unlinked_path(backup_dir)
     harnesses = selected_harnesses(selected)
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
     overlays = load_overlays(repo_root)
@@ -932,11 +962,7 @@ def deploy(
         raise SystemExit(format_target_collision(collisions))
 
     for harness, dest in resolved.items():
-        if dest.is_symlink():
-            raise SystemExit(
-                f"error: {dest} is a symlink; refusing to write through it. "
-                f"Move it aside or point {harness.env_var} at a regular file."
-            )
+        require_unlinked_path(dest)
 
     prepared: list[tuple[Harness, Path, str]] = []
     for harness, dest in resolved.items():

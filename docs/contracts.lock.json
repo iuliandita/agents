@@ -1,22 +1,22 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "Relative hook and Hermes artifact directories resolve under --repo-root; unmanaged hook previews change action and CRLF output requires updating.",
+      "breaking": "Hook, Hermes, and workflow writes refuse linked ancestors; relative hook and Hermes artifacts follow --repo-root; unmanaged hook previews change action and CRLF output requires updating.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "cc8e08a92e58b6978fbf119b72625eb4aae9f8923aa89d7fdcb18b20ad4798f2",
-      "migration": "Back up configs and consumers; upgrade with absolute directory overrides to retain locations and recognize the unmanaged action; roll back by restoring backups and the previous checkout.",
-      "note": "Record Bash and PowerShell launcher symlink resolution together with relative artifact paths and hook preview changes."
+      "fingerprint": "64e7df94faf9453236e7c1b4868f064135b8a15e90bc1b835f396b70a9f11a71",
+      "migration": "Back up configs and consumers; upgrade using real paths, absolute directory overrides for existing locations, and the unmanaged preview action; roll back by restoring backups and the previous checkout.",
+      "note": "Record hook, Hermes, and workflow destination ancestor-link refusal including Windows junctions and backup directories."
     },
     "harnesses": {
-      "breaking": "Relative artifact paths resolve under --repo-root; Windows drive-qualified PI_CONFIG_DIR stays under home; CRLF prompts and malformed optional blocks no longer pass checks.",
+      "breaking": "Writes refuse linked ancestors; relative artifacts resolve under --repo-root; Windows drive-qualified PI_CONFIG_DIR stays under home; CRLF prompts and malformed optional blocks no longer pass checks.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "bc2ff882d40115b796919ed7525c0f0c9cd32d194cac3812b46a134c29fdf9bc",
-      "migration": "Back up artifacts and sources; upgrade with absolute directory overrides to retain existing locations and paired optional markers; roll back by restoring backups and the previous checkout.",
-      "note": "Record symlink-aware prompt launchers, repository-relative artifacts, Windows config roots, and strict render checks."
+      "fingerprint": "9cfc2df93b8e81250755682feea814c6a0d1fa8ea2ff68230fb5c183afc56c0e",
+      "migration": "Back up artifacts and sources; upgrade using real paths instead of linked ancestors, absolute overrides for existing locations, and paired optional markers; roll back by restoring backups and the previous checkout.",
+      "note": "Record ancestor symlink and junction refusal alongside repository-relative artifacts, Windows config roots, and strict render checks."
     },
     "maintenance": {
       "breaking": "none",
@@ -27,13 +27,13 @@
       "note": "domain table lists all relevant maintenance documentation"
     },
     "models-agents": {
-      "breaking": "Malformed quoted role fields fail; relative role directories resolve under --repo-root; CRLF roles require replacement, unreadable targets fail, and max_turns notices identify a harness.",
+      "breaking": "Role writes refuse linked ancestors; malformed quoted fields fail; relative role directories follow --repo-root; CRLF roles require replacement, unreadable targets fail, and max_turns notices identify a harness.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "4bbe5b7c60e688a844ffd3d5995cf64c8b4d3522efc32342f6d1a6fc5a5ffbb4",
-      "migration": "Back up roles and output consumers; upgrade by escaping double quotes or doubling single quotes and using absolute directory overrides to retain locations; roll back by restoring backups and the previous checkout.",
-      "note": "Record quoted-description decoding, strict native frontmatter tests, clear null-model fallback notices, relative artifacts, and target diagnostics."
+      "fingerprint": "84405f8996afbc43ad029d1d9f9931eb3ab7c27767c63ad308a2595d6915b01c",
+      "migration": "Back up roles and consumers; upgrade using real paths, escaped descriptions, and absolute directory overrides to retain locations; roll back by restoring backups and the previous checkout.",
+      "note": "Record role target ancestor-link refusal, quoted-description decoding, null-model notices, relative artifacts, and diagnostic corrections."
     },
     "overlays-trust": {
       "breaking": "none",
