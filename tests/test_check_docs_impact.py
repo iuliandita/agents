@@ -264,6 +264,31 @@ def test_carried_over_breaking_receipt_is_not_reported(tmp_path, capsys):
     assert "recorded a breaking change" not in out
 
 
+def test_breaking_receipt_dropped_on_the_base_branch_is_not_reported_after_a_merge(tmp_path, capsys):
+    repo, _ = make_repo(tmp_path)
+    write(repo, "prompts/core.md", "core v2\n")
+    write(repo, "README.md", "# Readme\n\nv2\n")
+    write(repo, "CHANGELOG.md", FILES["CHANGELOG.md"] + "\nBreaking.\n")
+    assert accept_prompts(repo, capsys, "--migration", MIGRATION, docs="CHANGELOG.md,README.md", breaking="x is removed")[0] == 0
+    fork = commit(repo, "breaking on the base branch")
+    git(repo, "checkout", "-q", "-b", "feature")
+    write(repo, "scripts/sync-ai-prompts", "#!/bin/sh\nexec python scripts/render_prompts.py --x\n")
+    write(repo, "INSTALL.md", "# Install\n\nfeature\n")
+    assert run(repo, capsys, "--accept", "harnesses", "--docs", "INSTALL.md", "--note", NOTE, "--breaking", "none")[0] == 0
+    commit(repo, "feature keeps the prompts receipt untouched")
+    git(repo, "checkout", "-q", "-")
+    write(repo, "prompts/core.md", "core v3\n")
+    write(repo, "README.md", "# Readme\n\nv3\n")
+    assert accept_prompts(repo, capsys)[0] == 0
+    base = commit(repo, "base drops the breaking receipt")
+    git(repo, "checkout", "-q", "feature")
+    git(repo, "merge", "-q", "--no-edit", base)
+    assert fork != base
+    code, out = run(repo, capsys, "--base", base)
+    assert "recorded a breaking change" not in out, out
+    assert code == 0, out
+
+
 def test_baseline_cannot_replace_existing_lock(tmp_path, capsys):
     repo, _ = make_repo(tmp_path)
     write(repo, "prompts/core.md", "core v2\n")
