@@ -85,6 +85,21 @@ def test_invariants_source_exists_and_is_nonempty():
     assert "Never add AI attribution" in invariants
 
 
+@pytest.mark.parametrize("harness,name", [
+    ("claude", ri.HOOK_NAME), ("antigravity", ri.ANTIGRAVITY_HOOK_NAME),
+])
+def test_crlf_hook_is_replaced(tmp_path, capsys, harness, name):
+    settings = tmp_path / "settings.json"
+    ri.deploy(REPO, tmp_path, settings, tmp_path / "backups", False, harness)
+    hook = tmp_path / name
+    expected = hook.read_bytes()
+    hook.write_bytes(expected.replace(b"\n", b"\r\n"))
+    ri.deploy(REPO, tmp_path, settings, tmp_path / "backups", True, harness)
+    assert f"would install hook: {hook}" in capsys.readouterr().out
+    ri.deploy(REPO, tmp_path, settings, tmp_path / "backups", False, harness)
+    assert hook.read_bytes() == expected
+
+
 def test_render_all_writes_five_artifacts(tmp_path):
     written = ri.render_all(REPO, tmp_path, "$HOME/.claude/hooks/" + ri.HOOK_NAME)
     assert set(written) == {

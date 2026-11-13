@@ -1,23 +1,22 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "Unmanaged hook dry-runs without --adopt report would-replace-unmanaged instead of would-install.",
+      "breaking": "Unmanaged hook dry-runs report would-replace-unmanaged; CRLF hooks and Hermes config require updating.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "8b45502261742fad095a6a128166397d0747e5ec0d2bd2aa04fce3499abb1b4a",
-      "migration": "Back up output consumers; upgrade by recognizing the unmanaged hook action; roll back by restoring the previous checkout and consumers.",
-      "note": "Record unmanaged hook replacement explicitly in human and JSON dry-run output."
+      "fingerprint": "439ac18b684d93144ed39b3368be73a905e8157085dff0d9ed651afa90fdea65",
+      "migration": "Back up configs and output consumers; upgrade by recognizing the unmanaged action and redeploying LF output; roll back by restoring backups and the previous checkout.",
+      "note": "Record unmanaged hook dry-run actions and LF normalization for hooks and Hermes config."
     },
     "harnesses": {
-      "breaking": "Invalid or missing targets and negative backup counts now exit 2 instead of 1; conflicting modes and abbreviated options are rejected.",
+      "breaking": "CRLF prompt targets now report drift and require rewriting to LF.",
       "docs": [
-        "CHANGELOG.md",
-        "INSTALL.md"
+        "CHANGELOG.md"
       ],
-      "fingerprint": "1d1f83fa0678afb89f6aca9895235d5b6bc84949414046d3bfa77c64a48e784a",
-      "migration": "Back up saved commands, then upgrade by spelling options in full, selecting one mode while retaining deploy dry-run previews, and handling usage failures as exit 2. Roll back by restoring saved commands and checking out the previous version.",
-      "note": "Installation documents exclusive prompt modes, full option spelling, usage exit two, and JSON records retained on failure."
+      "fingerprint": "6d0cd7aa5286e21a60e2c573785fefbfa0ff1af21c64237ff64805722d873f69",
+      "migration": "Back up generated targets and output consumers; upgrade by redeploying to normalize LF; roll back by restoring backups and the previous checkout.",
+      "note": "Record byte-exact prompt deployment and drift detection for CRLF targets."
     },
     "maintenance": {
       "breaking": "none",
@@ -28,13 +27,13 @@
       "note": "domain table lists all relevant maintenance documentation"
     },
     "models-agents": {
-      "breaking": "Unsupported max_turns notices now identify a harness instead of each role.",
+      "breaking": "CRLF roles now require replacement, unreadable targets fail, and max_turns notices identify a harness.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "67a9423ef2bd355721ab89564d1c75af6ce39b785e9078f1e0b6aea7c1fe677b",
-      "migration": "Back up output consumers; upgrade by matching notices at the harness prefix; roll back by restoring the previous checkout and consumers.",
-      "note": "Record one unsupported turn-cap notice per harness instead of per role."
+      "fingerprint": "8fb24103cd4493b97609f7dc331594d596e5eaa2b1a92b13aa69afa7fdd56f1a",
+      "migration": "Back up generated roles and output consumers; upgrade by redeploying and matching notices at the harness prefix; roll back by restoring backups and the previous checkout.",
+      "note": "Record unreadable target failures, LF role rewrites, and one turn-cap notice per harness."
     },
     "overlays-trust": {
       "breaking": "none",

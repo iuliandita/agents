@@ -610,6 +610,13 @@ def prompt_owned(text: str) -> bool:
     return text.startswith(f"<!-- {PROMPT_MARKER} ")
 
 
+def read_bytes_or_none(path: Path) -> bytes | None:
+    try:
+        return path.read_bytes()
+    except FileNotFoundError:
+        return None
+
+
 def require_owned(path: Path, owned: bool, adopt: bool) -> None:
     if not owned and not adopt:
         raise SystemExit(f"error: {path} is unmanaged; refusing to replace it without --adopt (back up and review it first)")
@@ -902,11 +909,11 @@ def deploy(
             "sections": [{"name": label, "bytes": count} for label, count in section_sizes(rendered)],
         }
         if dry_run:
-            existing = dest.read_text(encoding="utf-8", errors="replace") if dest.exists() else None
-            if existing is not None and not prompt_owned(existing):
+            existing = read_bytes_or_none(dest)
+            if existing is not None and not prompt_owned(existing.decode("utf-8", errors="replace")):
                 print(f"would replace unmanaged {harness.name}: {dest} (not written by this repo; backed up first)")
                 action = "would-replace-unmanaged"
-            elif existing == rendered:
+            elif existing == rendered.encode("utf-8"):
                 print(f"unchanged {harness.name}: {dest}")
                 action = "unchanged"
             else:
@@ -915,7 +922,7 @@ def deploy(
             json_record(harness=harness.name, action=action, path=str(dest), bytes=layer_bytes)
             continue
         dest.parent.mkdir(parents=True, exist_ok=True)
-        if dest.exists() and dest.read_text(encoding="utf-8", errors="replace") == rendered:
+        if read_bytes_or_none(dest) == rendered.encode("utf-8"):
             print(f"unchanged {harness.name}: {dest}")
             json_record(harness=harness.name, action="unchanged", path=str(dest), bytes=layer_bytes)
         else:
@@ -1002,14 +1009,14 @@ def status(repo_root: Path, selected: list[str] | None, stamp: str | None, out_d
             json_record(harness=harness.name, state="not-deployed", path=str(dest))
             drift += 1
             continue
-        current = dest.read_text(encoding="utf-8", errors="replace")
-        if current == rendered:
+        current = dest.read_bytes()
+        if current == rendered.encode("utf-8"):
             print(f"{harness.name}: in sync ({dest})")
             json_record(harness=harness.name, state="in-sync", path=str(dest))
             continue
         entry = manifest.get(harness.name, {})
         recorded = entry.get("hash") if entry.get("path") == str(dest) else None
-        if recorded and content_hash(current) != recorded:
+        if recorded and hashlib.sha256(current).hexdigest()[:16] != recorded:
             print(f"{harness.name}: local edits since deploy ({dest})")
             state = "local-edits"
         else:

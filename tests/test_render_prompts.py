@@ -724,6 +724,20 @@ def test_status_reports_drift_then_in_sync(tmp_path, monkeypatch, capsys):
     assert "in sync" in capsys.readouterr().out
 
 
+def test_crlf_prompts_show_drift_and_are_replaced(tmp_path, monkeypatch, capsys):
+    repo = overlay_repo(tmp_path)
+    destination = tmp_path / "CLAUDE.md"
+    monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(destination))
+    renderer.deploy(repo, ["claude"], None, False, tmp_path / "backups")
+    expected = destination.read_bytes()
+    destination.write_bytes(expected.replace(b"\n", b"\r\n"))
+    assert renderer.status(repo, ["claude"], None) == 1
+    renderer.deploy(repo, ["claude"], None, True, tmp_path / "backups")
+    assert f"would update claude: {destination}" in capsys.readouterr().out
+    renderer.deploy(repo, ["claude"], None, False, tmp_path / "backups")
+    assert destination.read_bytes() == expected
+
+
 def test_target_path_prefers_explicit_override_then_native_env(tmp_path):
     assert renderer.target_path("codex", home=tmp_path, env={"CODEX_HOME": "/native"}) == Path("/native/AGENTS.md")
     assert renderer.target_path(

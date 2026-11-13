@@ -4,7 +4,7 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
-- Renderer polish: dry-run identifies unmanaged hooks, and unsupported turn caps produce one notice per harness (#224).
+- Renderer polish: dry-run identifies unmanaged hooks, unreadable role targets fail, unsupported turn caps produce one notice per harness, and byte comparisons rewrite CRLF output to LF. Breaking: unmanaged hook dry-runs now report `would-replace-unmanaged`, and turn-cap notices identify the harness. Back up output consumers before upgrading, recognize the new action and harness prefix, and restore the previous checkout and consumers to roll back (#224).
 
 - Stack checks validate the canon version, honor configured checkout values, share directory exclusions at every depth, and remove unused canon metadata. Model defaults omit redundant effort mappings without changing rendered roles. Installation docs clarify environment overrides, the 06:30 systemd schedule, and the Hermes status exclusion; tests cover every bundled skill installer target and drop redundant configuration pins (#224).
 

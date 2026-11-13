@@ -219,7 +219,7 @@ def deploy(
     rules = render_rules(repo_root, with_overlays=not withheld)
     original = config_path.read_text(encoding="utf-8") if config_path.exists() else f"{AGENT}:\n"
     merged = merge_coding_instructions(original, rules)
-    if merged == original:
+    if config_path.exists() and config_path.read_bytes() == merged.encode("utf-8"):
         if not dry_run:
             render_prompts.record_deployed(repo_root, "hermes-config", config_path, merged)
         print(f"unchanged hermes: {config_path}")

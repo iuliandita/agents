@@ -113,6 +113,17 @@ def test_deploy_merges_and_backs_up(tmp_path):
     assert list(backup_dir.iterdir())
 
 
+def test_crlf_config_is_replaced(tmp_path, capsys):
+    config = tmp_path / "config.yaml"
+    rh.deploy(REPO, config, tmp_path / "backups", False)
+    expected = config.read_bytes()
+    config.write_bytes(expected.replace(b"\n", b"\r\n"))
+    rh.deploy(REPO, config, tmp_path / "backups", True)
+    assert f"would update hermes: {config}" in capsys.readouterr().out
+    rh.deploy(REPO, config, tmp_path / "backups", False)
+    assert config.read_bytes() == expected
+
+
 def test_deploy_dry_run_writes_nothing(tmp_path):
     config = tmp_path / "config.yaml"
     config.write_text("agent:\n  reasoning_effort: medium\n", encoding="utf-8")

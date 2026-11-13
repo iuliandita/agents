@@ -276,7 +276,7 @@ def prepare_deploy(
     merged, changed = merge_hook_into_settings(settings, command, harness)
     hook_unchanged = (
         hook_dest.exists()
-        and hook_dest.read_text(encoding="utf-8") == hook_text
+        and hook_dest.read_bytes() == hook_text.encode("utf-8")
         and (os.name == "nt" or hook_dest.stat().st_mode & 0o777 == 0o755)
     )
     return HookPlan(hook_text, json.dumps(merged, indent=2, ensure_ascii=False) + "\n", changed, hook_unchanged, hook_unmanaged)

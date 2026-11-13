@@ -726,6 +726,49 @@ def test_deploy_dry_run_writes_nothing(tmp_path, monkeypatch, capsys):
     assert "explorer.toml" in out
 
 
+@pytest.mark.parametrize("json_output", [False, True])
+def test_unreadable_dry_run_target_is_an_error(tmp_path, monkeypatch, capsys, json_output):
+    target = tmp_path / "unreadable.md"
+    read = Path.read_text
+
+    def unreadable(path, *args, **kwargs):
+        if path == target:
+            raise PermissionError("target cannot be read")
+        return read(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", unreadable)
+    import render_prompts
+
+    work = lambda: ra.print_dry_run("claude", target, "output") or 0
+    if json_output:
+        code = render_prompts.run_json(work, "render-agents", "actions", mode="deploy", dry_run=True)
+    else:
+        code = render_prompts.run_plain(work, "render-agents")
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "error: render-agents: target cannot be read" in captured.err
+    assert "would create" not in captured.out + captured.err
+    if json_output:
+        data = json.loads(captured.out)
+        assert data["ok"] is False and data["mode"] == "deploy" and data["actions"] == []
+
+
+@pytest.mark.parametrize("harness", ["claude", "codex"])
+def test_crlf_roles_are_replaced(tmp_path, monkeypatch, capsys, harness):
+    target = tmp_path / "roles"
+    target.mkdir()
+    monkeypatch.setenv(ra.TARGET_DIRS[harness][1], str(target))
+    role = ra.load_agents(REPO)[0]
+    files, _ = ra.render_harness([role], harness, {}, ra.read_invariants(REPO), DEFAULTS)
+    filename, text = next(iter(files.items()))
+    destination = target / filename
+    destination.write_bytes(text.replace("\n", "\r\n").encode("utf-8"))
+    ra.deploy(REPO, [harness], {}, True, tmp_path / "backups")
+    assert f"would replace {harness}: {destination}" in capsys.readouterr().out
+    ra.deploy(REPO, [harness], {}, False, tmp_path / "backups")
+    assert destination.read_bytes() == text.encode("utf-8")
+
+
 def test_deploy_dry_run_reports_unchanged_file(tmp_path, monkeypatch, capsys):
     target = tmp_path / "codex-agents"
     monkeypatch.setenv("CODEX_AGENTS_DIR", str(target))

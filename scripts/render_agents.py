@@ -38,6 +38,7 @@ from render_prompts import (
     backup_existing,
     json_record,
     omp_agent_dir,
+    read_bytes_or_none,
     record_deployed,
     require_owned,
     run_json,
@@ -779,7 +780,7 @@ def check(repo_root: Path, selected: list[str] | None, allow_inherit: bool = Fal
 def read_text_or_none(path: Path) -> str | None:
     try:
         return path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
+    except FileNotFoundError:
         return None
 
 
@@ -818,7 +819,7 @@ def print_dry_run(harness: str, dest: Path, text: str) -> None:
     if existing is None:
         print(f"would create {harness}: {dest}")
         action = "would-create"
-    elif existing == text:
+    elif dest.read_bytes() == text.encode("utf-8"):
         print(f"unchanged {harness}: {dest}")
         action = "unchanged"
     elif generated_text(existing):
@@ -897,7 +898,7 @@ def deploy(
             raise SystemExit(f"error: {target} exists and is not a directory")
         for filename, text in files.items():
             dest = target / filename
-            if read_text_or_none(dest) == text:
+            if read_bytes_or_none(dest) == text.encode("utf-8"):
                 record_deployed(repo_root, f"roles:{harness}:{filename}", dest, text)
                 print(f"unchanged {harness}: {dest}")
                 json_record(harness=harness, action="unchanged", path=str(dest))
