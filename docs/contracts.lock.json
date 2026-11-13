@@ -29,14 +29,13 @@
       "note": "domain table lists all relevant maintenance documentation"
     },
     "models-agents": {
-      "breaking": "Invalid or missing targets and negative backup counts now exit 2 instead of 1; conflicting modes and abbreviated options are rejected.",
+      "breaking": "none",
       "docs": [
         "CHANGELOG.md",
         "INSTALL.md"
       ],
-      "fingerprint": "70dcb1a0dd2372b2619e249ca868d68515577ae7eb7fe39a00b1b7a78eb806ac",
-      "migration": "Back up saved commands, then upgrade by spelling options in full, selecting one mode while retaining deploy dry-run previews, and handling usage failures as exit 2. Roll back by restoring saved commands and checking out the previous version.",
-      "note": "Installation documents agent target validation, mutually exclusive modes, runtime guards, and the complete JSON error contract."
+      "fingerprint": "9b4595d95a81a9fa2eee89593074e076eca32f1878369517e7e01ac0f4b9eaca",
+      "note": "INSTALL explains identity fallback for omitted effort mappings; rendered role files remain byte-identical"
     },
     "overlays-trust": {
       "breaking": "none",
