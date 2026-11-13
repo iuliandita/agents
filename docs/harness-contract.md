@@ -46,7 +46,10 @@ pattern (`medium`), or it is not vendored (`n/a`).
   `%USERPROFILE%\.config\opencode`. A WSL install reads the WSL home, separate from native Windows.
 - Permission keys include `read`, `edit` (gates `write`/`edit`/`apply_patch`), `bash`, `task`, `glob`,
   `grep`, `list`, `todowrite`, `webfetch`, `websearch`, `external_directory`, `lsp`, `skill`,
-  `question`. Unlisted custom/MCP tools fall back to global defaults.
+  `question`. Rendered read-only roles put `"*": deny` first, then their explicit allows and denies;
+  unlisted custom/MCP tools, `skill`, `lsp`, and `external_directory` stay denied. Builder and verifier
+  retain explicit maps without a wildcard. This uses the V1 Markdown `permission` format
+  ([wildcards and ordering](https://github.com/anomalyco/opencode/blob/v1.2.0/packages/web/src/content/docs/permissions.mdx)).
 
 ### Command Code
 - Global rules `~/.commandcode/AGENTS.md`; project rules `./AGENTS.md`; settings and hooks in

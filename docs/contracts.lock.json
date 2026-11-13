@@ -27,10 +27,12 @@
     "models-agents": {
       "breaking": "none",
       "docs": [
-        "INSTALL.md"
+        "CHANGELOG.md",
+        "README.md",
+        "docs/harness-contract.md"
       ],
-      "fingerprint": "81ac3411f253ff51b45086923bb42f37e2f2ee7c3789d1e4f5d69cc719b12f1c",
-      "note": "changelog and INSTALL json table cover reviewer, planner, line caps, and per-section byte sizes"
+      "fingerprint": "280377bfb8a2b5add3558a1b928eccd41f27debf85a6d2b443fafc94c08c1bc1",
+      "note": "Document deny-all read-only roles, body tool budgets, blocker output, empty expansion errors, and unsupported turn-cap notices."
     },
     "overlays-trust": {
       "breaking": "none",

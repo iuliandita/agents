@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- OpenCode read-only roles deny unlisted tools; all roles gain budgets, blocker output, and shared data handling. The renderer rejects empty tool expansions, reports unsupported turn caps, and omits unused effort from Antigravity hashes (#201).
+
 - Docs impact check: a breaking receipt that a commit did not change no longer fails the range, so merging the base branch into a feature branch no longer reports a stale breaking change (#212).
 
 - Invariants deployment now installs and refreshes both Claude and Antigravity hooks, validates settings before merging, preserves Unicode, and updates managed hook paths in place. `--harness` selects a channel and `--antigravity-config-dir` relocates Antigravity config (#203).

@@ -419,12 +419,14 @@ OPENCODE_KNOWN = ("read", "list", "grep", "glob", "edit", "bash", "webfetch", "w
 OPENCODE_DENY_ALWAYS = frozenset({"task", "todowrite", "question"})
 
 
-def expand_tools(tools: tuple[str, ...], table: dict[str, tuple[str, ...]]) -> list[str]:
+def expand_tools(spec: AgentSpec, harness: str, table: dict[str, tuple[str, ...]]) -> list[str]:
     names: list[str] = []
-    for tool in tools:
+    for tool in spec.tools:
         for name in table[tool]:
             if name not in names:
                 names.append(name)
+    if not names:
+        raise SystemExit(f"error: {spec.source}: {harness}/{spec.name}: tool expansion is empty")
     return names
 
 
@@ -450,7 +452,7 @@ def render_claude(spec: AgentSpec, resolved: Resolved, invariants: str) -> str:
         "---",
         f"name: {spec.name}",
         f"description: {yaml_string(spec.description)}",
-        f"tools: {', '.join(expand_tools(spec.tools, CLAUDE_TOOLS))}",
+        f"tools: {', '.join(expand_tools(spec, 'claude', CLAUDE_TOOLS))}",
     ]
     if resolved.model is not None:
         lines.append(f"model: {yaml_string(resolved.model)}")
@@ -499,7 +501,7 @@ def render_codex(spec: AgentSpec, resolved: Resolved, invariants: str) -> str:
 
 
 def render_opencode(spec: AgentSpec, resolved: Resolved, invariants: str) -> str:
-    allowed = set(expand_tools(spec.tools, OPENCODE_TOOLS))
+    allowed = set(expand_tools(spec, "opencode", OPENCODE_TOOLS))
     lines = [
         "---",
         f"description: {yaml_string(spec.description)}",
@@ -513,6 +515,8 @@ def render_opencode(spec: AgentSpec, resolved: Resolved, invariants: str) -> str
     if spec.max_turns is not None:
         lines.append(f"steps: {spec.max_turns}")
     lines.append("permission:")
+    if not WRITE_TOOLS & set(spec.tools):
+        lines.append('  "*": deny')
     for tool in OPENCODE_KNOWN:
         if tool in OPENCODE_DENY_ALWAYS:
             lines.append(f"  {tool}: deny")
@@ -528,7 +532,7 @@ def render_commandcode(spec: AgentSpec, resolved: Resolved, invariants: str) -> 
         "---",
         f"name: {spec.name}",
         f"description: {yaml_string(spec.description)}",
-        f"tools: {', '.join(expand_tools(spec.tools, COMMANDCODE_TOOLS))}",
+        f"tools: {', '.join(expand_tools(spec, 'commandcode', COMMANDCODE_TOOLS))}",
     ]
     if resolved.model is not None:
         lines.append(f"model: {yaml_string(resolved.model)}")
@@ -542,7 +546,7 @@ def render_commandcode(spec: AgentSpec, resolved: Resolved, invariants: str) -> 
 
 
 def render_antigravity(spec: AgentSpec, resolved: Resolved, invariants: str) -> str:
-    tools = expand_tools(spec.tools, ANTIGRAVITY_TOOLS)
+    tools = expand_tools(spec, "antigravity", ANTIGRAVITY_TOOLS)
     lines = [
         "---",
         f"name: {spec.name}",
@@ -550,22 +554,19 @@ def render_antigravity(spec: AgentSpec, resolved: Resolved, invariants: str) -> 
         "subagent: true",
         "mainAgent: false",
     ]
-    if tools:
-        lines.append("tools:")
-        lines.extend(f"  - {name}" for name in tools)
+    lines.append("tools:")
+    lines.extend(f"  - {name}" for name in tools)
     if resolved.model is not None:
         lines.append(f"model: {yaml_string(resolved.model)}")
     if "shell" in spec.tools:
         lines.append("commandExecutionPolicy: sandbox")
     lines.append("---")
-    salt = f"antigravity:{resolved.model}:{resolved.effort}"
+    salt = f"antigravity:{resolved.model}"
     return "\n".join(lines) + "\n" + markdown_body(spec, invariants, salt=salt)
 
 
 def render_omp(spec: AgentSpec, resolved: Resolved, invariants: str) -> str:
-    # A flow list keeps an empty expansion explicit: omp reads a bare `tools:` as
-    # unrestricted but `tools: []` as no tools.
-    tools = expand_tools(spec.tools, OMP_TOOLS)
+    tools = expand_tools(spec, "omp", OMP_TOOLS)
     lines = [
         "---",
         f"name: {spec.name}",
@@ -680,6 +681,11 @@ def render_harness(
     for spec in specs:
         resolved = resolve(spec, harness, overrides, defaults)
         notices.extend(resolved.notices)
+        if spec.max_turns is not None and harness in {"codex", "antigravity", "omp"}:
+            notices.append(
+                f"{harness}/{spec.name}: max_turns={spec.max_turns} is not supported; "
+                "omitting it; the role body tool-call budget is advisory"
+            )
         models.append(resolved.model)
         text = RENDERERS[harness](spec, resolved, invariants)
         rendered[spec.name + EXTENSIONS[harness]] = text

@@ -1,4 +1,5 @@
 import subprocess
+from dataclasses import replace
 import tomllib
 from pathlib import Path
 
@@ -885,6 +886,7 @@ DOCUMENTED_KEYS = {
 }
 
 OPENCODE_PERMISSION_KEYS = {
+    "*",
     "read",
     "edit",
     "glob",
@@ -976,11 +978,12 @@ def test_render_omp_uses_role_alias_and_thinking_level():
     assert ra.GENERATED_MARKER in text
 
 
-def test_render_omp_empty_tool_expansion_stays_restricted():
-    resolved = ra.resolve(spec(), "omp", {}, DEFAULTS)
-    text = ra.render_omp(spec(tools=("shell-ro",)), resolved, INVARIANTS)
-    assert "tools: []" in text
-    assert omp_fields(text)["tools"] == []
+@pytest.mark.parametrize("harness", ["claude", "opencode", "commandcode", "antigravity", "omp"])
+def test_render_rejects_empty_tool_expansion(harness):
+    role = spec(tools=("shell-ro",))
+    resolved = ra.resolve(role, harness, {}, DEFAULTS)
+    with pytest.raises(SystemExit, match=rf"^error: .*{harness}/sample: tool expansion is empty"):
+        ra.RENDERERS[harness](role, resolved, INVARIANTS)
 
 
 def test_render_omp_apex_falls_back_to_slow_role_with_max_effort():
@@ -1090,3 +1093,54 @@ def test_opencode_unlisted_model_is_not_checked():
 def test_validate_overrides_rejects_bad_variants(bad):
     with pytest.raises(SystemExit, match="variants"):
         ra.validate_overrides({"opencode": {"variants": {"opencode-go/x": bad}}}, Path("models.local.json"))
+
+
+@pytest.mark.parametrize("role", ra.load_agents(REPO), ids=lambda role: role.name)
+def test_opencode_role_permissions_deny_unknown_tools_only_for_read_only_roles(role):
+    text = ra.render_opencode(role, ra.resolve(role, "opencode", {}, DEFAULTS), INVARIANTS)
+    permissions = yaml.safe_load(text.split("---")[1])["permission"]
+    if ra.WRITE_TOOLS & set(role.tools):
+        assert "*" not in permissions
+        assert set(permissions) == set(ra.OPENCODE_KNOWN)
+    else:
+        assert text.split("permission:\n", 1)[1].startswith('  "*": deny\n')
+        assert next(iter(permissions)) == "*"
+        assert permissions["*"] == "deny"
+        assert permissions.get("skill", permissions["*"]) == "deny"
+        assert "skill: allow" not in text
+        for tool in ("mcp_custom_write", "lsp", "external_directory", "skill"):
+            assert permissions.get(tool, permissions["*"]) == "deny"
+    allowed = {
+        "builder": {"read", "list", "grep", "glob", "edit", "bash"},
+        "explorer": {"read", "list", "grep", "glob"},
+        "planner": {"read", "list", "grep", "glob", "webfetch", "websearch"},
+        "researcher": {"read", "list", "grep", "glob", "webfetch", "websearch"},
+        "reviewer": {"read", "list", "grep", "glob"},
+        "verifier": {"read", "list", "bash"},
+    }[role.name]
+    assert {tool for tool, effect in permissions.items() if effect == "allow"} == allowed
+    for tool in ("edit", "bash", "task", "todowrite", "question"):
+        if tool not in allowed:
+            assert permissions[tool] == "deny"
+
+
+@pytest.mark.parametrize("harness", ra.AGENT_HARNESSES)
+@pytest.mark.parametrize("max_turns", [None, 30])
+def test_unsupported_max_turns_is_noticed(harness, max_turns, capsys):
+    role = spec(max_turns=max_turns)
+    _, notices = ra.render_harness([role], harness, {}, INVARIANTS, DEFAULTS)
+    ra.print_notices(notices)
+    output = capsys.readouterr().err
+    if max_turns is not None and harness in {"codex", "antigravity", "omp"}:
+        assert f"note: {harness}/sample: max_turns=30 is not supported" in output
+        assert "tool-call budget is advisory" in output
+    else:
+        assert "max_turns" not in output
+
+
+def test_antigravity_render_ignores_resolved_effort_but_tracks_model():
+    role = spec()
+    resolved = ra.resolve(role, "antigravity", {}, DEFAULTS)
+    text = ra.render_antigravity(role, resolved, INVARIANTS)
+    assert text == ra.render_antigravity(role, replace(resolved, effort="high"), INVARIANTS)
+    assert text != ra.render_antigravity(role, replace(resolved, model="pro"), INVARIANTS)
