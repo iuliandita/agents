@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- Prompt source scan: dependency trees are skipped at any depth and gitignored local files are skipped in a git checkout, while the deployed overlays under `prompts/` are still scanned (#214).
+
 - Leak and injection scanning now covers skills, templates, model metadata, wrapped instructions, hidden Unicode, and more network-to-interpreter commands; private markers match without case sensitivity, tracked overlays fail lint, and editor copies are ignored (#205).
 
 - OpenCode read-only roles deny unlisted tools; all roles gain budgets, blocker output, and shared data handling. The renderer rejects empty tool expansions, reports unsupported turn caps, and omits unused effort from Antigravity hashes (#201).
