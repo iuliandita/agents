@@ -18,9 +18,11 @@
     },
     "maintenance": {
       "breaking": "none",
-      "docs": [],
-      "fingerprint": "f28526bfd799bcaec3ad07aed2a8121635401f68b7a18a855834b5b429b6da07",
-      "no_impact": "Comment names Renovate instead of Dependabot; no behavior change."
+      "docs": [
+        "CHANGELOG.md"
+      ],
+      "fingerprint": "03ff2325b2cdb162a6958c95e4916eb2b159f234fc309f3a3f7de9277839d524",
+      "note": "MAINTENANCE explains that only receipt-changing commits count for the breaking carry check"
     },
     "models-agents": {
       "breaking": "none",
