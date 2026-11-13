@@ -3,10 +3,9 @@
     "deployment": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
         "README.md"
       ],
-      "fingerprint": "500ed5e5de473b94d80aaf1352460ce6c8553d5154b85af7350c5c6214cdef68",
+      "fingerprint": "f26b5cb660be47daedb99811d374d420340b12b5f83c95a082ad641bdd75c783",
       "note": "Document automatic Antigravity hook deployment, channel selection, managed path migration, and settings validation."
     },
     "harnesses": {

@@ -37,6 +37,8 @@ from render_prompts import (
 
 TARGETS_ENV = "AGENTS_DEPLOY_TARGETS"
 TARGETS_FILE = ("prompts", "deploy-targets.txt")
+UPDATE_BRANCHES_ENV = "AGENTS_UPDATE_BRANCHES"
+UPDATE_BRANCHES = {"main", "develop"}
 
 GIT_TIMEOUT_SECONDS = 300
 # Binaries that show a harness is installed; config homes come from the deploy resolvers.
@@ -154,6 +156,18 @@ def pull(repo_root: Path) -> None:
     dirty = git(repo_root, "status", "--porcelain", "--untracked-files=no", capture=True).stdout.strip()
     if dirty:
         raise SystemExit(f"error: local tracked changes in {repo_root}; not updating:\n{dirty}")
+    branch = git(repo_root, "rev-parse", "--abbrev-ref", "HEAD", capture=True).stdout.strip()
+    if branch == "HEAD":
+        raise SystemExit("error: detached HEAD; check out main or develop before updating")
+    allowed = UPDATE_BRANCHES
+    if UPDATE_BRANCHES_ENV in os.environ:
+        allowed = allowed.intersection(part.strip() for part in os.environ[UPDATE_BRANCHES_ENV].split(","))
+    if branch not in allowed:
+        raise SystemExit(f"error: branch {branch} is not allowed to update; allowed branches: {', '.join(sorted(allowed)) or 'none'}")
+    upstream = git(repo_root, "for-each-ref", "--format=%(upstream)", f"refs/heads/{branch}", capture=True).stdout.strip()
+    if not upstream:
+        raise SystemExit(f"error: branch {branch} must track an upstream before updating")
+    git(repo_root, "rev-parse", "--verify", "@{upstream}", capture=True)
     git(repo_root, "pull", "--ff-only")
 
 
@@ -165,11 +179,13 @@ def run_lock(repo_root: Path) -> Iterator[None]:
         try:
             import fcntl
 
-            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lock, lock_args = fcntl.flock, (handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except ImportError:
             import msvcrt
 
-            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            lock, lock_args = msvcrt.locking, (handle.fileno(), msvcrt.LK_NBLCK, 1)
+        try:
+            lock(*lock_args)
         except OSError:
             raise SystemExit(f"error: another update is running in {repo_root}")
         yield
@@ -194,6 +210,8 @@ Environment:
   AGENTS_PYTHON            Python 3.11+ executable the launcher runs (a path, not a command).
   AGENTS_DEPLOY_TARGETS    Harnesses to manage, comma-separated; --harness overrides it, and it overrides
                            prompts/deploy-targets.txt.
+  AGENTS_UPDATE_BRANCHES   Comma-separated subset of main,develop allowed to pull; default: main,develop.
+                           The branch must track an upstream. An empty value allows no branches.
   AGENTS_PRIVATE_HARNESSES Comma-separated harnesses that receive prompts/private.md; 'all' for every one.
   GIT_SSH_COMMAND          Used for the pull; defaults to 'ssh -o BatchMode=yes' so it never prompts.
   The render steps also read their path and home overrides, so set them in a scheduled job:
@@ -236,7 +254,9 @@ def run(args: argparse.Namespace) -> int:
     targets = load_targets(args.repo_root, ",".join(args.targets) if args.targets is not None else None)
     json_extra(targets=targets)
     with run_lock(args.repo_root):
-        if not args.no_pull:
+        if args.no_pull:
+            print("note: --no-pull: the checkout is deployed as is; skipping branch and upstream checks", file=sys.stderr)
+        else:
             pull(args.repo_root)
         for line in overlay_summary(args.repo_root, targets):
             print(line)

@@ -109,7 +109,8 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
    (subagent dirs). Customized homes (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `OPENCODE_CONFIG_DIR`,
    `PI_CODING_AGENT_DIR`, `OMP_PROFILE`, `HERMES_HOME`) are honored when they are set in this shell.
    Hermes is different: its global rules merge into `agent.coding_instructions` in `$HERMES_HOME/config.yaml`
-   (default `~/.hermes/config.yaml`), shown by `scripts/render-hermes --dry-run`; ignore the `HERMES.md`
+   (default `~/.hermes/config.yaml`, or `%LOCALAPPDATA%\hermes\config.yaml` on native Windows),
+   shown by `scripts/render-hermes --dry-run`; ignore the `HERMES.md`
    project-file line in `--list-targets`. Every other target is one rules file plus six subagent files.
 5. **Optional overlays** (see [Local and private overlays](README.md#local-and-private-overlays)): copy
    `prompts/local.example.md` to `prompts/local.md` for preferences that are safe with any model provider.
@@ -131,9 +132,16 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
    reach the user (log file, syslog/journal, or mail); default to the platform's native scheduler, 06:30,
    and the scheduler's own failure log if they have no preference. `scripts/update` pulls fast-forward only, never prompts (git runs
    non-interactively with a timeout), refuses to run over local tracked edits or alongside another run, and
-   exits non-zero on any failure. Schedulers start with a minimal environment: copy into the job every
+   exits non-zero on any failure. Before pulling, it requires `main` or `develop` with a configured
+   upstream; feature branches and detached HEAD exit 1 before any render or deploy step. Set
+   `AGENTS_UPDATE_BRANCHES=main` (stable) or `AGENTS_UPDATE_BRANCHES=develop` (nightly) to narrow the
+   allow-list. It accepts a comma-separated subset of `main,develop`; other names never add branches,
+   and an empty value allows none. `--no-pull` skips these checks and prints a `note:` that the checkout
+   is deployed as is, including in dry runs. Use a dedicated clean clone on the chosen branch for
+   scheduled updates so feature work cannot interrupt the schedule.
+   Schedulers start with a minimal environment: copy into the job every
    variable the setup relied on (`AGENTS_PYTHON`, customized homes from step 4, `*_AGENTS_PATH` or
-   `*_AGENTS_DIR` overrides, `AGENTS_PRIVATE_HARNESSES`). Replace `<checkout>` with the real absolute path.
+   `*_AGENTS_DIR` overrides, `AGENTS_PRIVATE_HARNESSES`, `AGENTS_UPDATE_BRANCHES`). Replace `<checkout>` with the real absolute path.
 
    ```bash
    # cron (Linux/macOS): daily at 06:30; failures also go to syslog
@@ -227,7 +235,8 @@ GENERIC_AGENTS_PATH="$PWD/AGENTS.md" scripts/sync-ai-prompts --target generic --
 ### Hermes Global Rules
 
 Hermes has no global rules file. Merge the shared core into `agent.coding_instructions` in
-`$HERMES_HOME/config.yaml` (default `~/.hermes/config.yaml`):
+`$HERMES_HOME/config.yaml` (default `~/.hermes/config.yaml`, or
+`%LOCALAPPDATA%\hermes\config.yaml` on native Windows):
 
 ```bash
 scripts/render-hermes --dry-run
@@ -235,10 +244,15 @@ scripts/render-hermes --deploy
 ```
 
 The merge is a comment-preserving line edit and backs the config up first, so unrelated settings and
-comments are kept. It follows the indent the `agent:` block already uses. An inline value such as
+comments are kept. It follows the indent the `agent:` block already uses, including quoted keys and
+column-zero comments within the block. Before writing, a standard-library structural check refuses
+duplicate top-level `agent` keys, duplicate direct `coding_instructions` keys, or lost top-level keys;
+no PyYAML installation is needed. Symlinked config files are refused. An inline value such as
 `agent: {model: opus}` cannot be edited line by line, so deploy stops without writing; rewrite it as a
 block mapping and rerun. Override the target with `--path` or `HERMES_CONFIG_PATH`, and the home with
-`HERMES_HOME`.
+`HERMES_HOME`. When either environment override resolves inside a Git worktree, both `local.md` and
+`private.md` are withheld with a notice, even for trusted Hermes targets. The default config path
+keeps the normal overlay rules, including when `HOME` is a Git worktree.
 
 ## List Targets
 
@@ -301,7 +315,8 @@ Oh My Pi reads task agents from `~/.omp/agent/agents`, or `~/.omp/profiles/<name
 `OMP_PROFILE` (or `PI_PROFILE`) names a profile, even when `PI_CODING_AGENT_DIR` moves its rules file. The
 renderers follow the same profile resolution; `OMP_AGENTS_DIR` overrides it.
 
-Hermes has no per-role prompt file, so its six roles are a manual paste; delegation is configured under `delegation:` in `~/.hermes/config.yaml`.
+Hermes has no per-role prompt file, so its six roles are a manual paste; delegation is configured under
+`delegation:` in `~/.hermes/config.yaml` (or `%LOCALAPPDATA%\hermes\config.yaml` on native Windows).
 
 After a real deploy, `scripts/render-agents --verify` confirms all six role files exist in each harness's agent directory.
 
