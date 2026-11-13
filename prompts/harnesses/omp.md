@@ -6,4 +6,4 @@
 - Skills load from `~/.omp/agent/skills`, `.omp/skills`, and `~/.agents/skills`; `~/.claude/skills` only when enabled.
 - Task agents are markdown in `~/.omp/agent/agents/` (user) and `.omp/agents/` (project), with `name`, `description`, `tools`, `model`, and `thinkingLevel` frontmatter. Project beats user beats bundled; the bundled `scout`, `reviewer`, `security-reviewer`, `task`, and `sonic` stay available unless a file reuses the name, as `reviewer` does here. An agent without the `task` tool cannot spawn others.
 - Hooks live in `~/.omp/agent/hooks/pre|post` and extensions in `~/.omp/agent/extensions`; no invariants channel is wired here, so the hard rules ride in the rules file and each rendered agent.
-- Verify discovery after deploy: open `/agents` in a session and confirm the six roles and their models, and check the session header for the resolved model and thinking level.
+- Verify roles with `/agents` and the resolved model and thinking level in the session header.

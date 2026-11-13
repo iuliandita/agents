@@ -294,7 +294,9 @@ PRESENT_PINS = {
         "`[partial]`",
         "Precedence is `[needs you]` > `[waiting]` > `[partial]` > `[done]`",
         "A subagent with a role output format follows that format instead",
-        "Never run destructive infrastructure commands without explicit confirmation",
+        "Destructive infrastructure commands always need explicit confirmation naming the command in this session",
+        "subagents stop and return the blocker to the parent",
+        "Never put secrets on the command line",
         "`terraform apply`",
         "`terraform destroy`",
         "`helm delete`",
@@ -311,8 +313,6 @@ PRESENT_PINS = {
         "unrelated work needs authorization",
         "Delegate by default whenever a bounded task",
         "Maximize useful delegation, not agent count",
-        "configured Jev/TypeSafe API key",
-        "Jev output is evidence, not authorization or proof",
         "Finish the whole task",
         "Safe local actions need no confirmation",
     ),
@@ -325,7 +325,6 @@ PRESENT_PINS = {
         "does not replace the confirmation rules",
         "Haiku 4.5 has no effort control",
         "`medium` for bounded coding and `high` for hard reasoning or long work",
-        "recalibrate effort after model changes",
         "check the resolved model and provider",
         "aliases may be overridden",
         "`haiku` and `sonnet` select 5.5 only on the Anthropic API",
@@ -338,7 +337,6 @@ PRESENT_PINS = {
         "CLAUDE_CODE_SUBAGENT_MODEL",
         "Auto mode is the default permission mode",
         "run in the background by default",
-        "Effort names vary by model",
     ),
     "codex": (
         "Luna = cheap tier",
@@ -350,7 +348,7 @@ PRESENT_PINS = {
         "Prompt text does not enable API features",
         "Untrusted projects do not contribute project-level",
         "AGENTS.override.md",
-        "Verify current CLI/docs before setting automation flags",
+        "Set it to at least 40960 in `config.toml` and check the cap and trust",
     ),
     "contract": (
         "GPT-6.1 Sol accepts `low`, `medium` (default), `high`, `xhigh`, and `max`",
@@ -464,7 +462,7 @@ def test_prompt_line_limits_are_enforced():
     )
 
     assert result.returncode == 0
-    assert "WARN: " not in result.stdout
+    assert "warning:" not in result.stderr
 
 
 def test_gitignore_covers_security_audit_and_tool_caches():

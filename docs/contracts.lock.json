@@ -47,8 +47,8 @@
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "c5cf2fb0fe57c09353bb7ebb2303d2aa6b27c76a130dd7d89abd08278a6ee7ed",
-      "note": "changelog records the prompt diet and the pushed-history confirmation scope"
+      "fingerprint": "c65a7311b7b73b12693b07c7b411b45b51f93e405eef2eaac9b005542ec453d8",
+      "note": "Changelog covers confirmation scope, subagent blockers, rendered effort, Codex context cap, and warning-free prompt limits."
     },
     "workflow-templates": {
       "baseline": true,

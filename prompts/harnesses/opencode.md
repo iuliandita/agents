@@ -2,11 +2,11 @@
 - Global rules: `~/.config/opencode/AGENTS.md`; config `opencode.json`/`opencode.jsonc`; agents in `~/.config/opencode/agents/`; skills in `~/.config/opencode/skills/`. Override with `OPENCODE_AGENTS_PATH` or `OPENCODE_CONFIG_DIR`.
 - Same paths on macOS; on Windows run under WSL (recommended) or use `%USERPROFILE%\.config\opencode`. A WSL install reads the WSL home, separate from native Windows.
 - Non-interactive: `opencode run`; add `--format json` or `--continue` for pipelines. List models with `opencode models` and agents with `opencode agent list`.
-- Model IDs, effort, and declared `variants` live in `prompts/models.json`; effort renders as the agent's `variant` (`provider/model#variant`), and a variant the model does not list (`opencode models`) fails resolution, and rendering fails on an undeclared one. DeepSeek V4.1 Flash, GLM-5.3, and GLM-5.3 Flash accept `low`, `high`, and `max`; Kimi K3 only `max`.
+- Effort renders as the agent's `variant` (`provider/model#variant`). A variant absent from `opencode models` fails resolution; the renderer also rejects undeclared variants.
 - On a single-model setup (for example DeepSeek V4.1 Flash on every tier), tiers differ by effort, not model. Unknown frontmatter keys such as `reasoningEffort` are sent as raw request-body fields, not as the provider's effort setting.
 - Skills are native, no plugin required. Discovery spans global `~/.claude/skills`, `~/.agents/skills`, and `~/.config/opencode/skills`, then project `.claude/skills`, `.agents/skills`, and `.opencode/skills` searched upward from CWD, with later sources winning.
 - Subagents are markdown in `agents/`; invoke with `@name` or the Task tool. Deny `task` in a subagent to stop nested delegation.
 - Permissions use `permission:` keys (`read`, `edit`, `bash`, `task`, `todowrite`, `webfetch`, `websearch`, `external_directory`, `lsp`, `skill`, `question`); unlisted custom and MCP tools fall back to global config, so a read-only role needs an explicit deny-all before its allowances.
 - Hooks and plugins can inject rules per turn; let a hook deliver the hard rules instead of repeating them per prompt.
-- Verify after deploy: `opencode agent list` shows the roles and the session header names the expected model; the TUI, CLI, and desktop app share this config.
+- Verify roles with `opencode agent list` and the resolved model in the session header; the TUI, CLI, and desktop app share this config.
 - Use `question` when available: each option has a label and description; `multiple` enables multi-select. It adds a typed-answer option and is gated by the `question` permission key.
