@@ -230,7 +230,7 @@ Environment:
   GIT_SSH_COMMAND          Used for the pull; defaults to 'ssh -o BatchMode=yes' so it never prompts.
   The render steps also read their path and home overrides, so set them in a scheduled job:
   <HARNESS>_AGENTS_PATH, <HARNESS>_AGENTS_DIR, CLAUDE_CONFIG_DIR, CODEX_HOME, OPENCODE_CONFIG_DIR,
-  PI_CODING_AGENT_DIR, OMP_PROFILE, PI_PROFILE, HERMES_HOME, HERMES_CONFIG_PATH, CLAUDE_HOOKS_DIR,
+  PI_CODING_AGENT_DIR, PI_CONFIG_DIR, OMP_PROFILE, PI_PROFILE, HERMES_HOME, HERMES_CONFIG_PATH, CLAUDE_HOOKS_DIR,
   CLAUDE_SETTINGS_PATH, HOME.
 
 """ + EXIT_CODES_HELP + "  A failing step's exit code is passed through; git missing exits 3.\n"
