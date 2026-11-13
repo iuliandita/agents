@@ -39,8 +39,8 @@
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "aa8993a2d9bb2d7a368ae3cac416218f912cb1546bf3dde2a2e789e4dfb99b06",
-      "note": "Document expanded scanner coverage, local casefolded markers, and tracked overlay rejection."
+      "fingerprint": "be20fa75f41844776af6a19da44d55651ea5fa80eee2836865c8e5e026e74e24",
+      "note": "MAINTENANCE explains the scan skips dependency trees and gitignored files but keeps the prompts overlays"
     },
     "prompts": {
       "breaking": "none",

@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 - Prompt rules now align on destructive-action confirmation, subagent blockers, and secrets. Harness notes keep runtime checks and config paths, describe rendered effort values, and require a Codex context cap of at least 40 KiB. Public prompts drop repeated rules and optional routing policy; the line-limit test rejects lint warnings (#204).
 
+- Prompt source scan: dependency trees are skipped at any depth and gitignored local files are skipped in a git checkout, while the deployed overlays under `prompts/` are still scanned (#214).
+
 - Leak and injection scanning now covers skills, templates, model metadata, wrapped instructions, hidden Unicode, and more network-to-interpreter commands; private markers match without case sensitivity, tracked overlays fail lint, and editor copies are ignored (#205).
 
 - OpenCode read-only roles deny unlisted tools; all roles gain budgets, blocker output, and shared data handling. The renderer rejects empty tool expansions, reports unsupported turn caps, and omits unused effort from Antigravity hashes (#201).
