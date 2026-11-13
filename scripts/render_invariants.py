@@ -37,7 +37,7 @@ from typing import NamedTuple
 
 from render_prompts import (
     EXIT_CODES_HELP, JsonArgumentParser, atomic_write, backup_existing, json_record,
-    record_deployed, require_owned, run_json, run_plain,
+    record_deployed, require_owned, resolve_repo_paths, run_json, run_plain,
 )
 
 
@@ -365,7 +365,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--repo-root", type=Path, default=repo_root)
-    parser.add_argument("--out-dir", type=Path, default=repo_root / "build" / "generated" / "invariants")
+    parser.add_argument("--out-dir", type=Path, default=Path("build/generated/invariants"))
     parser.add_argument("--deploy", action="store_true", help="Install selected hooks and merge their settings.")
     parser.add_argument("--adopt", action="store_true", help="Allow replacing unmanaged hook scripts after backing them up.")
     parser.add_argument("--harness", choices=("claude", "antigravity", "all"), default="all", help="Deploy channels (default: all).")
@@ -374,9 +374,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--settings-path", type=Path, help=f"Override settings path (default: {DEFAULT_SETTINGS_PATH}).")
     parser.add_argument("--antigravity-config-dir", type=Path, default=Path.home() / ".gemini" / "config",
                         help="Antigravity hooks and hooks.json directory (default: ~/.gemini/config).")
-    parser.add_argument("--backup-dir", type=Path, default=repo_root / ".backups", help="Directory for deploy backups.")
+    parser.add_argument("--backup-dir", type=Path, default=Path(".backups"), help="Directory for deploy backups.")
     parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
-    return parser.parse_args(argv)
+    return resolve_repo_paths(parser.parse_args(argv))
 
 
 def run(args: argparse.Namespace) -> int:

@@ -20,7 +20,7 @@ import re
 import shutil
 import tempfile
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from tempfile import TemporaryDirectory
 from typing import NamedTuple
 
@@ -374,7 +374,11 @@ def omp_config_root(home: str | Path | None, env: dict[str, str] | os._Environ[s
     """omp builds every path from $HOME/$PI_CONFIG_DIR, defaulting to ~/.omp."""
     home_path = Path.home() if home is None else Path(home)
     # Node's path.join appends an absolute PI_CONFIG_DIR under HOME; pathlib would replace it.
-    return home_path / (env.get("PI_CONFIG_DIR") or ".omp").lstrip("/\\")
+    config_dir = env.get("PI_CONFIG_DIR") or ".omp"
+    if os.name == "nt":
+        windows_path = PureWindowsPath(config_dir)
+        config_dir = windows_path.relative_to(windows_path.anchor).as_posix() if windows_path.anchor else windows_path.as_posix()
+    return home_path / config_dir.lstrip("/\\")
 
 
 def omp_profile_agent_dir(home: str | Path | None, env: dict[str, str] | os._Environ[str]) -> Path | None:
@@ -642,6 +646,14 @@ def read_bytes_or_none(path: Path) -> bytes | None:
         return path.read_bytes()
     except FileNotFoundError:
         return None
+
+
+def resolve_repo_paths(args: argparse.Namespace) -> argparse.Namespace:
+    args.repo_root = args.repo_root.expanduser().resolve()
+    for name in ("out_dir", "backup_dir"):
+        path = getattr(args, name).expanduser()
+        setattr(args, name, path if path.is_absolute() else args.repo_root / path)
+    return args
 
 
 def require_owned(path: Path, owned: bool, adopt: bool) -> None:
@@ -1071,7 +1083,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--repo-root", type=Path, default=repo_root)
-    parser.add_argument("--out-dir", type=Path, default=repo_root / "build" / "generated")
+    parser.add_argument("--out-dir", type=Path, default=Path("build/generated"))
     parser.add_argument(
         "--target",
         "--harness",
@@ -1101,14 +1113,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--backup-dir",
         type=Path,
-        default=repo_root / ".backups",
+        default=Path(".backups"),
         help="Directory for deploy backups.",
     )
     parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
     args = parser.parse_args(argv)
     if args.dry_run and (args.check or args.status or args.list_targets):
         parser.error("--dry-run cannot be combined with --check, --status, or --list-targets")
-    return args
+    return resolve_repo_paths(args)
 
 
 def run(args: argparse.Namespace) -> int:

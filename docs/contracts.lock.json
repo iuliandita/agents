@@ -1,22 +1,22 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "Unmanaged hook dry-runs report would-replace-unmanaged; CRLF hooks and Hermes config require updating.",
+      "breaking": "Relative hook and Hermes output and backup directories resolve under --repo-root; unmanaged hook previews change action and CRLF output requires updating.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "439ac18b684d93144ed39b3368be73a905e8157085dff0d9ed651afa90fdea65",
-      "migration": "Back up configs and output consumers; upgrade by recognizing the unmanaged action and redeploying LF output; roll back by restoring backups and the previous checkout.",
-      "note": "Record unmanaged hook dry-run actions and LF normalization for hooks and Hermes config."
+      "fingerprint": "311fbe598a748955a2796e4451442059396250b42b26102e04b29ce89449a3fe",
+      "migration": "Back up configs and consumers; upgrade with absolute directory overrides to retain locations and recognize the unmanaged action; roll back by restoring backups and the previous checkout.",
+      "note": "Record repository-relative hook and Hermes artifact directories alongside ownership previews and LF normalization."
     },
     "harnesses": {
-      "breaking": "CRLF prompt targets report drift and require rewriting; malformed optional blocks fail rendering.",
+      "breaking": "Relative output and backup paths resolve under --repo-root; Windows drive-qualified PI_CONFIG_DIR stays under home; CRLF prompts and malformed optional blocks no longer pass checks.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "59a16aa40acb592128efc128163b2d60d7b4932686121ff8f856edc5219ba223",
-      "migration": "Back up generated targets and sources; upgrade by pairing lower-case optional markers and redeploying LF output; roll back by restoring backups and the previous checkout.",
-      "note": "Record fence-aware section sizes and shape checks for empty cores, generated headers, core content, and optional markers."
+      "fingerprint": "4f8d00e2ca40a48ae05859e10c294124e16ec747fbfc3b82de333b710addc2a6",
+      "migration": "Back up artifacts and sources; upgrade with absolute directory overrides to retain existing locations and paired optional markers; roll back by restoring backups and the previous checkout.",
+      "note": "Record repository-relative artifact directories, Windows omp config paths, fence-aware sections, and stricter render shape validation."
     },
     "maintenance": {
       "breaking": "none",
@@ -27,13 +27,13 @@
       "note": "domain table lists all relevant maintenance documentation"
     },
     "models-agents": {
-      "breaking": "CRLF roles now require replacement, unreadable targets fail, and max_turns notices identify a harness.",
+      "breaking": "Relative role output and backup directories resolve under --repo-root; CRLF roles require replacement, unreadable targets fail, and max_turns notices identify a harness.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "8fb24103cd4493b97609f7dc331594d596e5eaa2b1a92b13aa69afa7fdd56f1a",
-      "migration": "Back up generated roles and output consumers; upgrade by redeploying and matching notices at the harness prefix; roll back by restoring backups and the previous checkout.",
-      "note": "Record unreadable target failures, LF role rewrites, and one turn-cap notice per harness."
+      "fingerprint": "4dbdcb315ff87e92c18df0c864e4de6e09eab54754d788824809ab1ce13f031e",
+      "migration": "Back up roles and output consumers; upgrade with absolute directory overrides to retain locations and adjust notice matching; roll back by restoring backups and the previous checkout.",
+      "note": "Record repository-relative role artifact directories, unreadable target failures, LF rewrites, and harness turn-cap notices."
     },
     "overlays-trust": {
       "breaking": "none",

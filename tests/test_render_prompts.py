@@ -1071,6 +1071,17 @@ def test_omp_profile_derived_match_is_exact(tmp_path):
     assert renderer.target_path("omp", home=tmp_path, env=env) == Path(derived) / "AGENTS.md"
 
 
+@pytest.mark.parametrize("config,expected", [
+    (r"D:\config\omp", "config/omp"), (r"D:config\omp", "config/omp"),
+    (r"\\server\share\omp", "omp"),
+])
+def test_omp_windows_pi_config_dir_stays_under_home(tmp_path, monkeypatch, config, expected):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(renderer, "os", SimpleNamespace(name="nt"))
+    assert renderer.omp_config_root(tmp_path, {"PI_CONFIG_DIR": config}) == tmp_path / expected
+
+
 def test_omp_absolute_pi_config_dir_stays_under_home(tmp_path):
     env = {"PI_CONFIG_DIR": "/srv/omp"}
     assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / "srv" / "omp" / "agent" / "AGENTS.md"

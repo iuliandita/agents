@@ -59,6 +59,26 @@ def test_invariants_dry_run_reports_unmanaged_hook(env, tmp_path, harness, filen
     assert not (tmp_path / "settings.json").exists()
 
 
+@pytest.mark.parametrize("module_name,default_out", [
+    ("render_prompts", "build/generated"), ("render_agents", "build/agents"),
+    ("render_invariants", "build/generated/invariants"), ("render_hermes", "build/generated"),
+])
+@pytest.mark.parametrize("kind", ["default", "relative", "absolute"])
+def test_renderer_paths_follow_repo_root(tmp_path, module_name, default_out, kind):
+    module = importlib.import_module(module_name)
+    root = tmp_path / "other-repo"
+    extra = []
+    out, backup = root / default_out, root / ".backups"
+    if kind != "default":
+        out_arg = Path("artifacts") if kind == "relative" else tmp_path / "artifacts"
+        backup_arg = Path("saved") if kind == "relative" else tmp_path / "saved"
+        extra = ["--out-dir", str(out_arg), "--backup-dir", str(backup_arg)]
+        out, backup = root / out_arg, root / backup_arg
+    args = module.parse_args(["--repo-root", str(root), *extra])
+    assert args.out_dir == out
+    assert args.backup_dir == backup
+
+
 def test_prompts_list_targets(env):
     code, data = run_json(env, "render_prompts.py", "--list-targets", "--harness", "claude,codex")
     assert code == 0

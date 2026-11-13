@@ -263,13 +263,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--repo-root", type=Path, default=repo_root)
-    parser.add_argument("--out-dir", type=Path, default=repo_root / "build" / "generated")
+    parser.add_argument("--out-dir", type=Path, default=Path("build/generated"))
     parser.add_argument("--path", type=Path, help="Hermes config.yaml (default: $HERMES_HOME/config.yaml).")
     parser.add_argument("--deploy", action="store_true", help="Merge into Hermes config.yaml.")
     parser.add_argument("--dry-run", action="store_true", help="Print the target without writing.")
-    parser.add_argument("--backup-dir", type=Path, default=repo_root / ".backups", help="Directory for backups.")
+    parser.add_argument("--backup-dir", type=Path, default=Path(".backups"), help="Directory for backups.")
     parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
-    return parser.parse_args(argv)
+    return render_prompts.resolve_repo_paths(parser.parse_args(argv))
 
 
 def run(args: argparse.Namespace) -> int:

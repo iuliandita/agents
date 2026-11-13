@@ -41,6 +41,7 @@ from render_prompts import (
     read_bytes_or_none,
     record_deployed,
     require_owned,
+    resolve_repo_paths,
     run_json,
     run_plain,
 )
@@ -948,7 +949,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--repo-root", type=Path, default=repo_root)
-    parser.add_argument("--out-dir", type=Path, default=repo_root / "build" / "agents")
+    parser.add_argument("--out-dir", type=Path, default=Path("build/agents"))
     parser.add_argument(
         "--target",
         "--harness",
@@ -973,12 +974,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Render harnesses with no tier map as session-model inheritance instead of failing.",
     )
-    parser.add_argument("--backup-dir", type=Path, default=repo_root / ".backups", help="Directory for deploy backups.")
+    parser.add_argument("--backup-dir", type=Path, default=Path(".backups"), help="Directory for deploy backups.")
     parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
     args = parser.parse_args(argv)
     if args.dry_run and (args.check or args.verify or args.list_targets):
         parser.error("--dry-run cannot be combined with --check, --verify, or --list-targets")
-    return args
+    return resolve_repo_paths(args)
 
 
 def run(args: argparse.Namespace) -> int:
