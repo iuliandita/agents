@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- CI runs the full suite on Linux, macOS, and Windows, expands Python coverage, isolates test homes and Git config, verifies hashed dependencies, and requires tagged-commit checks before release. Windows setup includes virtual environments and runbook commands (#218).
+
 - Correct documentation drift and the consolidation clear loop (#219).
 
 - Prompt rules now align on destructive-action confirmation, subagent blockers, and secrets. Harness notes keep runtime checks and config paths, describe rendered effort values, and require a Codex context cap of at least 40 KiB. Public prompts drop repeated rules and optional routing policy; the line-limit test rejects lint warnings (#204).

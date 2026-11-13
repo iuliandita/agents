@@ -8,15 +8,6 @@ import pytest
 import update
 
 
-@pytest.fixture(autouse=True)
-def isolated_git_config(tmp_path, monkeypatch):
-    config = tmp_path / "gitconfig"
-    config.write_text("", encoding="utf-8")
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(config))
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-    monkeypatch.delenv("AGENTS_UPDATE_BRANCHES", raising=False)
-
-
 def write_targets(repo: Path, text: str) -> None:
     (repo / "prompts").mkdir(parents=True, exist_ok=True)
     (repo / "prompts" / "deploy-targets.txt").write_text(text, encoding="utf-8")

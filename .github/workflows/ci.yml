@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
@@ -28,9 +28,11 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
 
       - name: Install test dependencies
-        run: python -m pip install -r requirements-dev.txt
+        run: python -m pip install -r requirements-dev.txt --require-hashes
 
       - name: Lint prompt sources
         run: python scripts/lint_prompts.py
@@ -63,11 +65,12 @@ jobs:
 
       - name: Install actionlint
         env:
-          ACTIONLINT_VERSION: "1.7.12"
+          # renovate: datasource=github-release-attachments depName=rhysd/actionlint
+          ACTIONLINT_VERSION: "v1.7.12"
           ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
         run: |
           mkdir -p "$HOME/.local/bin"
-          curl -fsSLo /tmp/actionlint.tar.gz "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLo /tmp/actionlint.tar.gz "https://github.com/rhysd/actionlint/releases/download/${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION#v}_linux_amd64.tar.gz"
           echo "${ACTIONLINT_SHA256}  /tmp/actionlint.tar.gz" | sha256sum --check
           tar -xzf /tmp/actionlint.tar.gz -C "$HOME/.local/bin" actionlint
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
@@ -91,7 +94,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -102,21 +105,28 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
 
       - name: Install test dependencies
-        run: python -m pip install -r requirements-dev.txt
+        run: python -m pip install -r requirements-dev.txt --require-hashes
 
       - name: Run tests
         run: python -m pytest -q
 
       - name: Syntax-check Python scripts
-        run: python -m py_compile scripts/render_prompts.py scripts/render_invariants.py scripts/lint_prompts.py scripts/scan_prompt_sources.py scripts/check_harness_docs.py scripts/check_harness_contract.py scripts/check_docs_impact.py scripts/check_docs_links.py scripts/render_agents.py scripts/render_hermes.py scripts/update.py scripts/install_workflow.py
+        run: python -m py_compile scripts/*.py .github/stack/stack-check.py
 
       - name: Check PowerShell launcher
         run: pwsh -NoProfile -File scripts/sync-ai-prompts.ps1 --check
 
-      - name: Dry-run deploy rendering
-        run: scripts/sync-ai-prompts --dry-run
+      - name: Dry-run deploy rendering with an isolated home
+        run: |
+          export HOME
+          HOME="$(mktemp -d)"
+          scripts/sync-ai-prompts --dry-run
+          scripts/render-invariants --dry-run
+          scripts/render-hermes --dry-run
 
   markdown:
     name: markdown
@@ -150,11 +160,12 @@ jobs:
 
       - name: Install lychee
         env:
-          LYCHEE_VERSION: "0.24.2"
+          # renovate: datasource=github-release-attachments depName=lycheeverse/lychee
+          LYCHEE_VERSION: "lychee-v0.24.2"
           LYCHEE_SHA256: "1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a"
         run: |
           mkdir -p "$HOME/.local/bin"
-          curl -fsSLo /tmp/lychee.tar.gz "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSLo /tmp/lychee.tar.gz "https://github.com/lycheeverse/lychee/releases/download/${LYCHEE_VERSION}/lychee-x86_64-unknown-linux-gnu.tar.gz"
           echo "${LYCHEE_SHA256}  /tmp/lychee.tar.gz" | sha256sum --check
           tar -xzf /tmp/lychee.tar.gz -C "$HOME/.local/bin" --strip-components=1 lychee-x86_64-unknown-linux-gnu/lychee
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
@@ -170,7 +181,7 @@ jobs:
           lychee --config lychee.toml "${markdown_files[@]}"
 
   macos-setup:
-    name: macOS setup smoke test
+    name: macos-setup
     runs-on: macos-15
     timeout-minutes: 15
     steps:
@@ -183,12 +194,14 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
 
       - name: Install test dependencies
-        run: python -m pip install -r requirements-dev.txt
+        run: python -m pip install -r requirements-dev.txt --require-hashes
 
-      - name: Test interpreter selection
-        run: python -m pytest -q tests/test_python_runtime.py
+      - name: Run full test suite
+        run: python -m pytest -q -rs
 
       - name: Render with system Bash and an isolated environment
         run: |
@@ -199,7 +212,7 @@ jobs:
           /bin/bash scripts/render-invariants --dry-run
 
   windows-setup:
-    name: Windows launcher smoke test
+    name: windows-setup
     runs-on: windows-2025
     timeout-minutes: 15
     steps:
@@ -212,9 +225,14 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
 
       - name: Install test dependencies
-        run: python -m pip install -r requirements-dev.txt
+        run: python -m pip install -r requirements-dev.txt --require-hashes
+
+      - name: Run full test suite
+        run: python -m pytest -q -rs
 
       - name: Render with the PowerShell launchers
         shell: pwsh
