@@ -763,7 +763,7 @@ def check(repo_root: Path, selected: list[str] | None, allow_inherit: bool = Fal
     # differ by design.
     overrides = load_overrides(repo_root)
     with TemporaryDirectory() as temp_dir:
-        written = render_all(repo_root, Path(temp_dir), selected, overrides, allow_inherit)
+        written = render_all(repo_root, Path(temp_dir).resolve(), selected, overrides, allow_inherit)
         for harness, paths in written.items():
             for path in paths:
                 text = path.read_text(encoding="utf-8")
@@ -982,7 +982,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if args.dry_run and (args.check or args.verify or args.list_targets):
         parser.error("--dry-run cannot be combined with --check, --verify, or --list-targets")
-    return resolve_repo_paths(args)
+    return resolve_repo_paths(args, parser)
 
 
 def run(args: argparse.Namespace) -> int:

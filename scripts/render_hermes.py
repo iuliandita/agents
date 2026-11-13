@@ -265,7 +265,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true", help="Print the target without writing.")
     parser.add_argument("--backup-dir", type=Path, default=Path(".backups"), help="Directory for backups.")
     parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
-    return render_prompts.resolve_repo_paths(parser.parse_args(argv))
+    return render_prompts.resolve_repo_paths(parser.parse_args(argv), parser)
 
 
 def run(args: argparse.Namespace) -> int:

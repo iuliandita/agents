@@ -662,11 +662,14 @@ def read_bytes_or_none(path: Path) -> bytes | None:
         return None
 
 
-def resolve_repo_paths(args: argparse.Namespace) -> argparse.Namespace:
-    args.repo_root = args.repo_root.expanduser().absolute()
-    for name in ("out_dir", "backup_dir"):
-        path = getattr(args, name).expanduser()
-        setattr(args, name, path if path.is_absolute() else args.repo_root / path)
+def resolve_repo_paths(args: argparse.Namespace, parser: argparse.ArgumentParser) -> argparse.Namespace:
+    try:
+        args.repo_root = args.repo_root.expanduser().absolute()
+        for name in ("out_dir", "backup_dir"):
+            path = getattr(args, name).expanduser()
+            setattr(args, name, path if path.is_absolute() else args.repo_root / path)
+    except (OSError, RuntimeError, ValueError) as exc:
+        parser.error(f"cannot resolve renderer paths: {exc}")
     return args
 
 
@@ -783,7 +786,7 @@ def check_render_shape(repo_root: Path, selected: list[str] | None = None) -> in
         if not apply_optional_blocks(core, frozenset(harness.optional_blocks)).strip():
             raise SystemExit(f"error: {harness.name}: core is empty after optional blocks")
     with TemporaryDirectory() as temp_dir:
-        out_dir = Path(temp_dir)
+        out_dir = Path(temp_dir).resolve()
         written = render_all(repo_root, out_dir, selected=selected, stamp="check")
         for harness, path in written.items():
             text = path.read_text(encoding="utf-8")
@@ -1112,7 +1115,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if args.dry_run and (args.check or args.status or args.list_targets):
         parser.error("--dry-run cannot be combined with --check, --status, or --list-targets")
-    return resolve_repo_paths(args)
+    return resolve_repo_paths(args, parser)
 
 
 def run(args: argparse.Namespace) -> int:

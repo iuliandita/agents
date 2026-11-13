@@ -129,6 +129,36 @@ def test_render_does_not_resolve_away_linked_repo_ancestors(tmp_path, module_nam
     assert not (real / "build").exists()
 
 
+@pytest.mark.parametrize("script", ["render_prompts.py", "render_agents.py", "render_invariants.py", "render_hermes.py"])
+@pytest.mark.parametrize("option", ["--repo-root", "--out-dir", "--backup-dir"])
+def test_path_resolution_errors_are_usage_errors(env, script, option):
+    proc = run(env, script, "--json", option, "~agents-no-such-user-224/output")
+    assert proc.returncode == 2 and "Traceback" not in proc.stderr
+    data = json.loads(proc.stdout)
+    assert data["mode"] is None and data["records"] == []
+    assert data["errors"][0].startswith("error:")
+    assert "cannot resolve renderer paths" in data["errors"][0]
+
+
+@pytest.mark.parametrize("module_name", ["render_prompts", "render_agents"])
+def test_check_resolves_its_private_temporary_directory(tmp_path, monkeypatch, module_name):
+    from contextlib import contextmanager
+
+    real = tmp_path / "temporary"
+    real.mkdir()
+    alias = tmp_path / "temporary-alias"
+    alias.symlink_to(real, target_is_directory=True)
+
+    @contextmanager
+    def temporary_directory():
+        yield str(alias)
+
+    module = importlib.import_module(module_name)
+    monkeypatch.setattr(module, "TemporaryDirectory", temporary_directory)
+    assert module.main(["--check", "--target", "claude"]) == 0
+    assert list(real.rglob("*.md"))
+
+
 def test_prompts_list_targets(env):
     code, data = run_json(env, "render_prompts.py", "--list-targets", "--harness", "claude,codex")
     assert code == 0

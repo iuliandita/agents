@@ -5,18 +5,18 @@
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "cf4793e789c649286720bce670993ee7e246904ffc67b5d762e25ae5d7d2cc44",
+      "fingerprint": "bfe84bfce52671ab7952e704e4affc8da2dc769f6dbb48e75fa10d9cc4e8bd64",
       "migration": "Back up configs and consumers; upgrade using real paths, absolute directory overrides for existing locations, and the unmanaged preview action; roll back by restoring backups and the previous checkout.",
-      "note": "Record ancestor-link refusal before creating Hermes preview directories, plus launcher resolution, hook previews, relative artifacts, and LF normalization."
+      "note": "Record usage-error JSON for invalid hook and Hermes artifact paths; preserve ancestor-link refusal, launcher resolution, hook previews, and LF normalization."
     },
     "harnesses": {
       "breaking": "Selected AGENTS.md artifacts always use harness subdirectories; relative artifacts follow --repo-root; writes refuse linked ancestors; Windows drive-qualified PI_CONFIG_DIR stays under home; CRLF prompts and malformed optional blocks no longer pass checks.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "080bdfeab8a8c53b46f0fb94d32a10fc574d341ec5cd0a11c9555f5f65b1ecd4",
+      "fingerprint": "ffb801aebef904abb3decc56a9cb64b6802b6e889338eb357959a2cf80d73d71",
       "migration": "Back up artifacts, sources, and consumers; upgrade by updating selected artifact paths, using absolute overrides for old locations, real destination paths, and paired optional markers; roll back by restoring backups, consumers, and the previous checkout.",
-      "note": "Record stable selected paths and shared helpers; preserve lexical repository ancestors for link checks while resolving relative artifacts under that repository."
+      "note": "Record canonical private check directories and JSON usage errors for invalid paths, while preserving user-selected ancestor checks and stable selected-render paths."
     },
     "maintenance": {
       "breaking": "none",
@@ -31,9 +31,9 @@
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "7e35af71176594f6ae72a6f9ea361b6bf8b28e4cc5bf037718c484948be1fb17",
+      "fingerprint": "7552a5eb7aabb3648514306a7d1e8d5ad927ee154ffcf70ee5de7ccb6a7f684e",
       "migration": "Back up roles and consumers; upgrade using real paths, escaped descriptions, and absolute directory overrides to retain locations; roll back by restoring backups and the previous checkout.",
-      "note": "Record shared target parsing and collision detection while retaining quoted-description decoding, ancestor-link refusal, relative artifacts, and diagnostic corrections."
+      "note": "Record canonical private role-check directories and JSON path usage errors alongside shared target helpers, quoted-description decoding, and target diagnostics."
     },
     "overlays-trust": {
       "breaking": "none",
