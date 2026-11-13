@@ -45,7 +45,7 @@
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "7c7b6a63a0005004b0c5efea69912acbe5584516317a1c19028e990068fe7b30",
+      "fingerprint": "c65a7311b7b73b12693b07c7b411b45b51f93e405eef2eaac9b005542ec453d8",
       "note": "Changelog covers confirmation scope, subagent blockers, rendered effort, Codex context cap, and warning-free prompt limits."
     },
     "workflow-templates": {
