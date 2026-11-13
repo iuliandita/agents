@@ -1,13 +1,6 @@
 from pathlib import Path
 
-
-def test_ci_installs_python_test_dependencies_from_requirements_file():
-    repo = Path(__file__).resolve().parents[1]
-    workflow = (repo / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    requirements = (repo / "requirements-dev.txt").read_text(encoding="utf-8")
-
-    assert "python -m pip install -r requirements-dev.txt" in workflow
-    assert "pytest>=" in requirements
+import pytest
 
 
 def test_renovate_tracks_github_actions_and_python_dependencies():
@@ -139,3 +132,29 @@ def test_release_notes_extract_from_the_real_changelog(tmp_path):
     text = notes.read_text(encoding="utf-8")
     assert "omit_sections" in text
     assert "## [" not in text and "compare/" not in text
+
+
+@pytest.mark.parametrize("ci,security", [("success", "success"), ("failure", "success"), ("success", "cancelled"), ("missing", "success")])
+def test_release_requires_successful_checks_for_the_tagged_commit(tmp_path, ci, security):
+    import os
+    import subprocess
+
+    steps = load_workflow("release.yml")["jobs"]["release"]["steps"]
+    step = next(s for s in steps if s["name"] == "Require successful CI for the tagged commit")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    commands = {
+        "git": '#!/bin/sh\nprintf "%s\\n" tagged-commit\n',
+        "gh": '#!/bin/sh\nprintf "%s\\n" "$*" >> "$REQUESTS"\ncase "$*" in\n  *ci.yml*) echo "$CI_RESULT";;\n  *) echo "$SECURITY_RESULT";;\nesac\n',
+    }
+    for name, body in commands.items():
+        path = bin_dir / name
+        path.write_text(body, encoding="utf-8")
+        path.chmod(0o755)
+    requests = tmp_path / "requests"
+    env = dict(os.environ, PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}", REQUESTS=str(requests),
+               GITHUB_REF_NAME="v1.0.0", GITHUB_REPOSITORY="example/repo", CI_RESULT=ci, SECURITY_RESULT=security)
+    result = subprocess.run(["bash", "-e", "-c", step["run"]], env=env, capture_output=True, text=True)
+    assert result.returncode == (0 if ci == security == "success" else 1), result.stdout + result.stderr
+    calls = requests.read_text(encoding="utf-8").splitlines()
+    assert all("-f head_sha=tagged-commit -f event=push -f branch=main" in call for call in calls)

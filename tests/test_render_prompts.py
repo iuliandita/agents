@@ -1211,7 +1211,7 @@ def test_backup_retention_groups_source_paths_and_recognizes_legacy_names(tmp_pa
         for index in range(3):
             source.write_text(f"{parent}:{index}")
             backup = renderer.backup_existing(source, backups)
-            os.utime(backup, ns=(index + 1, index + 1))
+            os.utime(backup, (index + 1, index + 1))  # whole seconds: NTFS has 100 ns resolution
     legacy = backups / "AGENTS-2026-01-01-tmp-legacy-AGENTS.md.bak"
     legacy.write_text("legacy")
     renderer.prune_backups(backups, 1, False)

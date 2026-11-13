@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -6,15 +7,6 @@ from types import SimpleNamespace
 import pytest
 
 import update
-
-
-@pytest.fixture(autouse=True)
-def isolated_git_config(tmp_path, monkeypatch):
-    config = tmp_path / "gitconfig"
-    config.write_text("", encoding="utf-8")
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(config))
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-    monkeypatch.delenv("AGENTS_UPDATE_BRANCHES", raising=False)
 
 
 def write_targets(repo: Path, text: str) -> None:
@@ -180,7 +172,7 @@ def test_main_refuses_untrusted_checkout_before_steps(remote_checkout, monkeypat
 
     result = subprocess.run(
         [sys.executable, update.__file__, "--repo-root", str(checkout), "--targets", "hermes", "--dry-run"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=dict(os.environ),
     )
 
     assert result.returncode == 1

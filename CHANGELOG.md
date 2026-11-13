@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- CI runs the full suite on Linux, macOS, and Windows, expands Python coverage, isolates test homes and Git config, verifies hashed dependencies, and requires tagged-commit checks before release. Windows setup includes virtual environments and runbook commands (#218).
+
 - Deploy safety: preflight all selected prompt and role renders, replace files atomically, record each completed file in the deploy manifest, and preserve corrupt manifests. Unmanaged prompt, role, and hook files now require `--adopt`; back up and review them before upgrading, or restore the affected backup and previous checkout to roll back. Environment-selected targets inside Git worktrees withhold local and private overlays; default global paths keep them. Backups use private permissions, bounded filenames, and retention per source path, including new workflow bundles (#216).
 
 - Correct documentation drift and the consolidation clear loop (#219).

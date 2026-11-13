@@ -9,7 +9,7 @@ import lint_prompts as linter
 
 def test_lint_file_flags_private_path_marker(tmp_path):
     target = tmp_path / "core.md"
-    target.write_text("Render from internal.example/prompt-core.md instead.\n", encoding="utf-8")
+    target.write_text("Render from internal.example/prompt-core.md instead.\n", encoding="utf-8", newline="\n")
 
     failures = linter.lint_file(target, private_patterns=("internal.example",))
 
@@ -21,7 +21,7 @@ def test_load_private_patterns_from_file(tmp_path):
     (repo / "prompts").mkdir(parents=True)
     (repo / "prompts" / "private-patterns.txt").write_text(
         "# comments are ignored\ninternal.example\n\n",
-        encoding="utf-8",
+        encoding="utf-8", newline="\n",
     )
 
     assert "internal.example" in linter.load_private_patterns(repo)
@@ -29,7 +29,7 @@ def test_load_private_patterns_from_file(tmp_path):
 
 def test_lint_file_flags_token_like_secret(tmp_path):
     target = tmp_path / "core.md"
-    target.write_text("Example token: sk-" + "a" * 32 + "\n", encoding="utf-8")
+    target.write_text("Example token: sk-" + "a" * 32 + "\n", encoding="utf-8", newline="\n")
 
     failures = linter.lint_file(target)
 
@@ -50,13 +50,13 @@ def test_lint_file_flags_additional_vendor_secret_prefixes(tmp_path):
     }
     for filename, body in samples.items():
         target = tmp_path / filename
-        target.write_text(body + "\n", encoding="utf-8")
+        target.write_text(body + "\n", encoding="utf-8", newline="\n")
         assert linter.lint_file(target) == 1, filename
 
 
 def test_lint_file_flags_non_ascii_content(tmp_path):
     target = tmp_path / "core.md"
-    target.write_text("Use a regular dash, not an em—dash.\n", encoding="utf-8")
+    target.write_text("Use a regular dash, not an em—dash.\n", encoding="utf-8", newline="\n")
 
     failures = linter.lint_file(target)
 
@@ -74,7 +74,7 @@ def test_lint_file_flags_crlf_line_endings(tmp_path):
 
 def test_lint_file_passes_clean_ascii(tmp_path):
     target = tmp_path / "core.md"
-    target.write_text("Plain ASCII guidance with no markers.\n", encoding="utf-8")
+    target.write_text("Plain ASCII guidance with no markers.\n", encoding="utf-8", newline="\n")
 
     failures = linter.lint_file(target)
 
@@ -83,7 +83,7 @@ def test_lint_file_passes_clean_ascii(tmp_path):
 
 def test_lint_line_count_returns_failure_when_over_hard_cap(tmp_path):
     target = tmp_path / "core.md"
-    target.write_text("\n".join("line" for _ in range(12)), encoding="utf-8")
+    target.write_text("\n".join("line" for _ in range(12)), encoding="utf-8", newline="\n")
 
     failures = linter.lint_line_count(target, warn_at=8, max_lines=10)
 
@@ -92,7 +92,7 @@ def test_lint_line_count_returns_failure_when_over_hard_cap(tmp_path):
 
 def test_lint_line_count_returns_zero_when_within_warn_threshold(tmp_path):
     target = tmp_path / "core.md"
-    target.write_text("\n".join("line" for _ in range(5)), encoding="utf-8")
+    target.write_text("\n".join("line" for _ in range(5)), encoding="utf-8", newline="\n")
 
     failures = linter.lint_line_count(target, warn_at=8, max_lines=10)
 
@@ -101,7 +101,7 @@ def test_lint_line_count_returns_zero_when_within_warn_threshold(tmp_path):
 
 def test_lint_line_count_returns_zero_when_only_warning(tmp_path):
     target = tmp_path / "core.md"
-    target.write_text("\n".join("line" for _ in range(9)), encoding="utf-8")
+    target.write_text("\n".join("line" for _ in range(9)), encoding="utf-8", newline="\n")
 
     failures = linter.lint_line_count(target, warn_at=8, max_lines=10)
 
@@ -131,18 +131,18 @@ def test_main_flags_orphan_harness_fragment(tmp_path, capsys):
     scripts_dir.mkdir(parents=True)
     prompts = repo_root / "prompts"
     (prompts / "harnesses").mkdir(parents=True)
-    (prompts / "core.md").write_text("# Core\nclean line\n", encoding="utf-8")
-    (prompts / "invariants.md").write_text("# Invariants\nclean line\n", encoding="utf-8")
+    (prompts / "core.md").write_text("# Core\nclean line\n", encoding="utf-8", newline="\n")
+    (prompts / "invariants.md").write_text("# Invariants\nclean line\n", encoding="utf-8", newline="\n")
     for harness in linter.HARNESSES:
         (prompts / "harnesses" / harness.fragment).write_text(
-            "## Fragment\nclean line\n", encoding="utf-8"
+            "## Fragment\nclean line\n", encoding="utf-8", newline="\n"
         )
     (prompts / "harnesses" / "orphan.md").write_text(
-        "## Orphan\nclean line\n", encoding="utf-8"
+        "## Orphan\nclean line\n", encoding="utf-8", newline="\n"
     )
-    (prompts / "local.example.md").write_text("# Local\nclean line\n", encoding="utf-8")
+    (prompts / "local.example.md").write_text("# Local\nclean line\n", encoding="utf-8", newline="\n")
     (prompts / "private.example.md").write_text(
-        "# Example\nclean line\n", encoding="utf-8"
+        "# Example\nclean line\n", encoding="utf-8", newline="\n"
     )
 
     fake_script = scripts_dir / "lint_prompts.py"
@@ -167,16 +167,16 @@ def test_main_lints_private_example_when_present(tmp_path, capsys):
     scripts_dir.mkdir(parents=True)
     prompts = repo_root / "prompts"
     (prompts / "harnesses").mkdir(parents=True)
-    (prompts / "core.md").write_text("# Core\nclean line\n", encoding="utf-8")
-    (prompts / "invariants.md").write_text("# Invariants\nclean line\n", encoding="utf-8")
+    (prompts / "core.md").write_text("# Core\nclean line\n", encoding="utf-8", newline="\n")
+    (prompts / "invariants.md").write_text("# Invariants\nclean line\n", encoding="utf-8", newline="\n")
     for harness in linter.HARNESSES:
         (prompts / "harnesses" / harness.fragment).write_text(
-            "## Fragment\nclean line\n", encoding="utf-8"
+            "## Fragment\nclean line\n", encoding="utf-8", newline="\n"
         )
-    (prompts / "private-patterns.txt").write_text("internal.example\n", encoding="utf-8")
-    (prompts / "local.example.md").write_text("# Local\nclean line\n", encoding="utf-8")
+    (prompts / "private-patterns.txt").write_text("internal.example\n", encoding="utf-8", newline="\n")
+    (prompts / "local.example.md").write_text("# Local\nclean line\n", encoding="utf-8", newline="\n")
     (prompts / "private.example.md").write_text(
-        "# Example\nLeaks internal.example/secret path.\n", encoding="utf-8"
+        "# Example\nLeaks internal.example/secret path.\n", encoding="utf-8", newline="\n"
     )
 
     fake_script = scripts_dir / "lint_prompts.py"
@@ -201,18 +201,18 @@ def test_main_lints_agent_sources(tmp_path, capsys):
     scripts_dir.mkdir(parents=True)
     prompts = repo_root / "prompts"
     (prompts / "harnesses").mkdir(parents=True)
-    (prompts / "core.md").write_text("# Core\nclean line\n", encoding="utf-8")
-    (prompts / "invariants.md").write_text("# Invariants\nclean line\n", encoding="utf-8")
+    (prompts / "core.md").write_text("# Core\nclean line\n", encoding="utf-8", newline="\n")
+    (prompts / "invariants.md").write_text("# Invariants\nclean line\n", encoding="utf-8", newline="\n")
     for harness in linter.HARNESSES:
         (prompts / "harnesses" / harness.fragment).write_text(
-            "## Fragment\nclean line\n", encoding="utf-8"
+            "## Fragment\nclean line\n", encoding="utf-8", newline="\n"
         )
-    (prompts / "local.example.md").write_text("# Local\nclean line\n", encoding="utf-8")
-    (prompts / "private.example.md").write_text("# Example\nclean line\n", encoding="utf-8")
+    (prompts / "local.example.md").write_text("# Local\nclean line\n", encoding="utf-8", newline="\n")
+    (prompts / "private.example.md").write_text("# Example\nclean line\n", encoding="utf-8", newline="\n")
     agents = repo_root / "agents"
     agents.mkdir()
     (agents / "explorer.md").write_text(
-        "---\nname: explorer\n---\nsee /home/yourname/secret\n", encoding="utf-8"
+        "---\nname: explorer\n---\nsee /home/yourname/secret\n", encoding="utf-8", newline="\n"
     )
 
     fake_script = scripts_dir / "lint_prompts.py"
@@ -233,7 +233,7 @@ def git_repo_with(tmp_path, files):
     for name, text in files.items():
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
+        path.write_text(text, encoding="utf-8", newline="\n")
     subprocess.run(["git", "-C", str(tmp_path), "init", "-q"], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "add", *files], check=True)
     return tmp_path
@@ -241,7 +241,7 @@ def git_repo_with(tmp_path, files):
 
 def test_tracked_marker_scan_covers_every_tracked_file(tmp_path, capsys):
     repo = git_repo_with(tmp_path, {"README.md": "see lab.example.net\n", "docs/x.md": "clean\n"})
-    (repo / "untracked.md").write_text("lab.example.net\n", encoding="utf-8")
+    (repo / "untracked.md").write_text("lab.example.net\n", encoding="utf-8", newline="\n")
     assert linter.lint_tracked_markers(repo, ("lab.example.net",)) == 1
     out = capsys.readouterr().err
     assert "README.md: tracked file contains local marker: lab.example.net" in out
@@ -311,7 +311,7 @@ def lint_repo(tmp_path, monkeypatch):
 def test_main_lints_additional_public_sources(lint_repo, capsys, relative, body, message):
     target = lint_repo / relative
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(body + "\n", encoding="utf-8")
+    target.write_text(body + "\n", encoding="utf-8", newline="\n")
 
     assert linter.main() == 1
     errors = capsys.readouterr().err
@@ -337,7 +337,7 @@ def test_main_skips_binary_templates(lint_repo):
 ])
 def test_main_rejects_tracked_overlays_and_editor_copies(lint_repo, capsys, relative):
     target = lint_repo / relative
-    target.write_text("local context\n", encoding="utf-8")
+    target.write_text("local context\n", encoding="utf-8", newline="\n")
     subprocess.run(["git", "-C", str(lint_repo), "add", "-f", relative], check=True)
 
     assert linter.main() == 1
