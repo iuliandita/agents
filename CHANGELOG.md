@@ -10,6 +10,7 @@ All notable changes to this project are documented here. Versions follow semanti
   - The secret ban is unconditional, and the private-infrastructure rule is scoped to public repos.
   - Task-end branch cleanup belongs to the main thread.
   - The Command Code memory and hook notes are scoped.
+  - Git: work on a branch rather than the default or release branch unless the repo or user says otherwise, and flag it before committing there.
 
 - Core prompt: the Writing Voice rules now cover commits and PRs/MRs. Both take a `type(scope): description` title, commit bodies are at most three short lines of why, and PR/MR bodies are capped at ten lines. Quick dev text may be lower-case; email, wikis, and external docs are capitalized and proofread (#192).
 

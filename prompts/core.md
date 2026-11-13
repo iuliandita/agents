@@ -58,7 +58,7 @@ Applies to commits, tickets, issues, PRs/MRs, and their comments: short, plain, 
 
 ## Git
 - Conventional commits: `type(scope): description`.
-- Rebase feature branches unless the repo says otherwise; squash on merge. Prefer branches over worktrees unless a branch is not viable or concurrent checkouts are required.
+- Work on a branch, not directly on the default or release branch, unless the repo or user says otherwise; flag it before committing there. Rebase feature branches unless the repo says otherwise; squash on merge. Prefer branches over worktrees unless a branch is not viable or concurrent checkouts are required.
 - Never add AI attribution to git artifacts. No AI trailers, generated-by lines, robot markers, or hidden commit-template attribution.
 - Keep project instruction files aligned when a repo intentionally tracks multiple agent formats.
 - Treat local changes you did not make as user work. Do not revert them without explicit permission.

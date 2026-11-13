@@ -54,8 +54,8 @@
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "6c5d44801d61b678e53b9402af2031c15b3c29795096e9811c98fe3733af9b7f",
-      "note": "Contradicting rules removed (#194): model precedence line, slimmer Claude and Codex ladders, scoped auto-mode, secret, cleanup, and Command Code notes; no flag, path or overlay behavior changes."
+      "fingerprint": "49f452ff700220b697370897d71889b6f41163b76ccda7108ec0223563631b86",
+      "note": "changelog notes the core guideline to branch instead of committing to the default branch"
     },
     "workflow-templates": {
       "baseline": true,
