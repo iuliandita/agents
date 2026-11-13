@@ -25,6 +25,13 @@ issues include:
 - consolidation steps that delete or clear files outside their backup manifest
 - dependency vulnerabilities in the pinned tooling
 
+## Updater Trust Model
+
+The updater trusts the configured upstream of an allowed branch (`main` or `develop`, narrowed by
+`AGENTS_UPDATE_BRANCHES`) and runs the scripts it pulls. It does not verify commit or tag signatures
+yet. A compromised upstream can therefore execute code and change deployed prompts. With `--no-pull`,
+the updater skips branch and upstream checks and trusts the checkout as it is.
+
 ## Not in Scope
 
 - The behavior of third-party agent harnesses themselves.

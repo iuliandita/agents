@@ -131,9 +131,16 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
    reach the user (log file, syslog/journal, or mail); default to the platform's native scheduler, 06:30,
    and the scheduler's own failure log if they have no preference. `scripts/update` pulls fast-forward only, never prompts (git runs
    non-interactively with a timeout), refuses to run over local tracked edits or alongside another run, and
-   exits non-zero on any failure. Schedulers start with a minimal environment: copy into the job every
+   exits non-zero on any failure. Before pulling, it requires `main` or `develop` with a configured
+   upstream; feature branches and detached HEAD exit 1 before any render or deploy step. Set
+   `AGENTS_UPDATE_BRANCHES=main` (stable) or `AGENTS_UPDATE_BRANCHES=develop` (nightly) to narrow the
+   allow-list. It accepts a comma-separated subset of `main,develop`; other names never add branches,
+   and an empty value allows none. `--no-pull` skips these checks and prints a `note:` that the checkout
+   is deployed as is, including in dry runs. Use a dedicated clean clone on the chosen branch for
+   scheduled updates so feature work cannot interrupt the schedule.
+   Schedulers start with a minimal environment: copy into the job every
    variable the setup relied on (`AGENTS_PYTHON`, customized homes from step 4, `*_AGENTS_PATH` or
-   `*_AGENTS_DIR` overrides, `AGENTS_PRIVATE_HARNESSES`). Replace `<checkout>` with the real absolute path.
+   `*_AGENTS_DIR` overrides, `AGENTS_PRIVATE_HARNESSES`, `AGENTS_UPDATE_BRANCHES`). Replace `<checkout>` with the real absolute path.
 
    ```bash
    # cron (Linux/macOS): daily at 06:30; failures also go to syslog

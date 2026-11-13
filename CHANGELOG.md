@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- Updater: require an allowed branch with an upstream before pulling, allow narrowing with `AGENTS_UPDATE_BRANCHES`, and report Windows lock contention cleanly (#200).
+
 - Roles and pipeline (#198).
   - The planner returns `Need the goal: <what is missing>.` instead of asking.
   - The reviewer reviews named files when no diff is given, and puts its `Coverage: partial` line after the findings line.

@@ -1,14 +1,14 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "Update no longer accepts the retired target.",
+      "breaking": "none",
       "docs": [
         "CHANGELOG.md",
-        "INSTALL.md"
+        "INSTALL.md",
+        "SECURITY.md"
       ],
-      "fingerprint": "a74212abea55305ffaa98781132113258e6dc5ce456801e9cce8078e3b96238f",
-      "migration": "Back up saved commands, upgrade by removing the target, and roll back to the previous release if needed.",
-      "note": "Remove the retired target from update selection."
+      "fingerprint": "5924ff204ca466ff7fe8a346e54090714c33051da9164f2efa27f68f8c31640e",
+      "note": "Document allowed tracking branches, narrowing the updater allow-list, no-pull trust, and upstream signature limits."
     },
     "harnesses": {
       "breaking": "none",
