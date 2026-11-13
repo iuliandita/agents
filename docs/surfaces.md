@@ -11,6 +11,7 @@ so there is no separate desktop deployment; the account-synced chat surfaces are
 | OpenAI Codex | CLI, IDE, ChatGPT Desktop Codex | Yes - the desktop Personalization box edits global `AGENTS.md`; shared Codex home and auth | developers.openai.com/codex/app/settings |
 | ChatGPT | Desktop Chat/Work (non-Codex) | No - uses Memories/personality, separate from `~/.codex` | developers.openai.com/codex/app/settings |
 | OpenCode | TUI, CLI, desktop, GitHub Action | Yes - config "applies across all interfaces" | opencode.ai/docs/config |
+| Command Code | CLI | Yes - reads the global Command Code rules file | commandcode.ai/docs/memory |
 | Antigravity | Desktop 2.0, IDE extensions, `agy` CLI | Yes for rules/MCP/workspace - all share `~/.gemini/GEMINI.md` and `.agents/` | antigravity.google/docs/rules-workflows |
 | Hermes | CLI and desktop | Yes - desktop shares `HERMES_HOME` (same config, sessions, skills, memory) | hermes-agent.nousresearch.com/docs/user-guide/desktop |
 | Oh My Pi | CLI/TUI, `omp acp` (editor server) | Yes - all surfaces read the same `~/.omp/agent/AGENTS.md`; no desktop app | installed omp 18.2.11 source (omp.sh) |

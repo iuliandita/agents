@@ -11,36 +11,34 @@
     "harnesses": {
       "breaking": "none",
       "docs": [
-        "INSTALL.md"
+        "docs/harness-contract.md"
       ],
       "fingerprint": "09d2fddc2d5020153500f7eabb553a880f96c2d5cd5c20445bec9a2bd2f9e75d",
-      "note": "changelog and INSTALL json table cover reviewer, planner, line caps, and per-section byte sizes"
+      "note": "command code detection aliases are documented accurately"
     },
     "maintenance": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "docs/MAINTENANCE.md"
       ],
-      "fingerprint": "03ff2325b2cdb162a6958c95e4916eb2b159f234fc309f3a3f7de9277839d524",
-      "note": "MAINTENANCE explains that only receipt-changing commits count for the breaking carry check"
+      "fingerprint": "f3d3d9f5b63bf646479fc9c696b51e7d6689df4efb44fa5871bea8ffe1ece14b",
+      "note": "domain table lists all relevant maintenance documentation"
     },
     "models-agents": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md",
-        "README.md",
         "docs/harness-contract.md"
       ],
       "fingerprint": "280377bfb8a2b5add3558a1b928eccd41f27debf85a6d2b443fafc94c08c1bc1",
-      "note": "Document deny-all read-only roles, body tool budgets, blocker output, empty expansion errors, and unsupported turn-cap notices."
+      "note": "claude cheap role efforts match current role sources"
     },
     "overlays-trust": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "docs/MAINTENANCE.md"
       ],
       "fingerprint": "be20fa75f41844776af6a19da44d55651ea5fa80eee2836865c8e5e026e74e24",
-      "note": "MAINTENANCE explains the scan skips dependency trees and gitignored files but keeps the prompts overlays"
+      "note": "maintenance documentation describes overlay leak scanning behavior"
     },
     "prompts": {
       "breaking": "none",
@@ -51,11 +49,12 @@
       "note": "Changelog covers confirmation scope, subagent blockers, rendered effort, Codex context cap, and warning-free prompt limits."
     },
     "workflow-templates": {
-      "baseline": true,
       "breaking": "none",
-      "docs": [],
-      "fingerprint": "aba0b21a75c06a3808af72828ab46a498411f7c78033aacdad66a053b4cc46bd",
-      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+      "docs": [
+        "CHANGELOG.md"
+      ],
+      "fingerprint": "227257baff9aa30b4512eecba718234fda73a0b30063e2d0cd957f8b3d5d5128",
+      "note": "consolidation clearing handles final unterminated path safely"
     }
   },
   "schema": 1

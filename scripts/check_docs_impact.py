@@ -29,7 +29,7 @@ MAPPED_ROOTS = ("agents/", "prompts/", "scripts/", "skills/", "templates/")
 DOMAINS: dict[str, dict[str, tuple[str, ...]]] = {
     "prompts": {
         "sources": ("prompts/core.md", "prompts/invariants.md", "prompts/harnesses/*.md"),
-        "docs": ("README.md", "INSTALL.md", "docs/surfaces.md", CHANGELOG),
+        "docs": ("README.md", "INSTALL.md", "docs/surfaces.md", "docs/harness-contract.md", CHANGELOG),
     },
     "models-agents": {
         "sources": (
@@ -50,6 +50,7 @@ DOMAINS: dict[str, dict[str, tuple[str, ...]]] = {
             "docs/harness-contract.md",
             "docs/surfaces.md",
             "docs/legacy-harnesses.md",
+            "CONTRIBUTING.md",
             CHANGELOG,
         ),
     },
@@ -68,7 +69,7 @@ DOMAINS: dict[str, dict[str, tuple[str, ...]]] = {
             "scripts/python-runtime.ps1",
             "scripts/install_workflow.py",
         ),
-        "docs": ("README.md", "INSTALL.md", "SECURITY.md", CHANGELOG),
+        "docs": ("README.md", "INSTALL.md", "SECURITY.md", "CONTRIBUTING.md", "docs/harness-contract.md", "docs/surfaces.md", CHANGELOG),
     },
     "overlays-trust": {
         "sources": (
@@ -79,7 +80,7 @@ DOMAINS: dict[str, dict[str, tuple[str, ...]]] = {
             "scripts/scan_prompt_sources.py",
             ".gitignore",
         ),
-        "docs": ("README.md", "INSTALL.md", "SECURITY.md", CHANGELOG),
+        "docs": ("README.md", "INSTALL.md", "SECURITY.md", "docs/MAINTENANCE.md", CHANGELOG),
     },
     "workflow-templates": {
         "sources": ("skills/*", "templates/*"),
@@ -87,7 +88,7 @@ DOMAINS: dict[str, dict[str, tuple[str, ...]]] = {
     },
     "maintenance": {
         "sources": ("scripts/check_*.py",),
-        "docs": ("docs/MAINTENANCE.md", "README.md", CHANGELOG),
+        "docs": ("docs/MAINTENANCE.md", "README.md", "INSTALL.md", "CONTRIBUTING.md", "AGENTS.md", CHANGELOG),
     },
 }
 GENERIC_REASONS = {"docs reviewed", "no impact", "no docs impact", "n/a", "none", "not needed", "nothing to update"}
