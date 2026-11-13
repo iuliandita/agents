@@ -45,6 +45,8 @@ from render_prompts import (
     resolve_repo_paths,
     run_json,
     run_plain,
+    selected_names,
+    target_collisions,
 )
 
 
@@ -666,17 +668,7 @@ def verify(repo_root: Path, selected: list[str] | None, env: dict[str, str] | No
 
 
 def selected_agent_harnesses(selected: list[str] | None) -> list[str]:
-    if not selected:
-        return list(AGENT_HARNESSES)
-    names: list[str] = []
-    for item in selected:
-        names.extend(part.strip() for part in item.split(",") if part.strip())
-    if not names:
-        raise UsageError("error: no harness names parsed from --target; nothing to do")
-    for name in names:
-        if name not in AGENT_HARNESSES:
-            raise UsageError(f"error: unknown agent harness: {name}. Supported: {', '.join(AGENT_HARNESSES)}")
-    return list(dict.fromkeys(names))
+    return selected_names(selected, list(AGENT_HARNESSES), "agent harness")
 
 
 def agent_target_dir(harness: str, home: Path | None = None, env: dict[str, str] | None = None) -> Path:
@@ -884,13 +876,12 @@ def deploy(
         preflight_target(target, files, adopt or dry_run)
         deployments.append((harness, target, files, stale))
 
-    by_dir: dict[str, list[str]] = {}
-    for harness, target, _, _ in deployments:
-        # normcase folds case so Windows/macOS default filesystems cannot collide unseen.
-        by_dir.setdefault(os.path.normcase(str(target.expanduser().resolve(strict=False))), []).append(harness)
-    shared = {path: names for path, names in by_dir.items() if len(names) > 1}
+    shared = target_collisions({harness: target for harness, target, _, _ in deployments})
     if shared:
-        shared_dirs = "; ".join(f"{path} is shared by {', '.join(names)}" for path, names in sorted(shared.items()))
+        shared_dirs = "; ".join(
+            f"{path} is shared by {', '.join(names)}"
+            for path, names in sorted(shared.items(), key=lambda item: str(item[0]))
+        )
         raise SystemExit(
             f"error: agent deploy target collision: {shared_dirs}; "
             "select one harness with --target or point one *_AGENTS_DIR env var elsewhere"

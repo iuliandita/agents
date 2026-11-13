@@ -198,7 +198,7 @@ def test_render_all_writes_selected_harnesses_to_output_dir(tmp_path):
 
     assert written == {
         "claude": tmp_path / "out" / "CLAUDE.md",
-        "codex": tmp_path / "out" / "AGENTS.md",
+        "codex": tmp_path / "out" / "codex" / "AGENTS.md",
     }
     assert "claude only" in written["claude"].read_text(encoding="utf-8")
     assert "shared" in written["codex"].read_text(encoding="utf-8")
@@ -224,17 +224,19 @@ def test_full_catalog_render_places_colliding_outputs_in_harness_subdirectories(
             assert path == tmp_path / "out" / harness / item.output_name
 
 
-def test_single_selected_agents_output_stays_top_level(tmp_path):
+def test_selected_output_path_matches_full_catalog_and_deduplicates_targets(tmp_path):
     repo = Path(__file__).resolve().parents[1]
 
     written = renderer.render_all(
         repo_root=repo,
         out_dir=tmp_path / "out",
-        selected=["codex"],
+        selected=["codex,codex", "codex"],
         stamp="2026-04-25",
     )
 
-    assert written["codex"] == tmp_path / "out" / "AGENTS.md"
+    assert written == {"codex": tmp_path / "out" / "codex" / "AGENTS.md"}
+    full = renderer.render_all(repo_root=repo, out_dir=tmp_path / "out", stamp="2026-04-25")
+    assert full["codex"] == written["codex"]
 
 
 def test_apply_optional_blocks_keeps_enabled_and_drops_disabled():

@@ -20,10 +20,12 @@ import re
 import shutil
 import stat
 import tempfile
+from collections import Counter
+from collections.abc import Mapping
 from datetime import date
 from pathlib import Path, PureWindowsPath
 from tempfile import TemporaryDirectory
-from typing import NamedTuple
+from typing import NamedTuple, TypeVar
 
 
 DEPLOYABLE = "deployable"
@@ -338,16 +340,24 @@ def harness_target_rows(home: str = "~") -> list[tuple[str, str, str, str]]:
     return rows
 
 
-def selected_harnesses(selected: list[str] | None) -> list[Harness]:
+def selected_names(selected: list[str] | None, supported: list[str], label: str = "harness") -> list[str]:
     if not selected:
-        return list(HARNESSES)
+        return list(supported)
 
     names: list[str] = []
     for item in selected:
         names.extend(part.strip() for part in item.split(",") if part.strip())
     if not names:
         raise UsageError("error: no harness names parsed from --target; nothing to do")
-    return [harness_by_name(name) for name in names]
+    names = list(dict.fromkeys(names))
+    for name in names:
+        if name not in supported:
+            raise UsageError(f"error: unknown {label}: {name}. Supported: {', '.join(supported)}")
+    return names
+
+
+def selected_harnesses(selected: list[str] | None) -> list[Harness]:
+    return [harness_by_name(name) for name in selected_names(selected, harness_names())]
 
 
 OMP_PROFILE_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
@@ -746,9 +756,7 @@ def render_all(
     stamp: str | None = None,
 ) -> dict[str, Path]:
     harnesses = selected_harnesses(selected)
-    output_counts: dict[str, int] = {}
-    for harness in harnesses:
-        output_counts[harness.output_name] = output_counts.get(harness.output_name, 0) + 1
+    output_counts = Counter(harness.output_name for harness in HARNESSES)
     collisions = {name for name, count in output_counts.items() if count > 1}
 
     core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
@@ -804,8 +812,11 @@ def resolve_deploy_targets(harnesses: list[Harness]) -> tuple[dict[Harness, Path
     return resolved, skipped
 
 
-def target_collisions(resolved: dict[Harness, Path]) -> dict[Path, list[Harness]]:
-    by_key: dict[str, list[tuple[Path, Harness]]] = {}
+Target = TypeVar("Target")
+
+
+def target_collisions(resolved: Mapping[Target, Path]) -> dict[Path, list[Target]]:
+    by_key: dict[str, list[tuple[Path, Target]]] = {}
     for harness, dest in resolved.items():
         resolved_path = dest.expanduser().resolve(strict=False)
         # normcase folds case so Windows/macOS default filesystems cannot collide unseen.

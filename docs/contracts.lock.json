@@ -10,13 +10,13 @@
       "note": "Record hook, Hermes, and workflow destination ancestor-link refusal including Windows junctions and backup directories."
     },
     "harnesses": {
-      "breaking": "Writes refuse linked ancestors; relative artifacts follow --repo-root; Windows drive-qualified PI_CONFIG_DIR stays under home; CRLF prompts and malformed optional blocks no longer pass checks.",
+      "breaking": "Selected AGENTS.md artifacts always use harness subdirectories; relative artifacts follow --repo-root; writes refuse linked ancestors; Windows drive-qualified PI_CONFIG_DIR stays under home; CRLF prompts and malformed optional blocks no longer pass checks.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "f6c878589f5588d0f8ba75265544e6f2eb2ff3d3dd4868853b8ab6a964bff104",
-      "migration": "Back up artifacts and sources; upgrade using real paths instead of linked ancestors, absolute overrides for existing locations, and paired optional markers; roll back by restoring backups and the previous checkout.",
-      "note": "Record removal of unused section omission and build-only states; retain optional blocks, ancestor-link checks, relative artifacts, and strict render validation."
+      "fingerprint": "7fc9229a7ff749e589be6bf1c5fbf5180ec193a62bc177b6bcb73fa4a8782e12",
+      "migration": "Back up artifacts, sources, and consumers; upgrade by updating selected artifact paths, using absolute overrides for old locations, real destination paths, and paired optional markers; roll back by restoring backups, consumers, and the previous checkout.",
+      "note": "Record stable selected-render paths, deduplicated target selection, shared collision detection, removal of unused harness branches, and earlier renderer correctness fixes."
     },
     "maintenance": {
       "breaking": "none",
@@ -31,9 +31,9 @@
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "84405f8996afbc43ad029d1d9f9931eb3ab7c27767c63ad308a2595d6915b01c",
+      "fingerprint": "7e35af71176594f6ae72a6f9ea361b6bf8b28e4cc5bf037718c484948be1fb17",
       "migration": "Back up roles and consumers; upgrade using real paths, escaped descriptions, and absolute directory overrides to retain locations; roll back by restoring backups and the previous checkout.",
-      "note": "Record role target ancestor-link refusal, quoted-description decoding, null-model notices, relative artifacts, and diagnostic corrections."
+      "note": "Record shared target parsing and collision detection while retaining quoted-description decoding, ancestor-link refusal, relative artifacts, and diagnostic corrections."
     },
     "overlays-trust": {
       "breaking": "none",
