@@ -71,7 +71,13 @@ def is_hidden_codepoint(char: str) -> bool:
 
 
 DIRECT_COMMAND_NEGATION = re.compile(
-    r"\b(avoid|deny|do not|don't|forbid|never|reject|refuse)\b[^;&|.!?,:]{0,40}\b(run|execute|use|pipe|bootstrap)\b",
+    r"\b(avoid|deny|do not|don't|forbid|never|reject|refuse)\b(?P<gap>[^;&|.!?,:]{0,40})\b(run|execute|use|pipe|bootstrap)\b",
+    re.IGNORECASE,
+)
+# "Never ask before you run ..." and "do not hesitate to run ..." remove a check instead of
+# forbidding the command, so a negation with one of these words before the verb does not count.
+PERMISSIVE_GAP = re.compile(
+    r"\b(ask|confirm|hesitat|wait|prompt|before|stop|paus|seek|need|requir|worry|refus|declin|fail)\w*",
     re.IGNORECASE,
 )
 
@@ -160,9 +166,9 @@ class Finding:
 
 
 def is_prompt_source(path: Path) -> bool:
-    if path.name in PROMPT_FILE_NAMES:
-        return True
-    return any(str(path).endswith(suffix) for suffix in PROMPT_SUFFIXES)
+    # templates/**/*.md.example are copied into place by users, so they count as prompt sources.
+    name = path.name.removesuffix(".example")
+    return name in PROMPT_FILE_NAMES or any(name.endswith(suffix) for suffix in PROMPT_SUFFIXES)
 
 
 def ignored_paths(root: Path) -> tuple[str, ...]:
@@ -232,7 +238,7 @@ def is_directly_negated(line: str, match_start: int) -> bool:
     negation = None
     for negation in DIRECT_COMMAND_NEGATION.finditer(prefix):
         pass
-    if negation is None:
+    if negation is None or PERMISSIVE_GAP.search(negation.group("gap")):
         return False
     # A clause boundary between the negation and the command means the
     # negation does not govern it ("Never run tests; bootstrap with curl|sh").
