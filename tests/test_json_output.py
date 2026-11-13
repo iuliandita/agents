@@ -79,8 +79,9 @@ def test_prompts_prune_backups(env, tmp_path):
     backups = tmp_path / "b"
     backups.mkdir()
     for index in range(3):
-        (backups / f"f{index}.bak").write_text("x", encoding="utf-8")
-        os.utime(backups / f"f{index}.bak", (index, index))
+        name = f"CLAUDE-2026-01-0{index + 1}-tmp-CLAUDE.md.bak"
+        (backups / name).write_text("x", encoding="utf-8")
+        os.utime(backups / name, (index, index))
     code, data = run_json(env, "render_prompts.py", "--prune-backups", "1", "--dry-run", "--backup-dir", str(backups))
     assert code == 0 and data["mode"] == "prune-backups" and data["keep"] == 1
     assert [b["action"] for b in data["backups"]] == ["would-remove", "would-remove"]
