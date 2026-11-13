@@ -27,13 +27,13 @@
       "note": "domain table lists all relevant maintenance documentation"
     },
     "models-agents": {
-      "breaking": "Relative role output and backup directories resolve under --repo-root; CRLF roles require replacement, unreadable targets fail, and max_turns notices identify a harness.",
+      "breaking": "Malformed quoted role fields fail; relative role directories resolve under --repo-root; CRLF roles require replacement, unreadable targets fail, and max_turns notices identify a harness.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "4dbdcb315ff87e92c18df0c864e4de6e09eab54754d788824809ab1ce13f031e",
-      "migration": "Back up roles and output consumers; upgrade with absolute directory overrides to retain locations and adjust notice matching; roll back by restoring backups and the previous checkout.",
-      "note": "Record repository-relative role artifact directories, unreadable target failures, LF rewrites, and harness turn-cap notices."
+      "fingerprint": "4bbe5b7c60e688a844ffd3d5995cf64c8b4d3522efc32342f6d1a6fc5a5ffbb4",
+      "migration": "Back up roles and output consumers; upgrade by escaping double quotes or doubling single quotes and using absolute directory overrides to retain locations; roll back by restoring backups and the previous checkout.",
+      "note": "Record quoted-description decoding, strict native frontmatter tests, clear null-model fallback notices, relative artifacts, and target diagnostics."
     },
     "overlays-trust": {
       "breaking": "none",

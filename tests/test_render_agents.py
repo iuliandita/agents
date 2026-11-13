@@ -44,10 +44,25 @@ def test_parse_frontmatter_strips_matching_quotes(tmp_path):
     assert fields["description"] == "Quoted: value"
 
 
-def test_parse_frontmatter_keeps_value_with_interior_matching_quote(tmp_path):
+def test_parse_frontmatter_rejects_unescaped_interior_quote(tmp_path):
     path = write_agent(tmp_path / "sample.md", description='"a" and "b"')
-    fields, _ = ra.parse_frontmatter(path.read_text(encoding="utf-8"), path)
-    assert fields["description"] == '"a" and "b"'
+    with pytest.raises(SystemExit, match="invalid quoted frontmatter"):
+        ra.load_agent(path)
+
+
+@pytest.mark.parametrize("description,expected", [
+    (r'"Say \"hi\" and C:\\tools"', 'Say "hi" and C:\\tools'),
+    ("'It''s a quoted description'", "It's a quoted description"),
+    ('plain: "quoted" and \\ path', 'plain: "quoted" and \\ path'),
+])
+@pytest.mark.parametrize("harness", ra.AGENT_HARNESSES)
+def test_description_round_trips_through_native_parser(tmp_path, description, expected, harness):
+    role = ra.load_agent(write_agent(tmp_path / "sample.md", description=description))
+    resolved = ra.resolve(role, harness, {}, DEFAULTS)
+    text = ra.RENDERERS[harness](role, resolved, INVARIANTS)
+    data = tomllib.loads(text) if harness == "codex" else yaml.safe_load(text.split("\n---\n", 1)[0][4:])
+    assert role.description == expected
+    assert data["description"] == expected
 
 
 @pytest.mark.parametrize(
@@ -366,14 +381,15 @@ INVARIANTS = "# Hard Invariants (non-negotiable)\n- Never add AI attribution to 
 
 def test_render_claude_frontmatter_and_body():
     text = ra.render_claude(spec(tools=("read", "search", "shell-ro"), max_turns=30), ra.resolve(spec(), "claude", {}, DEFAULTS), INVARIANTS)
-    fields, body = ra.parse_frontmatter(text, Path("claude/sample.md"))
+    head, body = text[4:].split("\n---\n", 1)
+    fields = yaml.safe_load(head)
     assert fields == {
         "name": "sample",
         "description": "Sample.",
         "tools": "Read, Grep, Glob",
         "model": "haiku",
         "effort": "low",
-        "maxTurns": "30",
+        "maxTurns": 30,
     }
     assert ra.GENERATED_MARKER in body
     assert "Never add AI attribution" in body
@@ -382,7 +398,7 @@ def test_render_claude_frontmatter_and_body():
 
 def test_render_claude_omits_model_when_inherit():
     resolved = ra.Resolved(model=None, effort="low", effort_key="effort", notices=[])
-    fields, _ = ra.parse_frontmatter(ra.render_claude(spec(), resolved, INVARIANTS), Path("x.md"))
+    fields = yaml.safe_load(ra.render_claude(spec(), resolved, INVARIANTS)[4:].split("\n---\n", 1)[0])
     assert "model" not in fields
 
 
@@ -487,10 +503,11 @@ def test_render_harness_fails_loud_when_every_model_inherits():
 
 def test_render_commandcode_tools_list():
     text = ra.render_commandcode(spec(tools=("read", "search", "web"), max_turns=30), ra.resolve(spec(), "commandcode", {}, DEFAULTS), INVARIANTS)
-    fields, body = ra.parse_frontmatter(text, Path("x.md"))
+    head, body = text[4:].split("\n---\n", 1)
+    fields = yaml.safe_load(head)
     assert fields["tools"] == "read_file, read_directory, grep, glob, web_fetch, web_search"
     assert fields["reasoningEffort"] == "low"
-    assert fields["maxTurns"] == "30"
+    assert fields["maxTurns"] == 30
     assert fields["model"] == "deepseek/deepseek-v4.1-flash"
     assert ra.GENERATED_MARKER in body
 
@@ -601,14 +618,16 @@ def test_check_passes_on_repo(capsys):
 def test_render_antigravity_frontmatter_and_tools():
     resolved = ra.resolve(spec(tier="cheap", tools=("read", "search", "shell-ro")), "antigravity", {}, DEFAULTS)
     text = ra.render_antigravity(spec(tools=("read", "search", "shell-ro")), resolved, INVARIANTS)
-    fields, body = ra.parse_frontmatter(text, Path("x.md"))
+    head, body = text[4:].split("\n---\n", 1)
+    fields = yaml.safe_load(head)
 
     assert fields["name"] == "sample"
-    assert fields["subagent"] == "true"
-    assert fields["mainAgent"] == "false"
+    assert fields["subagent"] is True
+    assert fields["mainAgent"] is False
     assert fields["model"] == "flash"
     assert "  - view_file" in text
     assert "  - grep_search" in text
+    assert fields["tools"] == ["view_file", "list_dir", "grep_search", "find_by_name"]
     assert "run_command" not in text
     assert ra.GENERATED_MARKER in body
 
@@ -1033,6 +1052,15 @@ def test_render_omp_apex_falls_back_to_slow_role_with_max_effort():
     resolved = ra.resolve(spec(tier="apex", effort="max"), "omp", {}, DEFAULTS)
     assert resolved.model == "@slow"
     assert resolved.effort == "max"
+
+
+def test_null_flagship_fallback_explains_session_inheritance():
+    defaults = {"codex": {"tiers": {"flagship": {"model": None, "effort": "high"}}}}
+    resolved = ra.resolve(spec(tier="apex"), "codex", {}, defaults)
+    assert resolved.model is None and resolved.effort == "high"
+    assert resolved.notices == [
+        "codex/sample: no apex model configured; using flagship settings and inheriting the session model",
+    ]
 
 
 def test_omp_reviewer_shadow_is_noticed():

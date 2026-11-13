@@ -106,11 +106,18 @@ def parse_frontmatter(text: str, source: Path) -> tuple[dict[str, str], str]:
         key, value = line.split(":", 1)
         key = key.strip()
         value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-            quote = value[0]
-            interior = value[1:-1]
-            if quote not in interior:
-                value = interior
+        if value.startswith('"'):
+            try:
+                decoded = json.loads(value)
+            except json.JSONDecodeError as exc:
+                raise SystemExit(f"error: {source}: invalid quoted frontmatter value for {key}: {exc}") from None
+            if not isinstance(decoded, str):
+                raise SystemExit(f"error: {source}: quoted frontmatter value for {key} must be a string")
+            value = decoded
+        elif value.startswith("'"):
+            if not re.fullmatch(r"'(?:[^']|'')*'", value):
+                raise SystemExit(f"error: {source}: invalid single-quoted frontmatter value for {key}; double embedded apostrophes")
+            value = value[1:-1].replace("''", "'")
         if key in fields:
             raise SystemExit(f"error: {source}: duplicate frontmatter key: {key}")
         fields[key] = value
@@ -358,8 +365,10 @@ def resolve(spec: AgentSpec, harness: str, overrides: dict, defaults: dict) -> R
     elif tier == "apex" and tiers.get("flagship") is not None:
         # A flagship object with a null model still carries its effort.
         entry_value = tiers["flagship"]
+        flagship = tier_model(entry_value)
+        fallback = f"flagship '{flagship}'" if flagship is not None else "flagship settings and inheriting the session model"
         notices.append(
-            f"{harness}/{spec.name}: no apex model configured; using flagship '{tier_model(entry_value)}'"
+            f"{harness}/{spec.name}: no apex model configured; using {fallback}"
         )
     elif tiers:
         notices.append(f"{harness}/{spec.name}: no {tier} model configured; inheriting the session model")
@@ -456,8 +465,7 @@ def generated_header(spec: AgentSpec, invariants: str, salt: str = "") -> str:
 
 
 def yaml_string(value: str) -> str:
-    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
-    return f'"{escaped}"'
+    return json.dumps(value, ensure_ascii=False)
 
 
 def markdown_body(spec: AgentSpec, invariants: str, salt: str = "") -> str:
