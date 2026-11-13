@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- Core prompt and harness notes: tighter wording with the same behavior, and repeated paths and maintainer notes removed; the Codex render drops from 32,700 to 32,047 bytes (#196).
+  - Invariants: only rewriting pushed history needs confirmation, so a local rebase of an unpushed branch does not.
+
 - Core prompt and harness notes: removed rules that contradicted each other (#194).
   - Model routing now has one stated precedence, and the Claude and Codex ladders drop prices and version numbers.
   - The Claude auto-mode note no longer reads as skipping confirmation.
