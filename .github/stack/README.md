@@ -26,10 +26,11 @@ Run it from the repository root. Findings print to stderr, one per line, as `err
 - Assets: `assets/logo.png`, `assets/logo-256.png`, and `assets/wordmark.png` exist, and the two logos have the canonical pixel sizes.
 - CONTRIBUTING: the shared opening paragraph, the three `##` headings in order, a `sh` block first under `Checks and documentation`, and `develop`, `main`, and `Unreleased` in `Releases`.
 - Agent entry point: `AGENTS.md` names the repo in its first heading, stays within 60 lines, has the `Commands`, `Layout`, `Rules`, and `For agents` sections in order, and tells agents to read `AGENTS.local.md`. In a git checkout, `CLAUDE.md` must be a symlink to `AGENTS.md` in the git index (the filesystem is not consulted, because Windows checks symlinks out as plain files), `AGENTS.local.md` and `CLAUDE.local.md` must be git-ignored, and `AGENTS.md` and `CLAUDE.md` must not be. Outside a git checkout only the file checks run.
-- Workflows (line-based, no YAML parser): the required job ids exist and are named after their id, every `uses:` is pinned to a 40-hex SHA with a `# v` comment, every job has `timeout-minutes`, and every checkout step sets `persist-credentials: false`.
+- Workflows (line-based, no YAML parser): the required job ids exist and are named after their id, every `uses:` is pinned to a 40-hex SHA with a `# v` comment, every job has `timeout-minutes`, and every checkout step sets the key and value in `workflows.checkout_require` (currently `persist-credentials: false`).
 - Installer help: each command in `repo.json` exits 0 on `--help`, lists its declared flags, and has `Environment` and `Exit codes` sections.
 - Error strings: no upper-case `ERROR:`, and no `SystemExit("...")` or `sys.exit("...")` with a string literal that lacks an `error:`, `warning:`, or `note:` prefix, in the paths named in `repo.json`.
-- Text: tracked Markdown files are ASCII, and no tracked text file holds a home-directory path, a private IPv4 address, or an e-mail address outside the allowed identifiers.
+- Text: tracked Markdown files are ASCII, and no tracked text file holds a home-directory path, a private IPv4 address, or an e-mail address outside `private_patterns.allowed_emails`. The private-pattern scan skips directories named in `private_patterns.skip_dirs` at any depth; outside Git, file discovery uses the same list.
+- Canon: `canon_version` must be the supported integer version (currently 1). Exit-code descriptions and author identifiers are not shared enforcement settings; installer help sections and the explicit email allowlist define the checks above.
 - Vendoring: when `SOURCE` exists, the vendored files match their recorded sha256.
 
 ## What is not checked

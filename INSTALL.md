@@ -83,8 +83,7 @@ automatically. Use the environment's executable directly if activation is disabl
 ```
 
 PowerShell 7+ (`pwsh`) is expected. Rendered writes are LF and backup names are
-Windows-safe. If you prefer to call the Python scripts directly, pass
-`--repo-root .`. Run inside WSL to use the bash wrappers unchanged; a WSL install
+Windows-safe. Run inside WSL to use the bash wrappers unchanged; a WSL install
 reads the WSL home, separate from a native Windows install. Point both at one
 home with the native env var (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `HERMES_HOME`)
 if you want a shared config.
@@ -119,7 +118,8 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
    (gitignored). Show the user where each will be written and get a yes before going on:
    `scripts/sync-ai-prompts --list-targets` (rules files) and `scripts/render-agents --list-targets`
    (subagent dirs). Customized homes (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `OPENCODE_CONFIG_DIR`,
-   `PI_CODING_AGENT_DIR`, `OMP_PROFILE`, `HERMES_HOME`) are honored when they are set in this shell.
+   `PI_CODING_AGENT_DIR`, `PI_CONFIG_DIR`, `OMP_PROFILE`, `PI_PROFILE`, `HERMES_HOME`,
+   `HERMES_CONFIG_PATH`, `LOCALAPPDATA`) are honored when they are set in this shell.
    Hermes is different: its global rules merge into `agent.coding_instructions` in `$HERMES_HOME/config.yaml`
    (default `~/.hermes/config.yaml`, or `%LOCALAPPDATA%\hermes\config.yaml` on native Windows),
    shown by `scripts/render-hermes --dry-run`; ignore the `HERMES.md`
@@ -141,7 +141,7 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
 7. **Deploy**: `scripts/update --no-pull` (`./scripts/update.ps1 --no-pull` on native Windows).
    Existing files are backed up to `.backups/` first. Check: it
    ends with `update complete`; its last steps are `--verify` (every role file present) and `--status`
-   (every rules file in sync).
+   (managed global rules files in sync, excluding the Hermes YAML merge).
 8. **Schedule** a daily run. **ask** which scheduler, what time (local timezone), and how failures should
    reach the user (log file, syslog/journal, or mail); default to the platform's native scheduler, 06:30,
    and the scheduler's own failure log if they have no preference. `scripts/update` pulls fast-forward only, never prompts (git runs
@@ -155,7 +155,9 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
    scheduled updates so feature work cannot interrupt the schedule.
    Schedulers start with a minimal environment: copy into the job every
    variable the setup relied on (`AGENTS_PYTHON`, customized homes from step 4, `*_AGENTS_PATH` or
-   `*_AGENTS_DIR` overrides, `AGENTS_PRIVATE_HARNESSES`, `AGENTS_UPDATE_BRANCHES`). Replace `<checkout>` with the real absolute path.
+   `*_AGENTS_DIR` overrides, `AGENTS_PRIVATE_HARNESSES`, `AGENTS_UPDATE_BRANCHES`, and hook paths).
+   Include `PI_CONFIG_DIR`, `PI_PROFILE`, `HERMES_CONFIG_PATH`, and `LOCALAPPDATA` when used;
+   see [Environment variables](#environment-variables). Replace `<checkout>` with the real absolute path.
 
    ```bash
    # cron (Linux/macOS): daily at 06:30; failures also go to syslog
@@ -177,7 +179,7 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
 
    # ~/.config/systemd/user/agents-update.timer
    [Timer]
-   OnCalendar=daily
+   OnCalendar=*-*-* 06:30:00
    Persistent=true
 
    [Install]
@@ -193,7 +195,8 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
 
    Check: trigger the scheduled job itself once (`systemctl --user start agents-update.service`,
    `schtasks /Run /TN agents-update`, or the cron command in a minimal shell such as `env -i HOME="$HOME"
-   sh -c '...'`) and confirm it exits 0 and `--status` reports every target in sync.
+   sh -c '...'`) and confirm it exits 0 and `--status` reports managed global rules in sync.
+   Hermes YAML is excluded from `--status`; inspect its result separately.
 
 Report to the user what was deployed where, the backup location, and when the schedule runs. To change
 targets later, edit `prompts/deploy-targets.txt`; the next run applies it. `AGENTS_DEPLOY_TARGETS` or
@@ -287,6 +290,34 @@ OPENCODE_AGENTS_PATH="$HOME/.config/opencode/AGENTS.md" scripts/sync-ai-prompts 
 ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/GEMINI.md" scripts/sync-ai-prompts --target antigravity --deploy
 ```
 
+## Environment Variables
+
+Set these in the shell or scheduler that runs the command. Explicit command-line paths take
+precedence over environment defaults where supported.
+
+| Variable | Effect |
+|---|---|
+| `AGENTS_PYTHON` | Python 3.11+ executable for the launchers; a path, not a command with flags. |
+| `AGENTS_DEPLOY_TARGETS` | Comma-separated updater targets; overrides `prompts/deploy-targets.txt`, below `--harness` or `--targets`. |
+| `AGENTS_UPDATE_BRANCHES` | Comma-separated subset of `main,develop` allowed to pull; empty allows none. |
+| `AGENTS_PRIVATE_HARNESSES` | Private-overlay trust list; overrides `prompts/private-harnesses.txt`. |
+| `AGENTS_PRIVATE_PATTERNS` | Additional comma- or newline-separated private markers for the leak linter. |
+| `CLAUDE_AGENTS_PATH`, `CODEX_AGENTS_PATH`, `OPENCODE_AGENTS_PATH`, `COMMANDCODE_AGENTS_PATH` | Override the named harness's rules file. |
+| `ANTIGRAVITY_AGENTS_PATH`, `OMP_AGENTS_PATH`, `HERMES_AGENTS_PATH`, `GENERIC_AGENTS_PATH` | Override the named harness's rules file; Hermes here means project rules. |
+| `CLAUDE_AGENTS_DIR`, `CODEX_AGENTS_DIR`, `OPENCODE_AGENTS_DIR` | Override the named harness's role directory. |
+| `COMMANDCODE_AGENTS_DIR`, `ANTIGRAVITY_AGENTS_DIR`, `OMP_AGENTS_DIR` | Override the named harness's role directory. |
+| `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `OPENCODE_CONFIG_DIR` | Relocate both default rules and role paths; Claude's hook and settings defaults also follow its config home. |
+| `PI_CONFIG_DIR` | Oh My Pi config root relative to the home directory, default `.omp`. |
+| `OMP_PROFILE`, `PI_PROFILE` | Select the Oh My Pi profile; `OMP_PROFILE` takes precedence, including an empty value. |
+| `PI_CODING_AGENT_DIR` | Relocate Oh My Pi rules when no named profile takes precedence; task-agent discovery follows the profile or home. |
+| `HERMES_HOME` | Hermes home; global config defaults to `config.yaml` inside it. |
+| `HERMES_CONFIG_PATH` | Explicit Hermes global config file; takes precedence over `HERMES_HOME`. |
+| `LOCALAPPDATA` | Native Windows Hermes default is `%LOCALAPPDATA%\hermes\config.yaml` when set. |
+| `CLAUDE_HOOKS_DIR`, `CLAUDE_SETTINGS_PATH` | Override the invariants hook directory and Claude settings file. |
+| `HOME`, `USERPROFILE` | Platform home resolution and expansion of `~`. |
+| `PATH` | Executable discovery for launchers and updater detection. |
+| `GIT_SSH_COMMAND` | SSH command for updater pulls; default `ssh -o BatchMode=yes`. |
+
 ## Default Targets
 
 <!-- harness-targets:start -->
@@ -341,7 +372,7 @@ Existing `shell_ro_wrappers` settings are accepted for compatibility but no long
 
 Model tiers and effort maps come from the tracked `prompts/models.json`; `prompts/models.local.json` overrides them. Copy `prompts/models.local.example.json` to start. A harness with no tier map fails unless `--allow-inherit` is passed.
 
-A tier value is a model string, `null` (inherit the session model), or an object `{"model": "<id or null>", "effort": "<level>"}`. The object form is for single-model setups: point every tier at the same model and let the tier set the depth. Effort resolves in this order: `agents.<name>.effort` in the override file, then the tier's `effort`, then the role's own `effort`; `effort_map` then translates the level into the harness's vocabulary. A tier in `models.local.json` replaces the whole default entry, so a plain string there drops a default tier effort. A missing `apex` falls back to `flagship`, effort included; an explicit `"apex": null` inherits instead. Tier objects and the `max` level need this version or later; older checkouts reject them.
+A tier value is a model string, `null` (inherit the session model), or an object `{"model": "<id or null>", "effort": "<level>"}`. The object form is for single-model setups: point every tier at the same model and let the tier set the depth. Effort resolves in this order: `agents.<name>.effort` in the override file, then the tier's `effort`, then the role's own `effort`; `effort_map` then translates the level into the harness's vocabulary. Levels omitted from `effort_map` keep their original names, so identity entries are unnecessary. A tier in `models.local.json` replaces the whole default entry, so a plain string there drops a default tier effort. A missing `apex` falls back to `flagship`, effort included; an explicit `"apex": null` inherits instead. Tier objects and the `max` level need this version or later; older checkouts reject them.
 
 ## Project Instructions: Shared Or Private
 
@@ -532,7 +563,8 @@ even when the home directory belongs to a dotfiles worktree. After upgrading, pr
 paths and verify the generated headers. To roll back, restore the affected backup and check out
 the previous version before redeploying; restore only the affected prompt or role. Render/check
 the known-good checkout and preview its target paths before redeploying.
-`scripts/sync-ai-prompts --status` compares deployed rules with a fresh render;
+`scripts/sync-ai-prompts --status` compares deployed rules with a fresh render, excluding
+the Hermes global YAML merge;
 `scripts/render-agents --verify` checks only that role files exist, not their content,
 discovery or model compatibility.
 
