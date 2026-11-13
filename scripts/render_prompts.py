@@ -431,32 +431,58 @@ def target_path(harness: str, home: str | Path | None = None, env: dict[str, str
 
 
 OPTIONAL_BLOCK_RE = re.compile(
-    r"[ \t]*<!--\s*optional:([a-z0-9_-]+)\s*-->\n(.*?)\n[ \t]*<!--\s*/optional:\1\s*-->\n?",
-    re.DOTALL,
+    r"^[ \t]*<!--\s*optional:([a-z0-9_-]+)\s*-->[ \t]*\n(.*?)^[ \t]*<!--\s*/optional:\1\s*-->[ \t]*(?:\n|$)",
+    re.DOTALL | re.MULTILINE,
 )
+OPTIONAL_MARKER_RE = re.compile(r"<!--\s*/?optional\s*:", re.IGNORECASE)
+
+
+def require_no_optional_markers(text: str) -> None:
+    if OPTIONAL_MARKER_RE.search(text):
+        raise SystemExit("error: malformed or leftover optional block marker; check matching lower-case block names")
 
 
 def apply_optional_blocks(text: str, enabled: frozenset[str]) -> str:
     """Keep enabled optional blocks, drop the rest, and collapse left gaps."""
 
     def replace(match: re.Match[str]) -> str:
-        return match.group(2) + "\n" if match.group(1) in enabled else ""
+        return match.group(2) if match.group(1) in enabled else ""
 
     result = OPTIONAL_BLOCK_RE.sub(replace, text)
+    require_no_optional_markers(result)
     return re.sub(r"\n{3,}", "\n\n", result)
+
+
+def markdown_headings(lines: list[str]) -> dict[int, tuple[int, str]]:
+    """ATX headings outside fenced code blocks, indexed by source line."""
+    headings: dict[int, tuple[int, str]] = {}
+    fence: str | None = None
+    for index, line in enumerate(lines):
+        if fence is not None:
+            if re.fullmatch(r" {0,3}" + re.escape(fence[0]) + r"{" + str(len(fence)) + r",}[ \t]*\n?", line):
+                fence = None
+            continue
+        opening = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        if opening and (opening[1][0] != "`" or "`" not in opening[2]):
+            fence = opening[1]
+            continue
+        heading = re.match(r"^(#{1,6})[ \t]+(.+?)\s*$", line)
+        if heading:
+            headings[index] = (len(heading[1]), heading[2])
+    return headings
 
 
 def drop_sections(core: str, names: tuple[str, ...]) -> str:
     """Remove `## name` sections from core; a missing name fails the render instead of passing silently."""
     lines = core.splitlines(keepends=True)
     for name in names:
-        heading = f"## {name}"
-        starts = [i for i, line in enumerate(lines) if line.rstrip() == heading]
+        headings = markdown_headings(lines)
+        starts = [index for index, heading in headings.items() if heading == (2, name)]
         if not starts:
             raise SystemExit(f"error: omitted core section {name!r} not found in prompts/core.md")
         if len(starts) > 1:
             raise SystemExit(f"error: omitted core section {name!r} appears more than once in prompts/core.md")
-        end = next((i for i in range(starts[0] + 1, len(lines)) if lines[i].startswith(("## ", "# "))), len(lines))
+        end = next((index for index, (level, _) in headings.items() if index > starts[0] and level <= 2), len(lines))
         del lines[starts[0] : end]
     return "".join(lines)
 
@@ -488,6 +514,7 @@ def render_document(
     for overlay in (local, private):
         if overlay.strip():
             rendered += f"\n{overlay.rstrip()}\n"
+    require_no_optional_markers(rendered)
     return rendered
 
 
@@ -668,10 +695,12 @@ def section_sizes(rendered: str) -> list[tuple[str, int]]:
     """Byte size per top-level `# ` section; text before the first one is the harness notes."""
     sizes: list[tuple[str, int]] = []
     name, size = "harness notes", 0
-    for line in rendered.splitlines(keepends=True):
-        if line.startswith("# "):
+    lines = rendered.splitlines(keepends=True)
+    headings = markdown_headings(lines)
+    for index, line in enumerate(lines):
+        if index in headings and headings[index][0] == 1:
             sizes.append((name, size))
-            name, size = line[2:].strip(), 0
+            name, size = headings[index][1], 0
         size += len(line.encode("utf-8"))
     sizes.append((name, size))
     return [(label, count) for label, count in sizes if count]
@@ -726,16 +755,22 @@ def render_all(
 
 
 def check_render_shape(repo_root: Path, selected: list[str] | None = None) -> int:
+    core = (repo_root / "prompts" / "core.md").read_text(encoding="utf-8")
+    for harness in selected_harnesses(selected):
+        if not apply_optional_blocks(core, frozenset(harness.optional_blocks)).strip():
+            raise SystemExit(f"error: {harness.name}: core is empty after optional blocks")
     with TemporaryDirectory() as temp_dir:
         out_dir = Path(temp_dir)
         written = render_all(repo_root, out_dir, selected=selected, stamp="check")
-        paths = list(written.values())
-        if len(paths) != len(set(paths)):
-            print("error: render output paths collide; fix the harness output names", file=sys.stderr)
-            return 1
         for harness, path in written.items():
-            if not path.exists():
-                print(f"error: missing rendered output for {harness}: {path}; rerun the render", file=sys.stderr)
+            text = path.read_text(encoding="utf-8")
+            if not prompt_owned(text):
+                print(f"error: {harness}: missing generated header; rerun the render", file=sys.stderr)
+                return 1
+            require_no_optional_markers(text)
+            expected_core = apply_optional_blocks(core, frozenset(harness_by_name(harness).optional_blocks)).rstrip()
+            if expected_core not in text:
+                print(f"error: {harness}: rendered output is missing core content", file=sys.stderr)
                 return 1
             json_record(harness=harness)
         print("Render shape check passed")

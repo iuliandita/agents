@@ -246,6 +246,67 @@ def test_apply_optional_blocks_keeps_enabled_and_drops_disabled():
     assert "C" in renderer.apply_optional_blocks(text, frozenset())
 
 
+@pytest.mark.parametrize("enabled", [frozenset(), frozenset({"subagents"})])
+def test_optional_blocks_accept_empty_body(enabled):
+    assert renderer.apply_optional_blocks("A\n<!-- optional:subagents -->\n<!-- /optional:subagents -->\nB\n", enabled) == "A\nB\n"
+
+
+@pytest.mark.parametrize("block", [
+    "<!-- optional:subagents -->\nbody\n<!-- /optional:other -->\n",
+    "<!-- optional:UPPER -->\nbody\n<!-- /optional:UPPER -->\n",
+    "<!-- optional:subagents -->\nbody\n",
+    "<!-- /optional:subagents -->\n",
+])
+def test_optional_blocks_reject_leftover_markers(block):
+    with pytest.raises(SystemExit, match="optional block marker"):
+        renderer.apply_optional_blocks(block, frozenset())
+
+
+@pytest.mark.parametrize("fence", ["```", "~~~~"])
+def test_heading_detection_ignores_fenced_content(fence):
+    code = f"{fence}text\n# code heading\n## B\n`\n{fence}\n"
+    core = f"# Core\n## A\n{code}## B\nkeep\n"
+    assert renderer.drop_sections(core, ("A",)) == "# Core\n## B\nkeep\n"
+    sizes = renderer.section_sizes(core)
+    assert [name for name, _ in sizes] == ["Core"]
+    assert sum(size for _, size in sizes) == len(core.encode("utf-8"))
+
+
+@pytest.mark.parametrize("core", ["", " \n", "<!-- optional:subagents -->\nonly optional\n<!-- /optional:subagents -->\n"])
+def test_shape_check_rejects_empty_core(tmp_path, core):
+    repo = overlay_repo(tmp_path)
+    (repo / "prompts" / "core.md").write_text(core, encoding="utf-8")
+    with pytest.raises(SystemExit, match="core is empty"):
+        renderer.check_render_shape(repo, ["generic"])
+
+
+@pytest.mark.parametrize("corruption", ["header", "core", "optional"])
+def test_shape_check_detects_corrupt_output(tmp_path, monkeypatch, capsys, corruption):
+    repo = overlay_repo(tmp_path)
+    render = renderer.render_all
+
+    def corrupt(*args, **kwargs):
+        written = render(*args, **kwargs)
+        path = written["claude"]
+        text = path.read_text(encoding="utf-8")
+        if corruption == "header":
+            text = text.split("\n", 1)[1]
+        elif corruption == "core":
+            text = text.replace("shared", "lost body")
+        else:
+            text += "<!-- optional:leftover -->\n"
+        path.write_text(text, encoding="utf-8")
+        return written
+
+    monkeypatch.setattr(renderer, "render_all", corrupt)
+    if corruption == "optional":
+        with pytest.raises(SystemExit, match="optional block marker"):
+            renderer.check_render_shape(repo, ["claude"])
+    else:
+        assert renderer.check_render_shape(repo, ["claude"]) == 1
+        assert "error:" in capsys.readouterr().err
+
+
 def test_generic_target_drops_the_subagent_delegation_block(tmp_path):
     repo = Path(__file__).resolve().parents[1]
 

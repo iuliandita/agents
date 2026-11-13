@@ -10,13 +10,13 @@
       "note": "Record unmanaged hook dry-run actions and LF normalization for hooks and Hermes config."
     },
     "harnesses": {
-      "breaking": "CRLF prompt targets now report drift and require rewriting to LF.",
+      "breaking": "CRLF prompt targets report drift and require rewriting; malformed optional blocks fail rendering.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "6d0cd7aa5286e21a60e2c573785fefbfa0ff1af21c64237ff64805722d873f69",
-      "migration": "Back up generated targets and output consumers; upgrade by redeploying to normalize LF; roll back by restoring backups and the previous checkout.",
-      "note": "Record byte-exact prompt deployment and drift detection for CRLF targets."
+      "fingerprint": "59a16aa40acb592128efc128163b2d60d7b4932686121ff8f856edc5219ba223",
+      "migration": "Back up generated targets and sources; upgrade by pairing lower-case optional markers and redeploying LF output; roll back by restoring backups and the previous checkout.",
+      "note": "Record fence-aware section sizes and shape checks for empty cores, generated headers, core content, and optional markers."
     },
     "maintenance": {
       "breaking": "none",
