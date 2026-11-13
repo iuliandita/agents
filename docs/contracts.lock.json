@@ -1,14 +1,13 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "Update no longer accepts the retired target.",
+      "breaking": "none",
       "docs": [
         "CHANGELOG.md",
-        "INSTALL.md"
+        "README.md"
       ],
-      "fingerprint": "a74212abea55305ffaa98781132113258e6dc5ce456801e9cce8078e3b96238f",
-      "migration": "Back up saved commands, upgrade by removing the target, and roll back to the previous release if needed.",
-      "note": "Remove the retired target from update selection."
+      "fingerprint": "500ed5e5de473b94d80aaf1352460ce6c8553d5154b85af7350c5c6214cdef68",
+      "note": "Document automatic Antigravity hook deployment, channel selection, managed path migration, and settings validation."
     },
     "harnesses": {
       "breaking": "none",

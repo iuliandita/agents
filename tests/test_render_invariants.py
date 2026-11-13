@@ -1,5 +1,7 @@
 import json
+import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -16,7 +18,7 @@ def test_invariants_source_exists_and_is_nonempty():
     assert "Never add AI attribution" in invariants
 
 
-def test_render_all_writes_three_artifacts(tmp_path):
+def test_render_all_writes_five_artifacts(tmp_path):
     written = ri.render_all(REPO, tmp_path, "$HOME/.claude/hooks/" + ri.HOOK_NAME)
     assert set(written) == {
         "hook",
@@ -164,3 +166,141 @@ def test_hook_paths_follow_claude_config_dir(tmp_path):
     env.update(CLAUDE_HOOKS_DIR=str(tmp_path / "hooks"), CLAUDE_SETTINGS_PATH=str(tmp_path / "s.json"))
     assert ri.resolve_hooks_dir(tmp_path, env) == tmp_path / "hooks"
     assert ri.resolve_settings_path(tmp_path, env) == tmp_path / "s.json"
+
+
+@pytest.fixture(params=["claude", "antigravity"])
+def channel(request):
+    harness = request.param
+    if harness == "claude":
+        return harness, ri.HOOK_NAME, "settings.json", "hooks", "UserPromptSubmit"
+    return harness, ri.ANTIGRAVITY_HOOK_NAME, "hooks.json", "invariants", "PreInvocation"
+
+
+def test_channel_refresh_preserves_settings_and_backs_up_files(tmp_path, channel, capsys):
+    harness, name, settings_name, section, event = channel
+    config = tmp_path / "config with spaces"
+    config.mkdir()
+    hook = config / name
+    hook.write_text("old hook\n", encoding="utf-8")
+    settings_path = config / settings_name
+    original = {"label": "caf\u00e9", "other": {"enabled": True}}
+    settings_path.write_text(json.dumps(original, ensure_ascii=False), encoding="utf-8")
+    backups = tmp_path / "backups"
+
+    ri.deploy(REPO, config, settings_path, backups, False, harness)
+
+    assert (hook.stat().st_mode & 0o777 == 0o755) or os.name == "nt"
+    result = subprocess.run(["bash", str(hook)], capture_output=True, text=True, check=True)
+    expected = ri.read_invariants(REPO)
+    assert (result.stdout if harness == "claude" else
+            json.loads(result.stdout)["injectSteps"][0]["ephemeralMessage"] + "\n") == expected
+    text = settings_path.read_text(encoding="utf-8")
+    assert "caf\u00e9" in text and "\\u00e9" not in text
+    data = json.loads(text)
+    assert all(data[key] == value for key, value in original.items())
+    entry = data[section][event][0]
+    command = entry["hooks"][0]["command"] if harness == "claude" else entry["command"]
+    assert command == ri.shell_quote(str(hook))
+    backup_texts = [path.read_text(encoding="utf-8") for path in backups.iterdir()]
+    assert "old hook\n" in backup_texts
+    assert any(json.loads(text) == original for text in backup_texts if text != "old hook\n")
+
+    capsys.readouterr()
+    before = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in config.iterdir()}
+    for dry_run in (True, False):
+        ri.deploy(REPO, config, settings_path, backups, dry_run, harness)
+        output = capsys.readouterr().out
+        assert "hook unchanged:" in output and "would install" not in output
+        assert before == {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in config.iterdir()}
+        assert len(list(backups.iterdir())) == 2
+
+
+def test_managed_path_migration_preserves_unrelated_entries(channel):
+    harness, name, _, section, event = channel
+    old = {"type": "command", "command": ri.shell_quote(f"/old hooks/{name}"), "timeout": 10}
+    unrelated = {"type": "command", "command": f"/new/{name}.custom"}
+    other = {"type": "command", "command": "/other/invariants.sh"}
+    entries = [{"matcher": "", "hooks": [unrelated, old, other]}] if harness == "claude" else [unrelated, old, other]
+    existing = {section: {event: entries, "Stop": []}, "label": "keep"}
+    command = ri.shell_quote(f"/new hooks/{name}")
+    merged, changed = ri.merge_hook_into_settings(existing, command, harness)
+    assert changed
+    hooks = merged[section][event][0]["hooks"] if harness == "claude" else merged[section][event]
+    assert hooks == [unrelated, {**old, "command": command}, other]
+    assert existing[section][event] == entries
+    assert merged[section]["Stop"] == [] and merged["label"] == "keep"
+    assert ri.merge_hook_into_settings(merged, command, harness) == (merged, False)
+
+
+@pytest.mark.parametrize("bad", [[], {"hooks": []}, {"hooks": {"UserPromptSubmit": {}}},
+                                     {"hooks": {"UserPromptSubmit": [None]}},
+                                     {"hooks": {"UserPromptSubmit": [{"hooks": {}}]}},
+                                     {"hooks": {"UserPromptSubmit": [{"hooks": [None]}]}},
+                                     {"invariants": []}, {"invariants": {"PreInvocation": {}}},
+                                     {"invariants": {"PreInvocation": [None]}}])
+@pytest.mark.parametrize("json_mode", [False, True])
+def test_invalid_settings_exit_cleanly_before_writes(tmp_path, bad, json_mode):
+    harness = "antigravity" if isinstance(bad, dict) and "invariants" in bad else "claude"
+    config = tmp_path / "config"
+    config.mkdir()
+    settings = config / ("settings.json" if harness == "claude" else "hooks.json")
+    settings.write_text(json.dumps(bad), encoding="utf-8")
+    before = settings.read_bytes()
+    args = ["--json"] if json_mode else []
+    proc = subprocess.run(
+        [sys.executable, str(REPO / "scripts" / "render_invariants.py"), "--dry-run",
+         "--harness", harness, "--hooks-dir", str(config), "--settings-path", str(settings),
+         "--antigravity-config-dir", str(config), *args],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 1
+    assert "error:" in proc.stderr and "Traceback" not in proc.stderr
+    if json_mode:
+        assert json.loads(proc.stdout)["ok"] is False
+    assert settings.read_bytes() == before and list(config.iterdir()) == [settings]
+
+
+@pytest.mark.parametrize("target", ["hook", "settings"])
+@pytest.mark.parametrize("kind", ["symlink", "directory"])
+def test_channel_refuses_unsafe_destinations(tmp_path, channel, target, kind):
+    harness, name, settings_name, _, _ = channel
+    config = tmp_path / "config"
+    config.mkdir()
+    settings = config / settings_name
+    destination = config / (name if target == "hook" else settings_name)
+    original = tmp_path / "original"
+    original.write_text("{}", encoding="utf-8")
+    if kind == "symlink":
+        destination.symlink_to(original)
+    else:
+        destination.mkdir()
+    with pytest.raises(SystemExit, match="error:.*refusing to write"):
+        ri.deploy(REPO, config, settings, tmp_path / "backups", False, harness)
+    assert original.read_text(encoding="utf-8") == "{}"
+    assert not (tmp_path / "backups").exists()
+
+
+@pytest.mark.parametrize("harness", ["claude", "antigravity", "all"])
+def test_cli_channel_selection_and_rendered_override(tmp_path, harness):
+    hooks, settings, antigravity = tmp_path / "hooks", tmp_path / "settings.json", tmp_path / "ag"
+    args = ["--hooks-dir", str(hooks), "--settings-path", str(settings),
+            "--antigravity-config-dir", str(antigravity), "--backup-dir", str(tmp_path / "backups")]
+    if harness != "all":
+        args += ["--harness", harness]
+    assert ri.main(["--deploy", *args]) == 0
+    assert (hooks / ri.HOOK_NAME).exists() == (harness in ("claude", "all"))
+    assert settings.exists() == (harness in ("claude", "all"))
+    assert (antigravity / ri.ANTIGRAVITY_HOOK_NAME).exists() == (harness in ("antigravity", "all"))
+    assert (antigravity / "hooks.json").exists() == (harness in ("antigravity", "all"))
+    assert ri.main(["--out-dir", str(tmp_path / "out"), *args]) == 0
+    snippet = json.loads((tmp_path / "out" / ri.ANTIGRAVITY_SETTINGS_NAME).read_text(encoding="utf-8"))
+    assert snippet["invariants"]["PreInvocation"][0]["command"] == ri.shell_quote(str(antigravity / ri.ANTIGRAVITY_HOOK_NAME))
+
+
+def test_windows_hook_commands_use_forward_slashes(monkeypatch):
+    with monkeypatch.context() as patch:
+        patch.setattr(ri.os, "name", "nt")
+        for render in (ri.render_settings_snippet, ri.render_antigravity_settings):
+            snippet = render("C:\\Users\\Hook Owner\\hooks\\invariants.sh")
+            assert "C:/Users/Hook Owner/hooks/invariants.sh" in snippet
+            assert "\\\\" not in snippet

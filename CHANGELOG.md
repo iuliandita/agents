@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- Invariants deployment now installs and refreshes both Claude and Antigravity hooks, validates settings before merging, preserves Unicode, and updates managed hook paths in place. `--harness` selects a channel and `--antigravity-config-dir` relocates Antigravity config (#203).
+
 - Roles and pipeline (#198).
   - The planner returns `Need the goal: <what is missing>.` instead of asking.
   - The reviewer reviews named files when no diff is given, and puts its `Coverage: partial` line after the findings line.
