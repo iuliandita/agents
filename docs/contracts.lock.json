@@ -47,10 +47,11 @@
     "prompts": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "README.md"
       ],
-      "fingerprint": "c65a7311b7b73b12693b07c7b411b45b51f93e405eef2eaac9b005542ec453d8",
-      "note": "Changelog covers confirmation scope, subagent blockers, rendered effort, Codex context cap, and warning-free prompt limits."
+      "fingerprint": "9f1d6f0600bb8efa4b1fa2c234f95582b2ca9c736eb1f11989941972c18ec378",
+      "note": "Name Fable as the opt-in megamind tier in the Claude ladder and the README tier list."
     },
     "workflow-templates": {
       "breaking": "none",
