@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- Leak and injection scanning now covers skills, templates, model metadata, wrapped instructions, hidden Unicode, and more network-to-interpreter commands; private markers match without case sensitivity, tracked overlays fail lint, and editor copies are ignored (#205).
+
 - Roles and pipeline (#198).
   - The planner returns `Need the goal: <what is missing>.` instead of asking.
   - The reviewer reviews named files when no diff is given, and puts its `Coverage: partial` line after the findings line.

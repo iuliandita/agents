@@ -5,6 +5,7 @@ import argparse
 import re
 import sys
 import unicodedata
+from bisect import bisect_right
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -47,24 +48,6 @@ PROMPT_SUFFIXES = {
     ".prompt.yml",
 }
 
-HIDDEN_CODEPOINTS = {
-    "\u200b",
-    "\u200c",
-    "\u200d",
-    "\u200e",
-    "\u200f",
-    "\u202a",
-    "\u202b",
-    "\u202c",
-    "\u202d",
-    "\u202e",
-    "\u2066",
-    "\u2067",
-    "\u2068",
-    "\u2069",
-    "\ufeff",
-}
-
 # Unicode Tag block (U+E0000-U+E007F) can encode invisible ASCII payloads
 # that tokenizers still see; treat the whole range as hidden.
 TAG_RANGE_START = 0xE0000
@@ -72,13 +55,18 @@ TAG_RANGE_END = 0xE007F
 
 
 def is_hidden_codepoint(char: str) -> bool:
-    if char in HIDDEN_CODEPOINTS:
-        return True
-    return TAG_RANGE_START <= ord(char) <= TAG_RANGE_END
+    cp = ord(char)
+    return (
+        unicodedata.category(char) == "Cf"
+        or cp == 0x034F
+        or 0xFE00 <= cp <= 0xFE0F
+        or 0xE0100 <= cp <= 0xE01EF
+        or TAG_RANGE_START <= cp <= TAG_RANGE_END
+    )
 
 
 DIRECT_COMMAND_NEGATION = re.compile(
-    r"\b(avoid|deny|do not|don't|forbid|never|reject|refuse)\b.{0,40}\b(run|execute|use|pipe|bootstrap)\b",
+    r"\b(avoid|deny|do not|don't|forbid|never|reject|refuse)\b[^;&|.!?,:]{0,40}\b(run|execute|use|pipe|bootstrap)\b",
     re.IGNORECASE,
 )
 
@@ -134,7 +122,14 @@ RULES = (
     ),
     Rule(
         name="network-shell-pipe",
-        pattern=re.compile(r"\b(curl|wget)\b[^\n|;&]{0,160}[|>]\s*(?:sudo\s+)?(?:ba)?sh\b", re.IGNORECASE),
+        pattern=re.compile(
+            r"\b(?:curl|wget)\b[^\n|;&]{0,160}[|>]\s*"
+            r"(?:sudo\s+(?:-E\s+)?)?(?:bash|sh|zsh|python(?:[23](?:\.\d+)?)?)\b"
+            r"|\b(?:bash|sh|zsh|python(?:[23](?:\.\d+)?)?)\s+"
+            r"(?:<\(\s*|\-c\s+[\"']?\$\(\s*)(?:curl|wget)\b"
+            r"|\b(?:iwr|invoke-webrequest)\b[^\n|;&]{0,160}\|\s*(?:iex|invoke-expression)\b",
+            re.IGNORECASE,
+        ),
         message="network-to-shell commands are high risk in prompt files",
         skip_if_negated=True,
     ),
@@ -171,13 +166,16 @@ def iter_prompt_sources(root: Path) -> list[Path]:
         # Exclusions match repo-relative parts only; matching absolute parts
         # would skip the whole repo when it is cloned under e.g. a build/ dir.
         rel_parts = path.relative_to(root).parts
-        if any(part in EXCLUDED_DIRS for part in rel_parts):
+        if rel_parts[0] in EXCLUDED_DIRS:
             continue
-        if path.name in EXCLUDED_FILES:
+        if len(rel_parts) == 1 and path.name in EXCLUDED_FILES:
             continue
         if any(rel_parts[: len(subtree)] == subtree for subtree in EXCLUDED_SUBTREES):
             continue
-        if path.is_file() and is_prompt_source(path):
+        render_input = rel_parts == ("prompts", "models.json") or (
+            len(rel_parts) == 2 and rel_parts[0] == "prompts" and path.suffix == ".txt"
+        )
+        if path.is_file() and (is_prompt_source(path) or render_input):
             paths.append(path)
     return sorted(paths)
 
@@ -211,30 +209,34 @@ def is_directly_negated(line: str, match_start: int) -> bool:
         return False
     # A clause boundary between the negation and the command means the
     # negation does not govern it ("Never run tests; bootstrap with curl|sh").
-    return not re.search(r"[;&|.!?]", prefix[negation.end() :])
+    return not re.search(r"[;&|.!?,:]", prefix[negation.end() :])
 
 
 def scan_file(path: Path, root: Path) -> list[Finding]:
     findings: list[Finding] = []
     text = path.read_text(encoding="utf-8", errors="replace")
     rel_path = path.relative_to(root)
-    for line_no, line in enumerate(text.splitlines(), start=1):
+    lines = text.splitlines()
+    single_line_hits: set[tuple[str, int, int]] = set()
+    for line_no, line in enumerate(lines, start=1):
         if hidden_codepoints(line):
             findings.append(
                 Finding(
                     path=rel_path,
                     line_no=line_no,
                     rule="hidden-unicode",
-                    message="zero-width, bidirectional, or tag-block Unicode can hide prompt instructions",
+                    message="format characters, variation selectors, or tag-block Unicode can hide prompt instructions",
                     line=visible_text(line),
                 )
             )
         for rule in RULES:
-            match = rule.pattern.search(line)
-            if not match:
+            matches = [
+                match for match in rule.pattern.finditer(line)
+                if not (rule.skip_if_negated and is_directly_negated(line, match.start()))
+            ]
+            if not matches:
                 continue
-            if rule.skip_if_negated and is_directly_negated(line, match.start()):
-                continue
+            single_line_hits.update((rule.name, line_no, match.start()) for match in matches)
             findings.append(
                 Finding(
                     path=rel_path,
@@ -244,6 +246,37 @@ def scan_file(path: Path, root: Path) -> list[Finding]:
                     line=visible_text(line),
                 )
             )
+
+    paragraph: list[tuple[int, str]] = []
+    for line_no, line in enumerate([*lines, ""], start=1):
+        if line.strip():
+            paragraph.append((line_no, line))
+            continue
+        if len(paragraph) > 1:
+            collapsed = " ".join(content for _, content in paragraph)
+            offsets: list[int] = []
+            offset = 0
+            for _, content in paragraph:
+                offsets.append(offset)
+                offset += len(content) + 1
+            for rule in RULES:
+                for match in rule.pattern.finditer(collapsed):
+                    first_index = bisect_right(offsets, match.start()) - 1
+                    last_index = bisect_right(offsets, match.end() - 1) - 1
+                    first_line = paragraph[first_index][0]
+                    column = match.start() - offsets[first_index]
+                    if first_index == last_index or (rule.name, first_line, column) in single_line_hits:
+                        continue
+                    if rule.skip_if_negated and is_directly_negated(collapsed, match.start()):
+                        continue
+                    findings.append(Finding(
+                        path=rel_path,
+                        line_no=first_line,
+                        rule=rule.name,
+                        message=rule.message,
+                        line=visible_text(collapsed),
+                    ))
+        paragraph = []
     return findings
 
 

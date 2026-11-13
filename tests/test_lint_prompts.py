@@ -1,4 +1,5 @@
 import importlib.util
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -229,8 +230,6 @@ def test_main_lints_agent_sources(tmp_path, capsys):
 
 
 def git_repo_with(tmp_path, files):
-    import subprocess
-
     for name, text in files.items():
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -265,3 +264,107 @@ def test_user_patterns_exclude_builtin_defaults(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTS_PRIVATE_PATTERNS", "mine.example")
     assert linter.load_user_patterns(tmp_path) == ("mine.example",)
     assert "internal.example" in linter.load_private_patterns(tmp_path)
+
+
+@pytest.mark.parametrize("marker,text", [
+    ("lab.example.net", "LAB.EXAMPLE.NET"),
+    ("Lab.Example.Net", "lab.example.net"),
+])
+def test_private_markers_ignore_case_in_sources_and_tracked_files(tmp_path, marker, text):
+    repo = git_repo_with(tmp_path, {"README.md": text + "\n"})
+
+    assert linter.lint_file(repo / "README.md", private_patterns=(marker,)) == 1
+    assert linter.lint_tracked_markers(repo, (marker,)) == 1
+
+
+def test_tracked_markers_use_unicode_casefold(tmp_path):
+    repo = git_repo_with(tmp_path, {"README.md": "STRASSE\n"})
+
+    assert linter.lint_tracked_markers(repo, ("Stra\u00dfe",)) == 1
+
+
+@pytest.fixture
+def lint_repo(tmp_path, monkeypatch):
+    files = {
+        "prompts/core.md": "# Core\nclean\n",
+        "prompts/invariants.md": "# Invariants\nclean\n",
+        "prompts/local.example.md": "# Local\nclean\n",
+        "prompts/private.example.md": "# Private\nclean\n",
+    }
+    files.update({f"prompts/harnesses/{h.fragment}": "clean\n" for h in linter.HARNESSES})
+    repo = git_repo_with(tmp_path, files)
+    monkeypatch.setattr(linter, "__file__", str(repo / "scripts/lint_prompts.py"))
+    monkeypatch.delenv("AGENTS_PRIVATE_PATTERNS", raising=False)
+    return repo
+
+
+@pytest.mark.parametrize("relative", [
+    "skills/nested/example/SKILL.md",
+    "templates/project/AGENTS.md.example",
+    "templates/nested/settings.toml",
+    "prompts/models.json",
+])
+@pytest.mark.parametrize("body,message", [
+    ("sk-" + "a" * 32, "token-like secret"),
+    ("non-ASCII \u00e9", "non-ASCII content"),
+])
+def test_main_lints_additional_public_sources(lint_repo, capsys, relative, body, message):
+    target = lint_repo / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body + "\n", encoding="utf-8")
+
+    assert linter.main() == 1
+    errors = capsys.readouterr().err
+    assert f"{target}:" in errors
+    assert message in errors
+
+
+def test_main_skips_binary_templates(lint_repo):
+    target = lint_repo / "templates/project/image.bin"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"\0sk-" + b"a" * 32)
+
+    assert linter.main() == 0
+
+
+@pytest.mark.parametrize("relative", [
+    "prompts/local.md", "prompts/private.md",
+    "prompts/local.md.bak", "prompts/private.md.orig", "prompts/private.md~",
+    "prompts/.local.md.swp", "prompts/.private.md.swo", "prompts/.private.md.un~",
+    "prompts/#private.md#", "prompts/.#local.md",
+    "prompts/private-patterns.txt", "prompts/private-harnesses.txt",
+    "prompts/models.local.json", "prompts/deploy-targets.txt",
+])
+def test_main_rejects_tracked_overlays_and_editor_copies(lint_repo, capsys, relative):
+    target = lint_repo / relative
+    target.write_text("local context\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(lint_repo), "add", "-f", relative], check=True)
+
+    assert linter.main() == 1
+    assert f"{relative}: private overlay or editor copy must not be tracked" in capsys.readouterr().err
+
+
+def test_tracked_overlay_check_fails_when_git_is_unavailable(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(linter, "tracked_files", lambda repo: None)
+
+    assert linter.lint_tracked_overlays(tmp_path) == 1
+    assert "cannot check for tracked private overlays" in capsys.readouterr().err
+
+
+def test_gitignore_covers_overlay_editor_copies_but_keeps_examples(tmp_path):
+    repo = git_repo_with(tmp_path, {
+        ".gitignore": (Path(__file__).resolve().parents[1] / ".gitignore").read_text(),
+    })
+    ignored = [
+        f"prompts/{name}"
+        for stem in ("local.md", "private.md")
+        for name in (stem, stem + ".bak", stem + ".orig", stem + "~", "." + stem + ".swp",
+                     "." + stem + ".swo", "." + stem + ".un~", "#" + stem + "#", ".#" + stem)
+    ]
+    examples = ["prompts/local.example.md", "prompts/private.example.md"]
+    result = subprocess.run(
+        ["git", "-C", str(repo), "check-ignore", "--no-index", *ignored, *examples],
+        capture_output=True, text=True, check=True,
+    )
+
+    assert set(result.stdout.splitlines()) == set(ignored)
