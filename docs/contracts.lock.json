@@ -54,8 +54,8 @@
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "61b48d832280641c635e96344811879ada0b84c216bef138319763d88bc3a0b2",
-      "note": "Writing Voice covers commits and PRs/MRs with conventional titles, short bodies, and an audience split for capitalization (#192); no flag, path or overlay behavior changes."
+      "fingerprint": "49f452ff700220b697370897d71889b6f41163b76ccda7108ec0223563631b86",
+      "note": "changelog notes the core guideline to branch instead of committing to the default branch"
     },
     "workflow-templates": {
       "baseline": true,
