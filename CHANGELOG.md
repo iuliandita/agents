@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- Leak and injection scanning now covers skills, templates, model metadata, wrapped instructions, hidden Unicode, and more network-to-interpreter commands; private markers match without case sensitivity, tracked overlays fail lint, and editor copies are ignored (#205).
+
 - OpenCode read-only roles deny unlisted tools; all roles gain budgets, blocker output, and shared data handling. The renderer rejects empty tool expansions, reports unsupported turn caps, and omits unused effort from Antigravity hashes (#201).
 
 - Docs impact check: a breaking receipt that a commit did not change no longer fails the range, so merging the base branch into a feature branch no longer reports a stale breaking change (#212).

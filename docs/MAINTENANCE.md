@@ -76,7 +76,11 @@ The release workflow fails when the tagged commit is not on `main`. It runs the 
 
 ## Private context
 
-`python scripts/lint_prompts.py` already fails when a local leak marker from `prompts/private-patterns.txt` appears in any tracked file, and `--check` renders validate the outputs. The guard does not read overlays. Keep private overlays out of receipts and notes; they are tracked.
+CI runs the generic private-pattern checks (private IP addresses, home paths, and non-allowlisted email addresses) through `check_private_patterns` in `.github/stack/stack-check.py`. The custom marker list stays local by design: `python scripts/lint_prompts.py` reads `prompts/private-patterns.txt` and `AGENTS_PRIVATE_PATTERNS`, then checks tracked text files with case-insensitive matching. The marker example file is excluded from that custom scan.
+
+The linter checks public prompts, role sources, `skills/**/SKILL.md`, text files under `templates/`, and `prompts/models.json` for token-like secrets and non-ASCII text. It also fails if Git tracks a private overlay or an editor copy. `.gitignore` covers overlay backup and swap names, including local and private Markdown suffix variants. `--check` renders validate outputs. The docs-impact guard does not read overlays. Keep private overlays out of tracked receipts and notes.
+
+`python scripts/scan_prompt_sources.py` checks prompt sources and the non-Markdown render inputs `prompts/models.json` and `prompts/*.txt`. It detects hidden Unicode format characters, variation selectors, joining characters, and tag characters, and scans both individual lines and paragraphs with wrapped lines joined. Its network-to-shell rule covers shell and Python interpreters, sudo environment preservation, shell substitutions, and PowerShell pipelines. Commas and colons terminate negation clauses. Directory and filename exclusions apply at the repository root; explicit local documentation subtrees remain excluded.
 
 ## Limits
 

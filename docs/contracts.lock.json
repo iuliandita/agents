@@ -37,10 +37,10 @@
     "overlays-trust": {
       "breaking": "none",
       "docs": [
-        "INSTALL.md"
+        "CHANGELOG.md"
       ],
-      "fingerprint": "b35504a86a836ac65f5f8f7dbe342e6b24a8d327d97c9469567f40794537b397",
-      "note": "changelog and INSTALL json table cover reviewer, planner, line caps, and per-section byte sizes"
+      "fingerprint": "aa8993a2d9bb2d7a368ae3cac416218f912cb1546bf3dde2a2e789e4dfb99b06",
+      "note": "Document expanded scanner coverage, local casefolded markers, and tracked overlay rejection."
     },
     "prompts": {
       "breaking": "none",
