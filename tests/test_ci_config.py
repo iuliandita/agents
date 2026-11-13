@@ -3,15 +3,6 @@ from pathlib import Path
 import pytest
 
 
-def test_renovate_tracks_github_actions_and_python_dependencies():
-    repo = Path(__file__).resolve().parents[1]
-    config = (repo / "renovate.json").read_text(encoding="utf-8")
-
-    assert '"config:recommended"' in config
-    assert '"GitHub Actions"' in config
-    assert '"Python"' in config
-
-
 def test_release_workflow_creates_a_release_on_version_tags():
     repo = Path(__file__).resolve().parents[1]
     workflow = (repo / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
@@ -22,15 +13,6 @@ def test_release_workflow_creates_a_release_on_version_tags():
     assert "contents: write" in workflow
 
 
-def test_ci_runs_a_python_matrix():
-    repo = Path(__file__).resolve().parents[1]
-    workflow = (repo / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-
-    assert "matrix:" in workflow
-    assert '"3.11"' in workflow
-    assert '"3.13"' in workflow
-
-
 def test_checkouts_do_not_persist_credentials():
     repo = Path(__file__).resolve().parents[1]
     for workflow in sorted((repo / ".github" / "workflows").glob("*.yml")):
@@ -39,13 +21,6 @@ def test_checkouts_do_not_persist_credentials():
             if "uses: actions/checkout@" in line:
                 block = "\n".join(lines[index + 1 : index + 4])
                 assert "persist-credentials: false" in block, f"{workflow.name}:{index + 1}"
-
-
-def test_renovate_waits_before_proposing_releases():
-    repo = Path(__file__).resolve().parents[1]
-    config = (repo / "renovate.json").read_text(encoding="utf-8")
-
-    assert '"minimumReleaseAge": "7 days"' in config
 
 
 def test_ci_smoke_tests_powershell_launchers_on_windows():
@@ -230,3 +205,21 @@ def test_stack_rejects_root_paths_and_exempts_reusable_workflow_timeouts(tmp_pat
     assert len(private) == 1 and "root-path" in private[0].message
     timeouts = stack_checker.check_workflow_timeouts(ctx)
     assert len(timeouts) == 1 and '"ordinary"' in timeouts[0].message
+
+
+def test_documented_skill_installer_covers_every_bundled_skill(tmp_path):
+    import json
+    import subprocess
+    import sys
+
+    repo = Path(__file__).resolve().parents[1]
+    target = tmp_path / "installed-skills"
+    result = subprocess.run(
+        [sys.executable, str(repo / "scripts" / "install_workflow.py"), "--skills-dir", str(target), "--json"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    actions = json.loads(result.stdout)["actions"]
+    expected = {target / source.relative_to(repo / "skills") for source in (repo / "skills").rglob("SKILL.md")}
+    assert expected
+    assert {Path(action["path"]) for action in actions} == expected

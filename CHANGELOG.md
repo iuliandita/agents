@@ -4,9 +4,7 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
-- Model defaults omit redundant effort mappings without changing rendered roles or effort resolution (#224).
-
-- Stack checks validate the canon version, honor configured checkout values, share directory exclusions at every depth, and remove unused canon metadata (#224).
+- Stack checks validate the canon version, honor configured checkout values, share directory exclusions at every depth, and remove unused canon metadata. Model defaults omit redundant effort mappings without changing rendered roles. Installation docs clarify environment overrides, the 06:30 systemd schedule, and the Hermes status exclusion; tests cover every bundled skill installer target and drop redundant configuration pins (#224).
 
 - Error contract: unexpected failures now report an error without a traceback and retain completed JSON records. Every JSON result includes a mode and records list, including parser and runtime failures; direct entry points reject Python older than 3.11 with exit 3. Breaking: invalid target selections, missing deploy targets, and negative backup counts now exit 2 instead of 1; conflicting modes and abbreviated options are rejected. Back up saved commands before upgrading, spell options in full, select one mode (keeping `--deploy --dry-run` valid), and handle usage failures as exit 2. Restore the saved commands and previous checkout to roll back (#217).
 
