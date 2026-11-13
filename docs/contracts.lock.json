@@ -1,19 +1,24 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "none",
+      "breaking": "Existing unmanaged hook scripts require --adopt, and backup pruning now retains recognized backups per source path.",
       "docs": [
+        "CHANGELOG.md",
+        "INSTALL.md",
         "SECURITY.md"
       ],
       "fingerprint": "b6f7f9146231176d731a81aa8c5639199901d0f769542d3eee9daf78c49222f2",
+      "migration": "Back up hook scripts and shared settings, upgrade by reviewing unmanaged hooks and passing --adopt once, then inspect the manifest and per-source backup retention. Roll back by restoring affected backups and checking out the previous version before redeploying.",
       "note": "Installer recovery covers hook adoption, private backups, atomic shared-config writes, workflow bundle retention, and Hermes overlay boundaries."
     },
     "harnesses": {
-      "breaking": "none",
+      "breaking": "Existing unmanaged prompt targets require --adopt, and environment-selected worktree targets no longer receive overlays.",
       "docs": [
+        "CHANGELOG.md",
         "INSTALL.md"
       ],
       "fingerprint": "d4319563cf7328ec5b679a4b3d5a986f32654ffd7c1b4784a7705a8760ec98ca",
+      "migration": "Back up existing prompt targets, upgrade by reviewing unmanaged files and using --adopt once, then verify overlay withholding. Roll back by restoring the affected backup and checking out the previous version before redeploying.",
       "note": "Recovery guidance covers prompt ownership adoption, environment-selected worktree overlay withholding, and incremental deployment manifests."
     },
     "maintenance": {
@@ -25,11 +30,13 @@
       "note": "domain table lists all relevant maintenance documentation"
     },
     "models-agents": {
-      "breaking": "none",
+      "breaking": "Existing unmanaged role files require --adopt before replacement.",
       "docs": [
+        "CHANGELOG.md",
         "INSTALL.md"
       ],
       "fingerprint": "15847bc35b42832f31a94868c4d51d37db042e65baa52ba30df16be19f113cac",
+      "migration": "Back up existing role directories, upgrade by reviewing unmanaged roles and passing --adopt once, then verify generated headers. Roll back by restoring the affected backups and checking out the previous version before redeploying.",
       "note": "Role recovery guidance explains generated-header ownership, opt-in adoption, atomic replacement, and manifest records per role file."
     },
     "overlays-trust": {
