@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+- OpenCode read-only roles deny unlisted tools; all roles gain budgets, blocker output, and shared data handling. The renderer rejects empty tool expansions, reports unsupported turn caps, and omits unused effort from Antigravity hashes (#201).
+
 - Roles and pipeline (#198).
   - The planner returns `Need the goal: <what is missing>.` instead of asking.
   - The reviewer reviews named files when no diff is given, and puts its `Coverage: partial` line after the findings line.
