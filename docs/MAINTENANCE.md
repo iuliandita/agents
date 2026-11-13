@@ -15,7 +15,7 @@ The plain check verifies that every domain's receipt matches its current sources
 
 `check_docs_links.py` is a separate, stateless check: local Markdown links and anchors in every tracked doc must resolve to tracked files, and script commands in the current docs must name tracked scripts and flags those scripts define. Changelog entries are history and `prompts/` fragments are agent context, so the command check skips them; their links are still checked. CI and the release workflow run both scripts.
 
-`--base` adds the range checks: docs a receipt cites must change in the range, a breaking receipt recorded earlier in the range cannot be replaced by a `breaking: none` one, and removing a harness from `scripts/render_prompts.py` needs a breaking receipt that cites `docs/legacy-harnesses.md`. CI runs it against the PR base, or the previous tip on pushes to `develop` and `main`, with full history. Findings print as `error:` lines on stderr. Exit codes: 0 pass, 1 findings, 2 missing tooling or invalid usage. The check needs Git and Python 3.11 and runs offline.
+`--base` adds the range checks: docs a receipt cites must change in the range, a breaking receipt recorded earlier in the range cannot be replaced by a `breaking: none` one (only commits that change a receipt count, so merging the base branch back in is safe), and removing a harness from `scripts/render_prompts.py` needs a breaking receipt that cites `docs/legacy-harnesses.md`. CI runs it against the PR base, or the previous tip on pushes to `develop` and `main`, with full history. Findings print as `error:` lines on stderr. Exit codes: 0 pass, 1 findings, 2 missing tooling or invalid usage. The check needs Git and Python 3.11 and runs offline.
 
 ## Domains
 
@@ -76,7 +76,11 @@ The release workflow fails when the tagged commit is not on `main`. It runs the 
 
 ## Private context
 
-`python scripts/lint_prompts.py` already fails when a local leak marker from `prompts/private-patterns.txt` appears in any tracked file, and `--check` renders validate the outputs. The guard does not read overlays. Keep private overlays out of receipts and notes; they are tracked.
+CI runs the generic private-pattern checks (private IP addresses, home paths, and non-allowlisted email addresses) through `check_private_patterns` in `.github/stack/stack-check.py`. The custom marker list stays local by design: `python scripts/lint_prompts.py` reads `prompts/private-patterns.txt` and `AGENTS_PRIVATE_PATTERNS`, then checks tracked text files with case-insensitive matching. The marker example file is excluded from that custom scan.
+
+The linter checks public prompts, role sources, `skills/**/SKILL.md`, text files under `templates/`, and `prompts/models.json` for token-like secrets and non-ASCII text. It also fails if Git tracks a private overlay or an editor copy. `.gitignore` covers overlay backup and swap names, including local and private Markdown suffix variants. `--check` renders validate outputs. The docs-impact guard does not read overlays. Keep private overlays out of tracked receipts and notes.
+
+`python scripts/scan_prompt_sources.py` checks prompt sources and the non-Markdown render inputs `prompts/models.json` and `prompts/*.txt`. It detects hidden Unicode format characters, variation selectors, joining characters, and tag characters, and scans both individual lines and paragraphs with wrapped lines joined. Its network-to-shell rule covers shell and Python interpreters, sudo environment preservation, shell substitutions, and PowerShell pipelines. Commas and colons terminate negation clauses. Directory and filename exclusions apply at the repository root; explicit local documentation subtrees remain excluded.
 
 ## Limits
 

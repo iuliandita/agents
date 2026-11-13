@@ -28,6 +28,7 @@ pattern (`medium`), or it is not vendored (`n/a`).
 - The desktop Code tab runs the same engine and reads the same files; the Chat/Cowork tab does not
   (see `docs/surfaces.md`).
 - Skills and hooks are first-class; the `UserPromptSubmit` hook is the invariants channel.
+  `render-invariants --deploy --harness claude` installs the script and merges its settings entry.
 
 ### OpenAI Codex
 - Global rules `$CODEX_HOME/AGENTS.md` (default `~/.codex/AGENTS.md`), read as `AGENTS.override.md` then
@@ -45,7 +46,10 @@ pattern (`medium`), or it is not vendored (`n/a`).
   `%USERPROFILE%\.config\opencode`. A WSL install reads the WSL home, separate from native Windows.
 - Permission keys include `read`, `edit` (gates `write`/`edit`/`apply_patch`), `bash`, `task`, `glob`,
   `grep`, `list`, `todowrite`, `webfetch`, `websearch`, `external_directory`, `lsp`, `skill`,
-  `question`. Unlisted custom/MCP tools fall back to global defaults.
+  `question`. Rendered read-only roles put `"*": deny` first, then their explicit allows and denies;
+  unlisted custom/MCP tools, `skill`, `lsp`, and `external_directory` stay denied. Builder and verifier
+  retain explicit maps without a wildcard. This uses the V1 Markdown `permission` format
+  ([wildcards and ordering](https://github.com/anomalyco/opencode/blob/v1.2.0/packages/web/src/content/docs/permissions.mdx)).
 
 ### Command Code
 - Global rules `~/.commandcode/AGENTS.md`; project rules `./AGENTS.md`; settings and hooks in
@@ -64,6 +68,10 @@ pattern (`medium`), or it is not vendored (`n/a`).
   `~/.gemini/config/mcp_config.json`. Hooks `hooks.json` in `.agents/` or `~/.gemini/config/`
   (`PreToolUse`, `PostToolUse`, `PreInvocation`, `PostInvocation`, `Stop`); `PreInvocation` can return
   `injectSteps[].ephemeralMessage`, the invariants channel for this harness.
+  `render-invariants --deploy --harness antigravity` installs `invariants-preinvocation.sh` and
+  merges `invariants.PreInvocation` into global `hooks.json`, with backups and the same destination
+  and settings validation as Claude. `--antigravity-config-dir` relocates both files. With no
+  `--harness`, the invariants deploy selects both Claude and Antigravity.
 - Headless: `agy -p` with `--output-format text|json|stream-json`, `--effort`, `--continue`.
 - Custom subagents: `.agents/agents/<name>.md` (workspace) or `~/.gemini/config/agents/<name>.md`
   (global), YAML frontmatter `name`, `description`, `tools` (exact names; a misspelled tool can hang the
