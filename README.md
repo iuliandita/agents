@@ -232,7 +232,7 @@ When a configured Jev/TypeSafe API key and a relevant installed skill such as `t
 
 Tiers map to models per harness:
 
-- Claude Code: `haiku` for `cheap` (at the role's own effort), `sonnet`, `opus`, and `fable` for `apex`.
+- Claude Code: `haiku` for `cheap` (at the role's own effort), `sonnet`, `opus`, and `fable` (the megamind model, opt-in) for `apex`.
 - Codex: `gpt-6-luna`, `gpt-6.1-terra` for `mid`, `gpt-6.1-sol` for `flagship`, and `gpt-6-astra` for `apex`.
 - Antigravity: `flash` and `pro`.
 - Oh My Pi: its `@smol`, `@default`, and `@slow` model roles.
