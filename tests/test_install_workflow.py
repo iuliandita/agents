@@ -90,3 +90,31 @@ def test_invalid_source_prevents_writes(repo, tmp_path):
     target = tmp_path / "target"
     assert install_workflow.main(["--skills-dir", str(target), "--deploy"]) == 1
     assert not target.exists()
+
+
+def test_workflow_backups_prune_per_source_and_remove_empty_bundles(repo, tmp_path):
+    from render_prompts import prune_backups
+
+    skills = tmp_path / "skills"
+    target = destination(skills)
+    target.parent.mkdir(parents=True)
+    for index in range(3):
+        target.write_text(str(index))
+        assert install_workflow.main(["--skills-dir", str(skills), "--deploy"]) == 0
+    backup_root = repo / ".backups"
+    assert len(list(backup_root.glob("workflow-*"))) == 3
+    assert prune_backups(backup_root, 1, False) == 0
+    remaining = list(backup_root.glob("workflow-*"))
+    assert len(remaining) == 1
+    assert [path.read_text() for path in remaining[0].iterdir()] == ["2"]
+
+
+def test_workflow_backups_cap_long_destination_names(repo, tmp_path):
+    target = tmp_path / ("command" * 30 + ".md")
+    target.write_text("old command")
+    assert install_workflow.main([
+        "--skills-dir", str(tmp_path / "skills"), "--legacy-command", str(target), "--deploy",
+    ]) == 0
+    backups = list((repo / ".backups").glob("workflow-*/*.bak"))
+    assert len(backups) == 1 and len(backups[0].name) < 255
+    assert backups[0].read_text() == "old command"

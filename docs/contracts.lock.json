@@ -1,68 +1,67 @@
 {
   "domains": {
     "deployment": {
-      "breaking": "Update no longer accepts the retired target.",
-      "docs": [
-        "CHANGELOG.md",
-        "INSTALL.md"
-      ],
-      "fingerprint": "a74212abea55305ffaa98781132113258e6dc5ce456801e9cce8078e3b96238f",
-      "migration": "Back up saved commands, upgrade by removing the target, and roll back to the previous release if needed.",
-      "note": "Remove the retired target from update selection."
-    },
-    "harnesses": {
-      "breaking": "Saved commands selecting the retired target fail.",
-      "docs": [
-        "CHANGELOG.md",
-        "INSTALL.md",
-        "README.md",
-        "docs/harness-contract.md",
-        "docs/legacy-harnesses.md",
-        "docs/surfaces.md"
-      ],
-      "fingerprint": "3a84a0bee8ed1271c8bb04b23fc87ef6836e9b10f09d508298bc37f9cc19da27",
-      "migration": "Back up saved commands, upgrade by removing the target, and roll back to the previous release if needed.",
-      "note": "Remove the retired harness target from the registry and active documentation; list it under legacy harnesses."
-    },
-    "maintenance": {
-      "breaking": "none",
-      "docs": [],
-      "fingerprint": "f28526bfd799bcaec3ad07aed2a8121635401f68b7a18a855834b5b429b6da07",
-      "no_impact": "Comment names Renovate instead of Dependabot; no behavior change."
-    },
-    "models-agents": {
-      "breaking": "Scripts that read ERROR: or notice: lines from render-agents stdout no longer match, and the Codex mid tier (builder) now renders gpt-6.1-terra instead of gpt-6.1-sol, which needs Codex CLI 0.159.0 or later.",
+      "breaking": "Existing unmanaged hook scripts require --adopt, and backup pruning retains recognized backups per source path. Invalid or missing targets and negative backup counts exit 2 instead of 1; conflicting modes and abbreviated options are rejected. Hook, Hermes, and workflow writes refuse linked ancestors; relative hook and Hermes artifacts follow --repo-root; unmanaged hook previews change action and CRLF output requires updating.",
       "docs": [
         "CHANGELOG.md"
       ],
-      "fingerprint": "e1ad342cafcea70316641a105c87b2d4cd1e3055ee451272d9ac01bc9656ff4e",
-      "migration": "Back up deployed Codex role files and read render-agents errors and notes from stderr. To upgrade, redeploy; to keep builder on Sol, set mid to gpt-6.1-sol under codex.tiers in prompts/models.local.json first. Roll back by checking out v4.3.0 and redeploying.",
-      "note": "Record the stderr prefixes for render-agents, the Codex mid tier move to gpt-6.1-terra, and the --json contract as breaking; INSTALL.md and the harness contract already document them."
+      "fingerprint": "9bbfd8d1fcd550114d00ba801b213f9f3daa8807cd2f41b25ce83cb4d3dea6fd",
+      "migration": "Back up hook scripts, shared settings, configs, saved commands, and consumers. Upgrade by reviewing unmanaged hooks and passing --adopt once, spelling options in full, selecting one mode while keeping deploy dry-run previews, handling usage failures as exit 2, using real paths and absolute directory overrides for existing locations, and matching the unmanaged preview action. Roll back by restoring the backups and saved commands and checking out v5.2.1 before redeploying.",
+      "note": "The 6.0.0 changelog section carries the combined breaking changes and upgrade steps for the release."
+    },
+    "harnesses": {
+      "breaking": "Existing unmanaged prompt targets require --adopt, and environment-selected worktree targets no longer receive overlays. Invalid or missing targets and negative backup counts exit 2 instead of 1; conflicting modes and abbreviated options are rejected. Selected AGENTS.md artifacts always use harness subdirectories; relative artifacts follow --repo-root; writes refuse linked ancestors; Windows drive-qualified PI_CONFIG_DIR stays under home; CRLF prompts and malformed optional blocks no longer pass checks.",
+      "docs": [
+        "CHANGELOG.md"
+      ],
+      "fingerprint": "ce6fe431dea9c3160f703e8acded745ab352f26f8bef37a6a2994e0f41496cc3",
+      "migration": "Back up existing prompt targets, artifacts, sources, saved commands, and consumers. Upgrade by reviewing unmanaged files and using --adopt once, verifying overlay withholding, spelling options in full, selecting one mode, handling usage failures as exit 2, updating selected artifact paths, and using absolute overrides for old locations, real destination paths, and paired optional markers. Roll back by restoring the backups and saved commands and checking out v5.2.1 before redeploying.",
+      "note": "The 6.0.0 changelog section carries the combined breaking changes and upgrade steps for the release."
+    },
+    "maintenance": {
+      "breaking": "none",
+      "docs": [
+        "docs/MAINTENANCE.md"
+      ],
+      "fingerprint": "f3d3d9f5b63bf646479fc9c696b51e7d6689df4efb44fa5871bea8ffe1ece14b",
+      "note": "domain table lists all relevant maintenance documentation"
+    },
+    "models-agents": {
+      "breaking": "Existing unmanaged role files require --adopt before replacement. Invalid or missing targets and negative backup counts exit 2 instead of 1; conflicting modes and abbreviated options are rejected. Role writes refuse linked ancestors; malformed quoted fields fail; relative role directories follow --repo-root; CRLF roles require replacement, unreadable targets fail, and max_turns notices identify a harness.",
+      "docs": [
+        "CHANGELOG.md"
+      ],
+      "fingerprint": "dfaaa226518f8eb86307cf517d2fe882d1cac0f9ee228d581a85318ea217f5ec",
+      "migration": "Back up existing role directories, saved commands, and consumers. Upgrade by reviewing unmanaged roles and passing --adopt once, verifying generated headers, spelling options in full, selecting one mode, handling usage failures as exit 2, and using real paths, escaped descriptions, and absolute directory overrides to retain locations. Roll back by restoring the backups and saved commands and checking out v5.2.1 before redeploying.",
+      "note": "The 6.0.0 changelog section carries the combined breaking changes and upgrade steps for the release."
     },
     "overlays-trust": {
       "breaking": "none",
       "docs": [
         "CHANGELOG.md",
         "INSTALL.md",
-        "README.md"
+        "docs/MAINTENANCE.md"
       ],
-      "fingerprint": "ad18f5f014b58f4ec199b627cb6f46e2e03400945ae49f7a2f054bfa31b685ce",
-      "note": "Remove the retired fragment-specific lint limit."
+      "fingerprint": "a007dac746f6703f1e05659a232986fe66f1529f3558793ba6528dc9685cbb06",
+      "note": "Document AGENTS_OVERLAY_DIR for the leak linter patterns file, the scan of md.example templates, and negations that remove a check."
     },
     "prompts": {
       "breaking": "none",
       "docs": [
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "README.md",
+        "docs/harness-contract.md"
       ],
-      "fingerprint": "614ec802ad12fd90efadd03d3d36c5b9c0ff0bcccdd3513948f0c33155c95da8",
-      "note": "Tighten the marker and question rules and the Codex question-tool note to fit the Codex budget (#188); no rule, flag, path or overlay behavior changes."
+      "fingerprint": "f2a935a11e2465c4218f0737e9fdfa2688199654966d661316b249735c4d3638",
+      "note": "Record the Command Code effort levels DeepSeek V4.1 Flash accepts and the pinned cheap tier."
     },
     "workflow-templates": {
-      "baseline": true,
       "breaking": "none",
-      "docs": [],
-      "fingerprint": "aba0b21a75c06a3808af72828ab46a498411f7c78033aacdad66a053b4cc46bd",
-      "note": "Baseline when the guard was introduced; existing docs were not re-verified line by line."
+      "docs": [
+        "CHANGELOG.md"
+      ],
+      "fingerprint": "227257baff9aa30b4512eecba718234fda73a0b30063e2d0cd957f8b3d5d5128",
+      "note": "consolidation clearing handles final unterminated path safely"
     }
   },
   "schema": 1

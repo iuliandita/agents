@@ -15,10 +15,11 @@ concurrency:
 jobs:
   release:
     name: Publish GitHub release
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       contents: write
+      actions: read
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -33,6 +34,21 @@ jobs:
             echo "::error::Tagged commit $GITHUB_SHA is not on main"
             exit 1
           fi
+
+      - name: Require successful CI for the tagged commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          commit="$(git rev-parse "${GITHUB_REF_NAME}^{commit}")"
+          for workflow in ci.yml security.yml; do
+            conclusion="$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs" \
+              -f head_sha="$commit" -f event=push -f branch=main -f per_page=1 \
+              --jq '.workflow_runs[0].conclusion // "missing"')"
+            if [ "$conclusion" != "success" ]; then
+              echo "::error::$workflow for tagged commit $commit is $conclusion; rerun the release after CI succeeds"
+              exit 1
+            fi
+          done
 
       - name: Check documentation impact for the release range
         run: |

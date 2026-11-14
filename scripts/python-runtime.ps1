@@ -7,7 +7,7 @@
 function Stop-AgentsRuntime([string]$Message, [string[]]$LauncherArgs) {
     [Console]::Error.WriteLine("error: $Message")
     if ($LauncherArgs -contains '--json') {
-        Write-Output ('{"ok": false, "errors": ["error: ' + $Message + '"], "warnings": [], "notes": []}')
+        Write-Output ('{"ok": false, "errors": ["error: ' + $Message + '"], "warnings": [], "notes": [], "mode": null, "records": []}')
     }
     exit 3
 }

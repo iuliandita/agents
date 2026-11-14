@@ -3,8 +3,15 @@ build/
 docs/local/
 docs/superpowers/
 plans/
-prompts/private.md
-prompts/local.md
+prompts/private.md*
+prompts/local.md*
+prompts/.private.md*
+prompts/.local.md*
+prompts/.*.sw?
+prompts/#private.md#
+prompts/#local.md#
+prompts/.#private.md*
+prompts/.#local.md*
 prompts/private-patterns.txt
 prompts/private-harnesses.txt
 prompts/deploy-targets.txt

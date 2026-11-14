@@ -1,13 +1,6 @@
 {
   "claude": {
     "effort_key": "effort",
-    "effort_map": {
-      "low": "low",
-      "medium": "medium",
-      "high": "high",
-      "xhigh": "xhigh",
-      "max": "max"
-    },
     "tiers": {
       "cheap": "haiku",
       "mid": "sonnet",
@@ -17,13 +10,6 @@
   },
   "codex": {
     "effort_key": "model_reasoning_effort",
-    "effort_map": {
-      "low": "low",
-      "medium": "medium",
-      "high": "high",
-      "xhigh": "xhigh",
-      "max": "max"
-    },
     "tiers": {
       "cheap": "gpt-6-luna",
       "mid": "gpt-6.1-terra",
@@ -34,11 +20,8 @@
   "opencode": {
     "effort_key": "variant",
     "effort_map": {
-      "low": "low",
       "medium": "high",
-      "high": "high",
-      "xhigh": "max",
-      "max": "max"
+      "xhigh": "max"
     },
     "tiers": {
       "cheap": "opencode-go/deepseek-v4.1-flash",
@@ -58,14 +41,14 @@
   "commandcode": {
     "effort_key": "reasoningEffort",
     "effort_map": {
-      "low": "low",
-      "medium": "medium",
-      "high": "high",
       "xhigh": "high",
       "max": "high"
     },
     "tiers": {
-      "cheap": "deepseek/deepseek-v4.1-flash",
+      "cheap": {
+        "model": "deepseek/deepseek-v4.1-flash",
+        "effort": "high"
+      },
       "mid": "claude-sonnet-5-5",
       "flagship": "claude-opus-5-5"
     }
@@ -80,13 +63,6 @@
   },
   "omp": {
     "effort_key": "thinkingLevel",
-    "effort_map": {
-      "low": "low",
-      "medium": "medium",
-      "high": "high",
-      "xhigh": "xhigh",
-      "max": "max"
-    },
     "tiers": {
       "cheap": "@smol",
       "mid": "@default",

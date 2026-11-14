@@ -62,7 +62,19 @@ now affects only the test suite, not installation.
 The bash wrappers are POSIX-only; on native Windows use the shipped PowerShell
 launchers. They resolve the same interpreter order as the bash launchers
 (`AGENTS_PYTHON`, then the checkout `.venv`, then `python`/`python3`, then the
-`py -3` launcher) and mirror their behavior:
+`py -3` launcher) and mirror their behavior. From the checkout root, first
+verify that `py -3` selects Python 3.11 or newer and create the environment:
+
+```powershell
+py -3 --version
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements-dev.txt --require-hashes
+```
+
+Activation is optional for the launchers, which find `.venv\Scripts\python.exe`
+automatically. Use the environment's executable directly if activation is disabled:
+`./.venv/Scripts/python.exe -m pytest -q`.
 
 ```powershell
 ./scripts/sync-ai-prompts.ps1 --check
@@ -71,8 +83,7 @@ launchers. They resolve the same interpreter order as the bash launchers
 ```
 
 PowerShell 7+ (`pwsh`) is expected. Rendered writes are LF and backup names are
-Windows-safe. If you prefer to call the Python scripts directly, pass
-`--repo-root .`. Run inside WSL to use the bash wrappers unchanged; a WSL install
+Windows-safe. Run inside WSL to use the bash wrappers unchanged; a WSL install
 reads the WSL home, separate from a native Windows install. Point both at one
 home with the native env var (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `HERMES_HOME`)
 if you want a shared config.
@@ -107,9 +118,11 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
    (gitignored). Show the user where each will be written and get a yes before going on:
    `scripts/sync-ai-prompts --list-targets` (rules files) and `scripts/render-agents --list-targets`
    (subagent dirs). Customized homes (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `OPENCODE_CONFIG_DIR`,
-   `PI_CODING_AGENT_DIR`, `OMP_PROFILE`, `HERMES_HOME`) are honored when they are set in this shell.
+   `PI_CODING_AGENT_DIR`, `PI_CONFIG_DIR`, `OMP_PROFILE`, `PI_PROFILE`, `HERMES_HOME`,
+   `HERMES_CONFIG_PATH`, `LOCALAPPDATA`) are honored when they are set in this shell.
    Hermes is different: its global rules merge into `agent.coding_instructions` in `$HERMES_HOME/config.yaml`
-   (default `~/.hermes/config.yaml`), shown by `scripts/render-hermes --dry-run`; ignore the `HERMES.md`
+   (default `~/.hermes/config.yaml`, or `%LOCALAPPDATA%\hermes\config.yaml` on native Windows),
+   shown by `scripts/render-hermes --dry-run`; ignore the `HERMES.md`
    project-file line in `--list-targets`. Every other target is one rules file plus six subagent files.
 5. **Optional overlays** (see [Local and private overlays](README.md#local-and-private-overlays)): copy
    `prompts/local.example.md` to `prompts/local.md` for preferences that are safe with any model provider.
@@ -119,21 +132,32 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
    not already set in the environment, since it overrides the file. If the user will edit or contribute
    to the repo, offer to list their private hosts and names in `prompts/private-patterns.txt` so lint
    catches them in any tracked file.
-6. **Preview**: `scripts/update --no-pull --dry-run`. It prints the effective overlay trust (`private
+6. **Preview**: `scripts/update --no-pull --dry-run` (`./scripts/update.ps1 --no-pull --dry-run` on
+   native Windows). It prints the effective overlay trust (`private
    overlay: sent to ...` and where the list came from), then every file it would write. Check: it ends with
    `update complete` and names only the confirmed targets. **ask** before continuing if any line says
    `would replace unmanaged`: that is content the user wrote (their own `CLAUDE.md`, `reviewer.md`, or
    Hermes `coding_instructions`), which deploy replaces after backing it up.
-7. **Deploy**: `scripts/update --no-pull`. Existing files are backed up to `.backups/` first. Check: it
+7. **Deploy**: `scripts/update --no-pull` (`./scripts/update.ps1 --no-pull` on native Windows).
+   Existing files are backed up to `.backups/` first. Check: it
    ends with `update complete`; its last steps are `--verify` (every role file present) and `--status`
-   (every rules file in sync).
+   (managed global rules files in sync, excluding the Hermes YAML merge).
 8. **Schedule** a daily run. **ask** which scheduler, what time (local timezone), and how failures should
    reach the user (log file, syslog/journal, or mail); default to the platform's native scheduler, 06:30,
    and the scheduler's own failure log if they have no preference. `scripts/update` pulls fast-forward only, never prompts (git runs
    non-interactively with a timeout), refuses to run over local tracked edits or alongside another run, and
-   exits non-zero on any failure. Schedulers start with a minimal environment: copy into the job every
+   exits non-zero on any failure. Before pulling, it requires `main` or `develop` with a configured
+   upstream; feature branches and detached HEAD exit 1 before any render or deploy step. Set
+   `AGENTS_UPDATE_BRANCHES=main` (stable) or `AGENTS_UPDATE_BRANCHES=develop` (nightly) to narrow the
+   allow-list. It accepts a comma-separated subset of `main,develop`; other names never add branches,
+   and an empty value allows none. `--no-pull` skips these checks and prints a `note:` that the checkout
+   is deployed as is, including in dry runs. Use a dedicated clean clone on the chosen branch for
+   scheduled updates so feature work cannot interrupt the schedule.
+   Schedulers start with a minimal environment: copy into the job every
    variable the setup relied on (`AGENTS_PYTHON`, customized homes from step 4, `*_AGENTS_PATH` or
-   `*_AGENTS_DIR` overrides, `AGENTS_PRIVATE_HARNESSES`). Replace `<checkout>` with the real absolute path.
+   `*_AGENTS_DIR` overrides, `AGENTS_PRIVATE_HARNESSES`, `AGENTS_UPDATE_BRANCHES`, and hook paths).
+   Include `PI_CONFIG_DIR`, `PI_PROFILE`, `HERMES_CONFIG_PATH`, and `LOCALAPPDATA` when used;
+   see [Environment variables](#environment-variables). Replace `<checkout>` with the real absolute path.
 
    ```bash
    # cron (Linux/macOS): daily at 06:30; failures also go to syslog
@@ -155,7 +179,7 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
 
    # ~/.config/systemd/user/agents-update.timer
    [Timer]
-   OnCalendar=daily
+   OnCalendar=*-*-* 06:30:00
    Persistent=true
 
    [Install]
@@ -163,14 +187,16 @@ result, and stop on any failure. Steps marked **ask** need the user's answer; do
    ```
 
    ```powershell
-   # Windows Task Scheduler (PowerShell 7); the inner quotes keep paths with spaces intact
+   # Windows step 8: schedule ./scripts/update.ps1 without --no-pull
+   # Task Scheduler (PowerShell 7); the inner quotes keep paths with spaces intact
    $script = "<checkout>\scripts\update.ps1"
    schtasks /Create /SC DAILY /ST 06:30 /TN agents-update /TR "pwsh -NoProfile -File `"$script`""
    ```
 
    Check: trigger the scheduled job itself once (`systemctl --user start agents-update.service`,
    `schtasks /Run /TN agents-update`, or the cron command in a minimal shell such as `env -i HOME="$HOME"
-   sh -c '...'`) and confirm it exits 0 and `--status` reports every target in sync.
+   sh -c '...'`) and confirm it exits 0 and `--status` reports managed global rules in sync.
+   Hermes YAML is excluded from `--status`; inspect its result separately.
 
 Report to the user what was deployed where, the backup location, and when the schedule runs. To change
 targets later, edit `prompts/deploy-targets.txt`; the next run applies it. `AGENTS_DEPLOY_TARGETS` or
@@ -227,7 +253,8 @@ GENERIC_AGENTS_PATH="$PWD/AGENTS.md" scripts/sync-ai-prompts --target generic --
 ### Hermes Global Rules
 
 Hermes has no global rules file. Merge the shared core into `agent.coding_instructions` in
-`$HERMES_HOME/config.yaml` (default `~/.hermes/config.yaml`):
+`$HERMES_HOME/config.yaml` (default `~/.hermes/config.yaml`, or
+`%LOCALAPPDATA%\hermes\config.yaml` on native Windows):
 
 ```bash
 scripts/render-hermes --dry-run
@@ -235,10 +262,15 @@ scripts/render-hermes --deploy
 ```
 
 The merge is a comment-preserving line edit and backs the config up first, so unrelated settings and
-comments are kept. It follows the indent the `agent:` block already uses. An inline value such as
+comments are kept. It follows the indent the `agent:` block already uses, including quoted keys and
+column-zero comments within the block. Before writing, a standard-library structural check refuses
+duplicate top-level `agent` keys, duplicate direct `coding_instructions` keys, or lost top-level keys;
+no PyYAML installation is needed. Symlinked config files are refused. An inline value such as
 `agent: {model: opus}` cannot be edited line by line, so deploy stops without writing; rewrite it as a
 block mapping and rerun. Override the target with `--path` or `HERMES_CONFIG_PATH`, and the home with
-`HERMES_HOME`.
+`HERMES_HOME`. When either environment override resolves inside a Git worktree, both `local.md` and
+`private.md` are withheld with a notice, even for trusted Hermes targets. The default config path
+keeps the normal overlay rules, including when `HOME` is a Git worktree.
 
 ## List Targets
 
@@ -257,6 +289,35 @@ CODEX_AGENTS_PATH="$CODEX_HOME/AGENTS.md" scripts/sync-ai-prompts --target codex
 OPENCODE_AGENTS_PATH="$HOME/.config/opencode/AGENTS.md" scripts/sync-ai-prompts --target opencode --deploy
 ANTIGRAVITY_AGENTS_PATH="$HOME/.gemini/GEMINI.md" scripts/sync-ai-prompts --target antigravity --deploy
 ```
+
+## Environment Variables
+
+Set these in the shell or scheduler that runs the command. Explicit command-line paths take
+precedence over environment defaults where supported.
+
+| Variable | Effect |
+|---|---|
+| `AGENTS_PYTHON` | Python 3.11+ executable for the launchers; a path, not a command with flags. |
+| `AGENTS_DEPLOY_TARGETS` | Comma-separated updater targets; overrides `prompts/deploy-targets.txt`, below `--harness` or `--targets`. |
+| `AGENTS_UPDATE_BRANCHES` | Comma-separated subset of `main,develop` allowed to pull; empty allows none. |
+| `AGENTS_PRIVATE_HARNESSES` | Private-overlay trust list; overrides `prompts/private-harnesses.txt`. |
+| `AGENTS_PRIVATE_PATTERNS` | Additional comma- or newline-separated private markers for the leak linter. |
+| `AGENTS_OVERLAY_DIR` | Directory read for the gitignored overlay files (`local.md`, `private.md`, `private-harnesses.txt`, `private-patterns.txt`, `deploy-targets.txt`, `models.local.json`) instead of `prompts/`; an absolute path. The prompt source scan does not read files there. The test suite sets it to an empty directory. |
+| `CLAUDE_AGENTS_PATH`, `CODEX_AGENTS_PATH`, `OPENCODE_AGENTS_PATH`, `COMMANDCODE_AGENTS_PATH` | Override the named harness's rules file. |
+| `ANTIGRAVITY_AGENTS_PATH`, `OMP_AGENTS_PATH`, `HERMES_AGENTS_PATH`, `GENERIC_AGENTS_PATH` | Override the named harness's rules file; Hermes here means project rules. |
+| `CLAUDE_AGENTS_DIR`, `CODEX_AGENTS_DIR`, `OPENCODE_AGENTS_DIR` | Override the named harness's role directory. |
+| `COMMANDCODE_AGENTS_DIR`, `ANTIGRAVITY_AGENTS_DIR`, `OMP_AGENTS_DIR` | Override the named harness's role directory. |
+| `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `OPENCODE_CONFIG_DIR` | Relocate both default rules and role paths; Claude's hook and settings defaults also follow its config home. |
+| `PI_CONFIG_DIR` | Oh My Pi config root relative to the home directory, default `.omp`. |
+| `OMP_PROFILE`, `PI_PROFILE` | Select the Oh My Pi profile; `OMP_PROFILE` takes precedence, including an empty value. |
+| `PI_CODING_AGENT_DIR` | Relocate Oh My Pi rules when no named profile takes precedence; task-agent discovery follows the profile or home. |
+| `HERMES_HOME` | Hermes home; global config defaults to `config.yaml` inside it. |
+| `HERMES_CONFIG_PATH` | Explicit Hermes global config file; takes precedence over `HERMES_HOME`. |
+| `LOCALAPPDATA` | Native Windows Hermes default is `%LOCALAPPDATA%\hermes\config.yaml` when set. |
+| `CLAUDE_HOOKS_DIR`, `CLAUDE_SETTINGS_PATH` | Override the invariants hook directory and Claude settings file. |
+| `HOME`, `USERPROFILE` | Platform home resolution and expansion of `~`. |
+| `PATH` | Executable discovery for launchers and updater detection. |
+| `GIT_SSH_COMMAND` | SSH command for updater pulls; default `ssh -o BatchMode=yes`. |
 
 ## Default Targets
 
@@ -301,7 +362,8 @@ Oh My Pi reads task agents from `~/.omp/agent/agents`, or `~/.omp/profiles/<name
 `OMP_PROFILE` (or `PI_PROFILE`) names a profile, even when `PI_CODING_AGENT_DIR` moves its rules file. The
 renderers follow the same profile resolution; `OMP_AGENTS_DIR` overrides it.
 
-Hermes has no per-role prompt file, so its six roles are a manual paste; delegation is configured under `delegation:` in `~/.hermes/config.yaml`.
+Hermes has no per-role prompt file, so its six roles are a manual paste; delegation is configured under
+`delegation:` in `~/.hermes/config.yaml` (or `%LOCALAPPDATA%\hermes\config.yaml` on native Windows).
 
 After a real deploy, `scripts/render-agents --verify` confirms all six role files exist in each harness's agent directory.
 
@@ -311,7 +373,7 @@ Existing `shell_ro_wrappers` settings are accepted for compatibility but no long
 
 Model tiers and effort maps come from the tracked `prompts/models.json`; `prompts/models.local.json` overrides them. Copy `prompts/models.local.example.json` to start. A harness with no tier map fails unless `--allow-inherit` is passed.
 
-A tier value is a model string, `null` (inherit the session model), or an object `{"model": "<id or null>", "effort": "<level>"}`. The object form is for single-model setups: point every tier at the same model and let the tier set the depth. Effort resolves in this order: `agents.<name>.effort` in the override file, then the tier's `effort`, then the role's own `effort`; `effort_map` then translates the level into the harness's vocabulary. A tier in `models.local.json` replaces the whole default entry, so a plain string there drops a default tier effort. A missing `apex` falls back to `flagship`, effort included; an explicit `"apex": null` inherits instead. Tier objects and the `max` level need this version or later; older checkouts reject them.
+A tier value is a model string, `null` (inherit the session model), or an object `{"model": "<id or null>", "effort": "<level>"}`. The object form is for single-model setups: point every tier at the same model and let the tier set the depth. Effort resolves in this order: `agents.<name>.effort` in the override file, then the tier's `effort`, then the role's own `effort`; `effort_map` then translates the level into the harness's vocabulary. Levels omitted from `effort_map` keep their original names, so identity entries are unnecessary. A tier in `models.local.json` replaces the whole default entry, so a plain string there drops a default tier effort. A missing `apex` falls back to `flagship`, effort included; an explicit `"apex": null` inherits instead. Tier objects and the `max` level need this version or later; older checkouts reject them.
 
 ## Project Instructions: Shared Or Private
 
@@ -443,16 +505,18 @@ clear verified project memory only when explicitly invoked.
 
 The scripts print `error:`, `warning:`, and `note:` lines to stderr, one line each, in lower case. An error names the failing object and, when one exists, the next command. The withheld-overlay line (`note: prompts/private.md withheld from ...`) is a note. Inventory and status lines on stdout, such as `would update`, `unchanged`, and `update complete`, keep their wording.
 
-Exit codes are the same for every command: 0 done, 1 failed, 2 usage error, 3 a required tool is missing (Python 3.11+ for the launchers, git for `scripts/update`). `--check`, `--status`, and `--verify` exit 1 when something is missing or out of sync. `scripts/update` passes through the exit code of a failing step. Every `--help` ends with its Environment and Exit codes sections.
+Exit codes for the commands in the table below are: 0 done, 1 failed, 2 usage error, 3 a required tool is missing (Python 3.11+ for both launchers and direct Python entry points, git for `scripts/update`). `--check`, `--status`, and `--verify` exit 1 when something is missing or out of sync. Invalid or empty target selections, `--deploy` without `--target` for prompts or agents, negative backup retention counts, and conflicting modes exit 2. `scripts/update` passes through the exit code of a failing step. Every `--help` ends with its Environment and Exit codes sections.
 
-`--json` prints exactly one JSON object to stdout and nothing else. Human output moves to stderr and exit codes do not change. Every object has `ok` (true when the exit code is 0), `errors`, `warnings`, and `notes` (the `error:`, `warning:`, and `note:` lines), plus a `mode` and one list of records named below. A usage error, or a launcher that finds no usable Python, prints the object with `ok` false. `scripts/update` runs its steps with their output on stderr, so a failing step shows up as one `error: update failed at ...` line in `errors`.
+Mode flags are mutually exclusive: choose one of `--check`, `--deploy`, `--status` or `--verify`, `--list-targets`, and `--prune-backups` where supported. `--dry-run` works alone or with `--deploy` or `--prune-backups`; it conflicts with read-only inventory and check modes, including updater detection. Spell options in full; abbreviated flags are rejected.
+
+`--json` prints exactly one JSON object to stdout and nothing else. Human output moves to stderr and exit codes do not change. Every object has `ok` (true when the exit code is 0), `errors`, `warnings`, and `notes` (the `error:`, `warning:`, and `note:` lines), plus a `mode` and one list of records named below. The records list retains entries produced before a failure and is empty only when none were produced. Parser usage errors and unsupported or missing Python errors use `mode: null` and `records: []` when the mode is unknown. Other usage errors keep their selected mode and its records key. Unexpected exceptions exit 1 with `error: <prog>: <exception>` on stderr and no traceback, including under `--json`. Intentional exit messages keep their wording. `scripts/update` runs its steps with their output on stderr, so a failing step shows up as one `error: update failed at ...` line in `errors`.
 
 | Command | `mode` | Records key | Record fields |
 |---|---|---|---|
 | `scripts/sync-ai-prompts` | `list-targets` | `targets` | `name`, `display`, `support`, `path` (null when none), `target` |
 | | `check` | `checked` | `harness` |
-| | `status` | `harnesses` | `harness`, `state` (`in-sync`, `drift`, `local-edits`, `not-deployed`, `not-rendered`, `manual`), `path` |
-| | `deploy` (`--deploy` or `--dry-run`; adds `dry_run`) | `actions` | `harness`, `action` (`updated`, `unchanged`, `would-update`, `would-replace-unmanaged`, `skipped`), `path`, and `reason` when skipped |
+| | `status` | `harnesses` | `harness`, `state` (`in-sync`, `drift`, `local-edits`, `not-deployed`, `manual`), `path` |
+| | `deploy` (`--deploy` or `--dry-run`; adds `dry_run`) | `actions` | `harness`, `action` (`updated`, `unchanged`, `would-update`, `would-replace-unmanaged`, `skipped`), `path`, `bytes` (`total`, and `sections` as a list of `name` and `bytes` for the harness notes, core, and overlays) when rendered, and `reason` when skipped |
 | | `prune-backups` (adds `keep`, `dry_run`) | `backups` | `path`, `action` (`removed`, `would-remove`) |
 | | `render` | `rendered` | `harness`, `path` |
 | `scripts/render-agents` | `list-targets` | `targets` | `name`, `display`, `path`, `env_var` |
@@ -460,7 +524,7 @@ Exit codes are the same for every command: 0 done, 1 failed, 2 usage error, 3 a 
 | | `verify` | `harnesses` | `harness`, `path`, `roles`, `missing` |
 | | `deploy` (adds `dry_run`) | `actions` | `harness`, `action` (`updated`, `unchanged`, `would-create`, `would-replace`, `would-replace-unmanaged`, `would-remove-stale`, `removed-stale`), `path` |
 | | `render` | `rendered` | `harness`, `path`, `agents` |
-| `scripts/render-invariants` | `deploy` (adds `dry_run`) | `actions` | `target` (`hook`, `settings`), `action` (`installed`, `merged`, `unchanged`, `would-install`, `would-merge`), `path` |
+| `scripts/render-invariants` | `deploy` (adds `dry_run`) | `actions` | `target` (`hook`, `settings`, `antigravity_hook`, `antigravity_settings`), `action` (`installed`, `merged`, `unchanged`, `would-install`, `would-merge`), `path` |
 | | `render` | `rendered` | `artifact`, `path` |
 | `scripts/render-hermes` | `deploy` (adds `dry_run`) | `actions` | `harness`, `action` (`updated`, `unchanged`, `would-update`, `would-replace-unmanaged`), `path` |
 | | `render` | `rendered` | `harness`, `path` |
@@ -468,7 +532,7 @@ Exit codes are the same for every command: 0 done, 1 failed, 2 usage error, 3 a 
 | | `update` (adds `dry_run`, `pull`, and `targets`, empty until they resolve) | `steps` | `step`, `exit` |
 | `scripts/install_workflow.py` | `dry-run` or `deploy` (adds `dry_run`) | `actions` | `action` (`would-install`, `installed`, `backup`), `path`, and `backup` for a backup |
 
-The check scripts (`scripts/check_*.py`, `scripts/lint_prompts.py`, `scripts/scan_prompt_sources.py`) have no `--json`.
+The check scripts (`scripts/check_*.py`, `scripts/lint_prompts.py`, `scripts/scan_prompt_sources.py`) have no `--json`; their exit-code contracts are documented separately. For example, the docs-impact check uses 2 for missing tooling or invalid usage.
 
 ## Recovery and removal
 
@@ -476,13 +540,34 @@ Stop only the updater schedule you configured before recovering files. For the d
 systemd setup, use `systemctl --user disable --now agents-update.timer`; for cron, launchd or
 Task Scheduler, remove only this checkout's job. Keep unrelated jobs and settings.
 
-Deployments back up overwritten files in this checkout's `.backups/` directory by default.
-Use `--backup-dir` to select another backup directory.
-Match a backup to its original filename and deployment before restoring it; preserve the
-current file first. Restore only the affected prompt or role, then render/check the known-good
-checkout and preview its target paths before redeploying. `scripts/sync-ai-prompts --status`
-compares deployed rules with a fresh render; `scripts/render-agents --verify` checks only that
-role files exist, not their content, discovery or model compatibility.
+Deployments back up overwritten files in this checkout's `.backups/` directory by default;
+`install_workflow.py` uses `.backups/workflow-*/` bundles. The renderers accept `--backup-dir`.
+Backups plus `build/deploy-manifest.json` are the recovery path: the manifest records each
+completed file's path and content hash as it lands. Selected harnesses render and pass their
+budgets before writes begin, and individual files are replaced atomically. Deploying multiple
+components remains sequential, so a later failure can leave earlier components updated.
+Match a backup to the manifest's recorded path before restoring it; preserve the current file
+first. A corrupt manifest produces a warning and is backed up before replacement. Backup
+directories use mode 0700, backup files and new overlay-bearing outputs use 0600 on POSIX.
+Backup filenames include a bounded readable path and a source-path hash. `--prune-backups KEEP`
+on `sync-ai-prompts` retains KEEP backups per source, including recognized files in workflow
+bundles, and removes empty bundles; unrelated names and older workflow files without source
+identifiers are kept for manual recovery.
+
+Prompt, role, and hook deploys refuse existing files without their own generated header.
+To upgrade an unmanaged target, back up and review it, then pass `--adopt` to
+`sync-ai-prompts`, `render-agents`, or `render-invariants` for that deployment. Existing generated
+headers remain compatible. Shared settings and Hermes YAML retain their entry-level merge checks.
+Environment-selected prompt or Hermes config targets inside Git worktrees receive neither
+`local.md` nor `private.md`; the installer prints a `note:`. Default global paths keep overlays
+even when the home directory belongs to a dotfiles worktree. After upgrading, preview the target
+paths and verify the generated headers. To roll back, restore the affected backup and check out
+the previous version before redeploying; restore only the affected prompt or role. Render/check
+the known-good checkout and preview its target paths before redeploying.
+`scripts/sync-ai-prompts --status` compares deployed rules with a fresh render, excluding
+the Hermes global YAML merge;
+`scripts/render-agents --verify` checks only that role files exist, not their content,
+discovery or model compatibility.
 
 There is no whole-suite uninstall command. To stop managing a hook, remove only its generated
 invariants entry from the relevant settings event and its corresponding hook file after keeping

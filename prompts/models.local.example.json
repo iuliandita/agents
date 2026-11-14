@@ -18,8 +18,8 @@
   },
   "commandcode": {
     "tiers": {
-      "cheap": "deepseek/deepseek-v4.1-flash",
-      "mid": "z-ai/glm-5.3-flash",
+      "cheap": {"model": "deepseek/deepseek-v4.1-flash", "effort": "high"},
+      "mid": {"model": "z-ai/glm-5.3-flash", "effort": "high"},
       "flagship": "moonshotai/kimi-k3"
     }
   }

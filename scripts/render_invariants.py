@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
 """Render and install the hard-invariants reinforcement artifacts.
 
-One source (prompts/invariants.md), two delivery paths:
+One source (prompts/invariants.md), two deployed delivery paths:
   1. Claude Code UserPromptSubmit hook -> re-injects invariants into the main
      loop every turn, surviving context compaction in long sessions.
-  2. A paste-in block for subagent definitions -> the hook does not fire on
-     subagent dispatches and built-in Explore/Plan agents skip CLAUDE.md, so
-     critical rules belong in the agent def itself.
+  2. Antigravity PreInvocation hook -> emits JSON with ephemeral invariants
+     context before each invocation.
 
 Without --deploy this only writes artifacts under the out dir. With --deploy it
-installs the hook and idempotently merges the hook wiring into settings.json,
-backing up anything it overwrites. It never edits subagent definitions; that
-channel stays a manual paste.
+installs the selected hooks and idempotently merges their wiring into Claude's
+settings.json and Antigravity's hooks.json, backing up anything it overwrites.
+subagent-block.md is reference output for external agent definitions; nothing in
+this repo consumes it. The agent renderer reads invariants.md directly.
 """
 from __future__ import annotations
+
+import sys
+
+if sys.version_info < (3, 11):
+    import json
+
+    message = "error: render-invariants: Python 3.11+ is required; see INSTALL.md."
+    print(message, file=sys.stderr)
+    if "--json" in sys.argv[1:]:
+        print(json.dumps({"ok": False, "errors": [message], "warnings": [], "notes": [], "mode": None, "records": []}))
+    raise SystemExit(3)
 
 import argparse
 import json
@@ -22,8 +33,12 @@ import re
 import shlex
 from copy import deepcopy
 from pathlib import Path
+from typing import NamedTuple
 
-from render_prompts import EXIT_CODES_HELP, JsonArgumentParser, backup_existing, json_record, run_json
+from render_prompts import (
+    EXIT_CODES_HELP, JsonArgumentParser, atomic_write, backup_existing, json_record,
+    record_deployed, require_owned, require_unlinked_path, resolve_repo_paths, run_json, run_plain,
+)
 
 
 HOOK_NAME = "invariants-userpromptsubmit.sh"
@@ -68,11 +83,13 @@ def render_hook(invariants: str) -> str:
 
 
 def render_settings_snippet(hook_path: str) -> str:
-    return json.dumps(settings_hook_block(hook_path), indent=2) + "\n"
+    return json.dumps(settings_hook_block(hook_path), indent=2, ensure_ascii=False) + "\n"
 
 
 def shell_quote(value: str) -> str:
     """Leave simple paths alone; quote anything a shell would reinterpret."""
+    if os.name == "nt":
+        value = value.replace("\\", "/")
     if re.fullmatch(r"[A-Za-z0-9._/@%+=:,-]+", value):
         return value
     return shlex.quote(value)
@@ -97,7 +114,7 @@ def render_subagent_block(invariants: str) -> str:
 
 
 def render_antigravity_hook(invariants: str) -> str:
-    payload = json.dumps({"injectSteps": [{"ephemeralMessage": invariants.rstrip()}]}, indent=2)
+    payload = json.dumps({"injectSteps": [{"ephemeralMessage": invariants.rstrip()}]}, indent=2, ensure_ascii=False)
     if any(line.strip() == "HOOKJSON" for line in payload.splitlines()):
         raise SystemExit("error: invariants JSON contains a bare 'HOOKJSON' line; refusing to render the hook")
     return (
@@ -115,6 +132,7 @@ def render_antigravity_settings(hook_path: str) -> str:
     return json.dumps(
         {"invariants": {"PreInvocation": [{"type": "command", "command": shell_quote(hook_path)}]}},
         indent=2,
+        ensure_ascii=False,
     ) + "\n"
 
 
@@ -125,56 +143,72 @@ def render_all(
     antigravity_hook_path: str | None = None,
 ) -> dict[str, Path]:
     invariants = read_invariants(repo_root)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    written: dict[str, Path] = {}
-
-    hook = out_dir / HOOK_NAME
-    hook.write_text(render_hook(invariants), encoding="utf-8", newline="\n")
-    hook.chmod(0o755)
-    written["hook"] = hook
-
-    settings = out_dir / SETTINGS_NAME
-    settings.write_text(render_settings_snippet(hook_install_path), encoding="utf-8", newline="\n")
-    written["settings"] = settings
-
-    subagent = out_dir / SUBAGENT_NAME
-    subagent.write_text(render_subagent_block(invariants), encoding="utf-8", newline="\n")
-    written["subagent"] = subagent
-
-    ag_hook = out_dir / ANTIGRAVITY_HOOK_NAME
-    ag_hook.write_text(render_antigravity_hook(invariants), encoding="utf-8", newline="\n")
-    ag_hook.chmod(0o755)
-    written["antigravity_hook"] = ag_hook
-
-    ag_settings = out_dir / ANTIGRAVITY_SETTINGS_NAME
     ag_path = antigravity_hook_path or ANTIGRAVITY_HOOK_PATH.format(home=Path.home())
-    ag_settings.write_text(render_antigravity_settings(ag_path), encoding="utf-8", newline="\n")
-    written["antigravity_settings"] = ag_settings
-
+    artifacts = {
+        "hook": (HOOK_NAME, render_hook(invariants), 0o755),
+        "settings": (SETTINGS_NAME, render_settings_snippet(hook_install_path), 0o600),
+        "subagent": (SUBAGENT_NAME, render_subagent_block(invariants), 0o600),
+        "antigravity_hook": (ANTIGRAVITY_HOOK_NAME, render_antigravity_hook(invariants), 0o755),
+        "antigravity_settings": (ANTIGRAVITY_SETTINGS_NAME, render_antigravity_settings(ag_path), 0o600),
+    }
+    written: dict[str, Path] = {}
+    for label, (name, text, mode) in artifacts.items():
+        path = out_dir / name
+        atomic_write(path, text, mode=mode)
+        written[label] = path
     return written
 
 
-def hook_command_present(settings: dict, command: str) -> bool:
-    for entry in settings.get("hooks", {}).get("UserPromptSubmit", []):
-        for hook in entry.get("hooks", []):
-            if hook.get("command") == command:
-                return True
-    return False
-
-
-def merge_hook_into_settings(settings: dict, command: str) -> tuple[dict, bool]:
-    """Append our hook entry if absent. Never removes or rewrites existing hooks."""
-    merged = deepcopy(settings)
-    if hook_command_present(merged, command):
-        return merged, False
-    hooks = merged.setdefault("hooks", {})
+def hook_entries(settings: dict, harness: str) -> list[dict]:
+    """Validate every container before inspecting any command."""
+    section, event = ("hooks", "UserPromptSubmit") if harness == "claude" else ("invariants", "PreInvocation")
+    if not isinstance(settings, dict):
+        raise SystemExit("error: settings root is not an object; refusing to merge")
+    hooks = settings.get(section, {})
     if not isinstance(hooks, dict):
-        raise SystemExit("error: settings 'hooks' is not an object; refusing to merge")
-    ups = hooks.setdefault("UserPromptSubmit", [])
-    if not isinstance(ups, list):
-        raise SystemExit("error: settings hooks.UserPromptSubmit is not a list; refusing to merge")
-    ups.append({"hooks": [{"type": "command", "command": command}]})
+        raise SystemExit(f"error: settings '{section}' is not an object; refusing to merge")
+    entries = hooks.get(event, [])
+    if not isinstance(entries, list):
+        raise SystemExit(f"error: settings {section}.{event} is not a list; refusing to merge")
+    commands = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise SystemExit(f"error: settings {section}.{event} entries must be objects; refusing to merge")
+        nested = entry.get("hooks", []) if harness == "claude" else [entry]
+        if not isinstance(nested, list) or any(not isinstance(hook, dict) for hook in nested):
+            raise SystemExit(f"error: settings {section}.{event} hooks must be a list of objects; refusing to merge")
+        commands.extend(nested)
+    return commands
+
+
+def managed_hook_command(command: object, hook_name: str) -> bool:
+    """Recognize only a single script path with our channel's managed filename."""
+    if not isinstance(command, str):
+        return False
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        return False
+    return len(parts) == 1 and parts[0].replace("\\", "/").rsplit("/", 1)[-1] == hook_name
+
+
+def merge_hook_into_settings(settings: dict, command: str, harness: str = "claude") -> tuple[dict, bool]:
+    """Refresh the managed script path in place and preserve unrelated entries."""
+    merged = deepcopy(settings)
+    entries = hook_entries(merged, harness)
+    hook_name = HOOK_NAME if harness == "claude" else ANTIGRAVITY_HOOK_NAME
+    for hook in entries:
+        if hook.get("type") == "command" and (
+            hook.get("command") == command or managed_hook_command(hook.get("command"), hook_name)
+        ):
+            changed = hook["command"] != command
+            hook["command"] = command
+            return merged, changed
+    hook = {"type": "command", "command": command}
+    if harness == "claude":
+        merged.setdefault("hooks", {}).setdefault("UserPromptSubmit", []).append({"hooks": [hook]})
+    else:
+        merged.setdefault("invariants", {}).setdefault("PreInvocation", []).append(hook)
     return merged, True
 
 
@@ -184,9 +218,9 @@ def load_settings(path: Path) -> dict:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise SystemExit(f"error: settings.json is not valid JSON ({path}): {exc}")
+        raise SystemExit(f"error: {path.name} is not valid JSON ({path}): {exc}")
     if not isinstance(data, dict):
-        raise SystemExit(f"error: settings.json root is not an object: {path}")
+        raise SystemExit(f"error: {path.name} root is not an object: {path}")
     return data
 
 
@@ -206,56 +240,108 @@ def resolve_settings_path(home: Path, env: dict[str, str]) -> Path:
     return Path(DEFAULT_SETTINGS_PATH.format(home=home))
 
 
+class HookPlan(NamedTuple):
+    hook_text: str
+    settings_text: str
+    changed: bool
+    hook_unchanged: bool
+    hook_unmanaged: bool
+
+
+def prepare_deploy(
+    repo_root: Path,
+    hooks_dir: Path,
+    settings_path: Path,
+    harness: str,
+    allow_unmanaged: bool,
+) -> HookPlan:
+    invariants = read_invariants(repo_root)
+    is_claude = harness == "claude"
+    hook_dest = hooks_dir / (HOOK_NAME if is_claude else ANTIGRAVITY_HOOK_NAME)
+    command = shell_quote(str(hook_dest))
+
+    for candidate in (hook_dest, settings_path):
+        require_unlinked_path(candidate)
+        if candidate.exists() and not candidate.is_file():
+            raise SystemExit(f"error: {candidate} is not a file; refusing to write")
+
+    hook_text = render_hook(invariants) if is_claude else render_antigravity_hook(invariants)
+    hook_unmanaged = False
+    if hook_dest.exists():
+        header = "#!/usr/bin/env bash\n# Generated by render-invariants. "
+        hook_unmanaged = not hook_dest.read_text(encoding="utf-8").startswith(header)
+        require_owned(hook_dest, not hook_unmanaged, allow_unmanaged)
+    settings = load_settings(settings_path)
+    merged, changed = merge_hook_into_settings(settings, command, harness)
+    hook_unchanged = (
+        hook_dest.exists()
+        and hook_dest.read_bytes() == hook_text.encode("utf-8")
+        and (os.name == "nt" or hook_dest.stat().st_mode & 0o777 == 0o755)
+    )
+    return HookPlan(hook_text, json.dumps(merged, indent=2, ensure_ascii=False) + "\n", changed, hook_unchanged, hook_unmanaged)
+
+
 def deploy(
     repo_root: Path,
     hooks_dir: Path,
     settings_path: Path,
     backup_dir: Path,
     dry_run: bool,
+    harness: str = "claude",
+    adopt: bool = False,
+    *,
+    plan: HookPlan | None = None,
 ) -> None:
-    invariants = read_invariants(repo_root)
-    hook_dest = hooks_dir / HOOK_NAME
-    command = shell_quote(str(hook_dest))
-
-    for candidate in (hook_dest, settings_path):
-        if candidate.is_symlink():
-            raise SystemExit(f"error: {candidate} is a symlink; refusing to write through it")
-
-    hook_text = render_hook(invariants)
-    settings = load_settings(settings_path)
-    merged, changed = merge_hook_into_settings(settings, command)
+    require_unlinked_path(backup_dir)
+    hook_text, settings_text, changed, hook_unchanged, hook_unmanaged = plan or prepare_deploy(
+        repo_root, hooks_dir, settings_path, harness, adopt or dry_run,
+    )
+    is_claude = harness == "claude"
+    hook_dest = hooks_dir / (HOOK_NAME if is_claude else ANTIGRAVITY_HOOK_NAME)
+    hook_target = "hook" if is_claude else "antigravity_hook"
+    settings_target = "settings" if is_claude else "antigravity_settings"
+    event = "UserPromptSubmit" if is_claude else "PreInvocation"
 
     if dry_run:
-        print(f"would install hook: {hook_dest}")
-        json_record(target="hook", action="would-install", path=str(hook_dest))
+        if hook_unmanaged and not adopt:
+            print(f"would replace unmanaged hook: {hook_dest} (not written by this repo; backed up first)")
+            action = "would-replace-unmanaged"
+        elif hook_unchanged:
+            print(f"hook unchanged: {hook_dest}")
+            action = "unchanged"
+        else:
+            print(f"would install hook: {hook_dest}")
+            action = "would-install"
+        json_record(target=hook_target, action=action, path=str(hook_dest))
         if changed:
-            print(f"would merge UserPromptSubmit hook into: {settings_path}")
-            json_record(target="settings", action="would-merge", path=str(settings_path))
+            print(f"would merge {event} hook into: {settings_path}")
+            json_record(target=settings_target, action="would-merge", path=str(settings_path))
         else:
             print(f"settings already reference the hook: {settings_path}")
-            json_record(target="settings", action="unchanged", path=str(settings_path))
+            json_record(target=settings_target, action="unchanged", path=str(settings_path))
         return
 
     hooks_dir.mkdir(parents=True, exist_ok=True)
-    if hook_dest.exists() and hook_dest.read_text(encoding="utf-8") == hook_text:
+    if hook_unchanged:
         print(f"hook unchanged: {hook_dest}")
-        json_record(target="hook", action="unchanged", path=str(hook_dest))
+        json_record(target=hook_target, action="unchanged", path=str(hook_dest))
     else:
         backup_existing(hook_dest, backup_dir)
-        hook_dest.write_text(hook_text, encoding="utf-8", newline="\n")
-        hook_dest.chmod(0o755)
+        atomic_write(hook_dest, hook_text, mode=0o755)
+        record_deployed(repo_root, f"hooks:{harness}", hook_dest, hook_text)
         print(f"installed hook: {hook_dest}")
-        json_record(target="hook", action="installed", path=str(hook_dest))
+        json_record(target=hook_target, action="installed", path=str(hook_dest))
 
     if not changed:
         print(f"settings already reference the hook: {settings_path}")
-        json_record(target="settings", action="unchanged", path=str(settings_path))
+        json_record(target=settings_target, action="unchanged", path=str(settings_path))
         return
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     backup_existing(settings_path, backup_dir)
-    settings_path.write_text(json.dumps(merged, indent=2) + "\n", encoding="utf-8", newline="\n")
-    print(f"merged UserPromptSubmit hook into: {settings_path}")
-    json_record(target="settings", action="merged", path=str(settings_path))
+    atomic_write(settings_path, settings_text)
+    record_deployed(repo_root, f"settings:{harness}", settings_path, settings_text)
+    print(f"merged {event} hook into: {settings_path}")
+    json_record(target=settings_target, action="merged", path=str(settings_path))
 
 
 HELP_EPILOG = """\
@@ -273,31 +359,51 @@ Environment:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     repo_root = Path(__file__).resolve().parents[1]
     parser = JsonArgumentParser(
+        allow_abbrev=False,
         description="Render and install hard-invariants reinforcement artifacts.",
         epilog=HELP_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--repo-root", type=Path, default=repo_root)
-    parser.add_argument("--out-dir", type=Path, default=repo_root / "build" / "generated" / "invariants")
-    parser.add_argument("--deploy", action="store_true", help="Install the hook and merge settings.json.")
+    parser.add_argument("--out-dir", type=Path, default=Path("build/generated/invariants"))
+    parser.add_argument("--deploy", action="store_true", help="Install selected hooks and merge their settings.")
+    parser.add_argument("--adopt", action="store_true", help="Allow replacing unmanaged hook scripts after backing them up.")
+    parser.add_argument("--harness", choices=("claude", "antigravity", "all"), default="all", help="Deploy channels (default: all).")
     parser.add_argument("--dry-run", action="store_true", help="Print deploy actions without writing.")
     parser.add_argument("--hooks-dir", type=Path, help=f"Override hooks dir (default: {DEFAULT_HOOKS_DIR}).")
     parser.add_argument("--settings-path", type=Path, help=f"Override settings path (default: {DEFAULT_SETTINGS_PATH}).")
-    parser.add_argument("--backup-dir", type=Path, default=repo_root / ".backups", help="Directory for deploy backups.")
+    parser.add_argument("--antigravity-config-dir", type=Path, default=Path.home() / ".gemini" / "config",
+                        help="Antigravity hooks and hooks.json directory (default: ~/.gemini/config).")
+    parser.add_argument("--backup-dir", type=Path, default=Path(".backups"), help="Directory for deploy backups.")
     parser.add_argument("--json", action="store_true", help="Print one JSON object to stdout; human output goes to stderr.")
-    return parser.parse_args(argv)
+    return resolve_repo_paths(parser.parse_args(argv), parser)
 
 
 def run(args: argparse.Namespace) -> int:
     home = Path.home()
     hooks_dir = args.hooks_dir or resolve_hooks_dir(home, os.environ)
     settings_path = args.settings_path or resolve_settings_path(home, os.environ)
+    ag_config_dir = args.antigravity_config_dir.expanduser()
 
     if args.deploy or args.dry_run:
-        deploy(args.repo_root, hooks_dir, settings_path, args.backup_dir, args.dry_run)
+        targets = []
+        if args.harness in ("claude", "all"):
+            targets.append(("claude", hooks_dir, settings_path))
+        if args.harness in ("antigravity", "all"):
+            targets.append(("antigravity", ag_config_dir, ag_config_dir / "hooks.json"))
+        prepared = [
+            (harness, directory, settings, prepare_deploy(
+                args.repo_root, directory, settings, harness, args.adopt or args.dry_run,
+            ))
+            for harness, directory, settings in targets
+        ]
+        for harness, directory, settings, plan in prepared:
+            deploy(args.repo_root, directory, settings, args.backup_dir, args.dry_run,
+                   harness, args.adopt, plan=plan)
         return 0
 
-    written = render_all(args.repo_root, args.out_dir, str(hooks_dir / HOOK_NAME))
+    written = render_all(args.repo_root, args.out_dir, str(hooks_dir / HOOK_NAME),
+                         str(ag_config_dir / ANTIGRAVITY_HOOK_NAME))
     for label, path in written.items():
         print(f"rendered {label}: {path}")
         json_record(artifact=label, path=str(path))
@@ -307,7 +413,7 @@ def run(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if not args.json:
-        return run(args)
+        return run_plain(lambda: run(args), "render-invariants")
     if args.deploy or args.dry_run:
         return run_json(lambda: run(args), "render-invariants", "actions", mode="deploy", dry_run=args.dry_run)
     return run_json(lambda: run(args), "render-invariants", "rendered", mode="render")

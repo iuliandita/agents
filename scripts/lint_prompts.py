@@ -5,9 +5,10 @@ import os
 import re
 import subprocess
 import sys
+from fnmatch import fnmatchcase
 from pathlib import Path
 
-from render_prompts import HARNESSES
+from render_prompts import HARNESSES, overlay_dir
 
 
 SECRET_PATTERNS = (
@@ -29,14 +30,29 @@ DEFAULT_LOCAL_MARKERS = (
     "company.internal",
 )
 
-CORE_WARN_LINES = 105
-CORE_MAX_LINES = 110
-HARNESS_WARN_LINES = 20
-HARNESS_MAX_LINES = 24
+CORE_WARN_LINES = 98
+CORE_MAX_LINES = 100
+HARNESS_WARN_LINES = 18
+HARNESS_MAX_LINES = 20
 PRIVATE_EXAMPLE_WARN_LINES = 30
 PRIVATE_EXAMPLE_MAX_LINES = 40
 # Tracked templates for the gitignored overlays; both are linted like public prompt sources.
 OVERLAY_EXAMPLES = ("local.example.md", "private.example.md")
+OVERLAY_PATH_PATTERNS = (
+    "prompts/local.md*",
+    "prompts/private.md*",
+    "prompts/.local.md*",
+    "prompts/.private.md*",
+    "prompts/.*.sw?",
+    "prompts/#local.md#",
+    "prompts/#private.md#",
+    "prompts/.#local.md*",
+    "prompts/.#private.md*",
+    "prompts/private-patterns.txt",
+    "prompts/private-harnesses.txt",
+    "prompts/deploy-targets.txt",
+    "prompts/models.local.json",
+)
 AGENT_WARN_LINES = 70
 AGENT_MAX_LINES = 90
 
@@ -74,7 +90,7 @@ PATTERNS_EXAMPLE = Path("prompts") / "private-patterns.example.txt"
 def load_user_patterns(repo_root: Path) -> tuple[str, ...]:
     """The user's own markers: AGENTS_PRIVATE_PATTERNS plus prompts/private-patterns.txt."""
     patterns = split_env_patterns(os.environ.get("AGENTS_PRIVATE_PATTERNS", ""))
-    pattern_file = repo_root / "prompts" / "private-patterns.txt"
+    pattern_file = overlay_dir(repo_root) / "private-patterns.txt"
     if pattern_file.exists():
         for line in pattern_file.read_text(encoding="utf-8").splitlines():
             value = line.strip()
@@ -116,11 +132,25 @@ def lint_tracked_markers(repo_root: Path, patterns: tuple[str, ...]) -> int:
         raw = path.read_bytes()
         if b"\0" in raw:
             continue
-        text = raw.decode("utf-8", errors="replace")
+        text = raw.decode("utf-8", errors="replace").casefold()
         for needle in patterns:
-            if needle in text:
+            if needle.casefold() in text:
                 error(f"{path.relative_to(repo_root)}: tracked file contains local marker: {needle}")
                 failures += 1
+    return failures
+
+
+def lint_tracked_overlays(repo_root: Path) -> int:
+    files = tracked_files(repo_root)
+    if files is None:
+        error("git ls-files unavailable; cannot check for tracked private overlays")
+        return 1
+    failures = 0
+    for path in files:
+        relative = path.relative_to(repo_root).as_posix()
+        if any(fnmatchcase(relative, pattern) for pattern in OVERLAY_PATH_PATTERNS):
+            error(f"{relative}: private overlay or editor copy must not be tracked")
+            failures += 1
     return failures
 
 
@@ -131,8 +161,9 @@ def lint_file(path: Path, private_patterns: tuple[str, ...] = DEFAULT_LOCAL_MARK
         error(f"{path}: contains CRLF line endings; convert to LF")
         failures += 1
     text = raw.decode("utf-8", errors="replace")
+    folded_text = text.casefold()
     for needle in private_patterns:
-        if needle in text:
+        if needle.casefold() in folded_text:
             error(f"{path}: contains private path or name marker: {needle}")
             failures += 1
 
@@ -201,6 +232,17 @@ def main() -> int:
         failures += lint_line_count(agent_path, AGENT_WARN_LINES, AGENT_MAX_LINES)
         failures += lint_file(agent_path, private_patterns=private_patterns)
 
+    extra_sources = [*repo_root.glob("skills/**/SKILL.md")]
+    extra_sources.extend(
+        path for path in (repo_root / "templates").rglob("*")
+        if path.is_file() and b"\0" not in path.read_bytes()
+    )
+    models = prompt_root / "models.json"
+    if models.is_file():
+        extra_sources.append(models)
+    for path in sorted(extra_sources):
+        failures += lint_file(path, private_patterns=private_patterns)
+
     for example_name in OVERLAY_EXAMPLES:
         example = prompt_root / example_name
         if not example.exists():
@@ -211,6 +253,7 @@ def main() -> int:
         failures += lint_file(example, private_patterns=private_patterns)
 
     failures += lint_tracked_markers(repo_root, load_user_patterns(repo_root))
+    failures += lint_tracked_overlays(repo_root)
 
     if failures:
         print(f"Prompt lint failed: {failures} issue(s)")

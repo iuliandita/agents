@@ -4,6 +4,61 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-11-14
+
+- CI dependencies: zizmor 1.32.0, markdownlint-cli2 0.24.0, pytest 9.2.0, newer setup-python, CodeQL, code-scan, and zizmor actions, and the Ubuntu 26.04 and macOS 26 runner images. Python 3.15 joins the Linux test matrix; the macOS and Windows jobs stay on the 3.11 floor.
+
+- `AGENTS_OVERLAY_DIR` names a directory to read the gitignored overlay files from instead of `prompts/`; the test suite points it at an empty directory, so no test reads a real overlay. The prompt source scan flags a negation that removes a check ("never ask before you run ...") and scans `*.md.example` templates. Command Code's cheap tier pins `high`, because its DeepSeek V4.1 Flash has no `medium` level and the cheap roles' effort fell back to the model default; redeploy the Command Code roles to pick it up. CI's links job runs the documented lychee command, stack-check requires the markdown, links, and setup jobs, and tests that only restated constants are gone (#227, #177, #132).
+
+- Claude model ladder names Fable as the megamind model and keeps it opt-in: only on request or when Opus has measurably fallen short (#228).
+
+- Renderer polish: unmanaged hook previews, unreadable target errors, byte-exact LF comparisons, one turn-cap notice per harness, quoted-description round trips, and clear null-model notices. Render checks validate core content, headers, optional markers, and headings outside fences, and resolve their private temporary directories on macOS. Invalid directory overrides retain usage-error JSON. Bash and PowerShell launchers follow symlinks; writes refuse linked ancestors and Windows junctions. Relative artifact directories follow `--repo-root`, and Windows drive-qualified `PI_CONFIG_DIR` stays under home. Shared selection helpers deduplicate targets; selected renders use the same paths as full renders. Unused section omission and build-only states are removed. Breaking: selected `AGENTS.md` artifacts now always use harness subdirectories; relative artifact paths move under the selected repo; linked ancestors and malformed quoted fields fail; unmanaged hook previews report `would-replace-unmanaged`; turn-cap notices identify the harness. Back up artifacts, sources, and consumers before upgrading, update saved artifact paths or use absolute directory overrides, use real destination paths, escape quoted fields, and match the new preview action and notice prefix. Restore the previous checkout, consumers, and backups to roll back (#224).
+
+- Stack checks validate the canon version, honor configured checkout values, share directory exclusions at every depth, and remove unused canon metadata. Model defaults omit redundant effort mappings without changing rendered roles. Installation docs clarify environment overrides, the 06:30 systemd schedule, and the Hermes status exclusion; tests cover every bundled skill installer target and drop redundant configuration pins (#224).
+
+- Error contract: unexpected failures now report an error without a traceback and retain completed JSON records. Every JSON result includes a mode and records list, including parser and runtime failures; direct entry points reject Python older than 3.11 with exit 3. Breaking: invalid target selections, missing deploy targets, and negative backup counts now exit 2 instead of 1; conflicting modes and abbreviated options are rejected. Back up saved commands before upgrading, spell options in full, select one mode (keeping `--deploy --dry-run` valid), and handle usage failures as exit 2. Restore the saved commands and previous checkout to roll back (#217).
+
+- CI runs the full suite on Linux, macOS, and Windows, expands Python coverage, isolates test homes and Git config, verifies hashed dependencies, and requires tagged-commit checks before release. Windows setup includes virtual environments and runbook commands (#218).
+
+- Deploy safety: preflight all selected prompt and role renders, replace files atomically, record each completed file in the deploy manifest, and preserve corrupt manifests. Unmanaged prompt, role, and hook files now require `--adopt`; back up and review them before upgrading, or restore the affected backup and previous checkout to roll back. Environment-selected targets inside Git worktrees withhold local and private overlays; default global paths keep them. Backups use private permissions, bounded filenames, and retention per source path, including new workflow bundles (#216).
+
+- Correct documentation drift and the consolidation clear loop (#219).
+
+- Prompt rules now align on destructive-action confirmation, subagent blockers, and secrets. Harness notes keep runtime checks and config paths, describe rendered effort values, and require a Codex context cap of at least 40 KiB. Public prompts drop repeated rules and optional routing policy; the line-limit test rejects lint warnings (#204).
+
+- Prompt source scan: dependency trees are skipped at any depth and gitignored local files are skipped in a git checkout, while the deployed overlays under `prompts/` are still scanned (#214).
+
+- Leak and injection scanning now covers skills, templates, model metadata, wrapped instructions, hidden Unicode, and more network-to-interpreter commands; private markers match without case sensitivity, tracked overlays fail lint, and editor copies are ignored (#205).
+
+- OpenCode read-only roles deny unlisted tools; all roles gain budgets, blocker output, and shared data handling. The renderer rejects empty tool expansions, reports unsupported turn caps, and omits unused effort from Antigravity hashes (#201).
+
+- Docs impact check: a breaking receipt that a commit did not change no longer fails the range, so merging the base branch into a feature branch no longer reports a stale breaking change (#212).
+
+- Invariants deployment now installs and refreshes both Claude and Antigravity hooks, validates settings before merging, preserves Unicode, and updates managed hook paths in place. `--harness` selects a channel and `--antigravity-config-dir` relocates Antigravity config (#203).
+
+- Updater: require an allowed branch with an upstream before pulling, allow narrowing with `AGENTS_UPDATE_BRANCHES`, and report Windows lock contention cleanly (#200).
+
+- Hermes merges recognize quoted keys and column-zero comments, refuse duplicate or lost keys and symlinked configs, and withhold overlays from environment-selected configs inside Git worktrees; installation docs include the native Windows default (#202).
+
+- Roles and pipeline (#198).
+  - The planner returns `Need the goal: <what is missing>.` instead of asking.
+  - The reviewer reviews named files when no diff is given, and puts its `Coverage: partial` line after the findings line.
+  - The prompt linter and the tests share one line cap: 100 for core and 20 for a harness fragment.
+  - `sync-ai-prompts --deploy` and `--dry-run` report a `bytes` object per harness in `--json`, with the total and a list of rendered sections.
+
+- Core prompt and harness notes: tighter wording with the same behavior, and repeated paths and maintainer notes removed; the Codex render drops from 32,700 to 32,047 bytes (#196).
+  - Invariants: only rewriting pushed history needs confirmation, so a local rebase of an unpushed branch does not.
+
+- Core prompt and harness notes: removed rules that contradicted each other (#194).
+  - Model routing now has one stated precedence, and the Claude and Codex ladders drop prices and version numbers.
+  - The Claude auto-mode note no longer reads as skipping confirmation.
+  - The secret ban is unconditional, and the private-infrastructure rule is scoped to public repos.
+  - Task-end branch cleanup belongs to the main thread.
+  - The Command Code memory and hook notes are scoped.
+  - Git: work on a branch rather than the default or release branch unless the repo or user says otherwise, and flag it before committing there.
+
+- Core prompt: the Writing Voice rules now cover commits and PRs/MRs. Both take a `type(scope): description` title, commit bodies are at most three short lines of why, and PR/MR bodies are capped at ten lines. Quick dev text may be lower-case; email, wikis, and external docs are capitalized and proofread (#192).
+
 ## [5.2.1] - 2026-11-06
 
 - Core prompt: the marker and question rules say the same in about 600 fewer bytes, so the Codex render fits its 32 KiB budget with personal overlays (#188).

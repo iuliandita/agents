@@ -1,4 +1,5 @@
 import subprocess
+from dataclasses import replace
 import tomllib
 from pathlib import Path
 
@@ -43,10 +44,25 @@ def test_parse_frontmatter_strips_matching_quotes(tmp_path):
     assert fields["description"] == "Quoted: value"
 
 
-def test_parse_frontmatter_keeps_value_with_interior_matching_quote(tmp_path):
+def test_parse_frontmatter_rejects_unescaped_interior_quote(tmp_path):
     path = write_agent(tmp_path / "sample.md", description='"a" and "b"')
-    fields, _ = ra.parse_frontmatter(path.read_text(encoding="utf-8"), path)
-    assert fields["description"] == '"a" and "b"'
+    with pytest.raises(SystemExit, match="invalid quoted frontmatter"):
+        ra.load_agent(path)
+
+
+@pytest.mark.parametrize("description,expected", [
+    (r'"Say \"hi\" and C:\\tools"', 'Say "hi" and C:\\tools'),
+    ("'It''s a quoted description'", "It's a quoted description"),
+    ('plain: "quoted" and \\ path', 'plain: "quoted" and \\ path'),
+])
+@pytest.mark.parametrize("harness", ra.AGENT_HARNESSES)
+def test_description_round_trips_through_native_parser(tmp_path, description, expected, harness):
+    role = ra.load_agent(write_agent(tmp_path / "sample.md", description=description))
+    resolved = ra.resolve(role, harness, {}, DEFAULTS)
+    text = ra.RENDERERS[harness](role, resolved, INVARIANTS)
+    data = tomllib.loads(text) if harness == "codex" else yaml.safe_load(text.split("\n---\n", 1)[0][4:])
+    assert role.description == expected
+    assert data["description"] == expected
 
 
 @pytest.mark.parametrize(
@@ -159,8 +175,14 @@ def test_commandcode_mid_renders_sonnet_5_5_with_mapped_effort(effort):
     resolved = ra.resolve(role, "commandcode", {}, DEFAULTS)
     data = yaml.safe_load(ra.render_commandcode(role, resolved, INVARIANTS).split("---")[1])
     assert data["model"] == "claude-sonnet-5-5"
-    assert data["reasoningEffort"] == DEFAULTS["commandcode"]["effort_map"][effort]
+    assert data["reasoningEffort"] == {"xhigh": "high", "max": "high"}.get(effort, effort)
     assert resolved.notices == []
+
+
+def test_commandcode_cheap_tier_pins_an_effort_deepseek_accepts():
+    # Command Code's DeepSeek V4.1 Flash has no medium level; an unsupported one falls back silently.
+    resolved = ra.resolve(spec(tier="cheap", effort="medium"), "commandcode", {}, DEFAULTS)
+    assert (resolved.model, resolved.effort) == ("deepseek/deepseek-v4.1-flash", "high")
 
 
 @pytest.mark.parametrize(
@@ -326,6 +348,7 @@ def test_validate_overrides_rejects_bad_tier_objects(tier_value, message):
         ra.validate_overrides({"opencode": {"tiers": {"cheap": tier_value}}}, Path("models.local.json"))
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 @pytest.mark.parametrize(
     "payload",
     [
@@ -365,14 +388,15 @@ INVARIANTS = "# Hard Invariants (non-negotiable)\n- Never add AI attribution to 
 
 def test_render_claude_frontmatter_and_body():
     text = ra.render_claude(spec(tools=("read", "search", "shell-ro"), max_turns=30), ra.resolve(spec(), "claude", {}, DEFAULTS), INVARIANTS)
-    fields, body = ra.parse_frontmatter(text, Path("claude/sample.md"))
+    head, body = text[4:].split("\n---\n", 1)
+    fields = yaml.safe_load(head)
     assert fields == {
         "name": "sample",
         "description": "Sample.",
         "tools": "Read, Grep, Glob",
         "model": "haiku",
         "effort": "low",
-        "maxTurns": "30",
+        "maxTurns": 30,
     }
     assert ra.GENERATED_MARKER in body
     assert "Never add AI attribution" in body
@@ -381,7 +405,7 @@ def test_render_claude_frontmatter_and_body():
 
 def test_render_claude_omits_model_when_inherit():
     resolved = ra.Resolved(model=None, effort="low", effort_key="effort", notices=[])
-    fields, _ = ra.parse_frontmatter(ra.render_claude(spec(), resolved, INVARIANTS), Path("x.md"))
+    fields = yaml.safe_load(ra.render_claude(spec(), resolved, INVARIANTS)[4:].split("\n---\n", 1)[0])
     assert "model" not in fields
 
 
@@ -398,10 +422,6 @@ def test_render_codex_is_valid_toml_with_sandbox():
 
     writer = ra.render_codex(spec(tools=("read", "edit")), ra.resolve(spec(), "codex", {}, DEFAULTS), INVARIANTS)
     assert tomllib.loads(writer)["sandbox_mode"] == "workspace-write"
-
-
-def test_tracked_codex_apex_model_is_astra():
-    assert DEFAULTS["codex"]["tiers"]["apex"] == "gpt-6-astra"
 
 
 def test_render_codex_escapes_description_quotes():
@@ -486,10 +506,11 @@ def test_render_harness_fails_loud_when_every_model_inherits():
 
 def test_render_commandcode_tools_list():
     text = ra.render_commandcode(spec(tools=("read", "search", "web"), max_turns=30), ra.resolve(spec(), "commandcode", {}, DEFAULTS), INVARIANTS)
-    fields, body = ra.parse_frontmatter(text, Path("x.md"))
+    head, body = text[4:].split("\n---\n", 1)
+    fields = yaml.safe_load(head)
     assert fields["tools"] == "read_file, read_directory, grep, glob, web_fetch, web_search"
-    assert fields["reasoningEffort"] == "low"
-    assert fields["maxTurns"] == "30"
+    assert fields["reasoningEffort"] == "high"
+    assert fields["maxTurns"] == 30
     assert fields["model"] == "deepseek/deepseek-v4.1-flash"
     assert ra.GENERATED_MARKER in body
 
@@ -600,14 +621,16 @@ def test_check_passes_on_repo(capsys):
 def test_render_antigravity_frontmatter_and_tools():
     resolved = ra.resolve(spec(tier="cheap", tools=("read", "search", "shell-ro")), "antigravity", {}, DEFAULTS)
     text = ra.render_antigravity(spec(tools=("read", "search", "shell-ro")), resolved, INVARIANTS)
-    fields, body = ra.parse_frontmatter(text, Path("x.md"))
+    head, body = text[4:].split("\n---\n", 1)
+    fields = yaml.safe_load(head)
 
     assert fields["name"] == "sample"
-    assert fields["subagent"] == "true"
-    assert fields["mainAgent"] == "false"
+    assert fields["subagent"] is True
+    assert fields["mainAgent"] is False
     assert fields["model"] == "flash"
     assert "  - view_file" in text
     assert "  - grep_search" in text
+    assert fields["tools"] == ["view_file", "list_dir", "grep_search", "find_by_name"]
     assert "run_command" not in text
     assert ra.GENERATED_MARKER in body
 
@@ -634,7 +657,7 @@ def test_deploy_writes_backs_up_and_cleans_stale(tmp_path, monkeypatch, capsys):
     foreign = target / "mine.md"
     foreign.write_text("---\nname: mine\n---\nhand written\n", encoding="utf-8")
     existing = target / "explorer.md"
-    existing.write_text("previous content\n", encoding="utf-8")
+    existing.write_text(f"<!-- {ra.GENERATED_MARKER} from agents/explorer.md -->\nprevious content\n", encoding="utf-8")
     monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(target))
     backup_dir = tmp_path / "backups"
 
@@ -725,6 +748,49 @@ def test_deploy_dry_run_writes_nothing(tmp_path, monkeypatch, capsys):
     assert "explorer.toml" in out
 
 
+@pytest.mark.parametrize("json_output", [False, True])
+def test_unreadable_dry_run_target_is_an_error(tmp_path, monkeypatch, capsys, json_output):
+    target = tmp_path / "unreadable.md"
+    read = Path.read_text
+
+    def unreadable(path, *args, **kwargs):
+        if path == target:
+            raise PermissionError("target cannot be read")
+        return read(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", unreadable)
+    import render_prompts
+
+    work = lambda: ra.print_dry_run("claude", target, "output") or 0
+    if json_output:
+        code = render_prompts.run_json(work, "render-agents", "actions", mode="deploy", dry_run=True)
+    else:
+        code = render_prompts.run_plain(work, "render-agents")
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "error: render-agents: target cannot be read" in captured.err
+    assert "would create" not in captured.out + captured.err
+    if json_output:
+        data = json.loads(captured.out)
+        assert data["ok"] is False and data["mode"] == "deploy" and data["actions"] == []
+
+
+@pytest.mark.parametrize("harness", ["claude", "codex"])
+def test_crlf_roles_are_replaced(tmp_path, monkeypatch, capsys, harness):
+    target = tmp_path / "roles"
+    target.mkdir()
+    monkeypatch.setenv(ra.TARGET_DIRS[harness][1], str(target))
+    role = ra.load_agents(REPO)[0]
+    files, _ = ra.render_harness([role], harness, {}, ra.read_invariants(REPO), DEFAULTS)
+    filename, text = next(iter(files.items()))
+    destination = target / filename
+    destination.write_bytes(text.replace("\n", "\r\n").encode("utf-8"))
+    ra.deploy(REPO, [harness], {}, True, tmp_path / "backups")
+    assert f"would replace {harness}: {destination}" in capsys.readouterr().out
+    ra.deploy(REPO, [harness], {}, False, tmp_path / "backups")
+    assert destination.read_bytes() == text.encode("utf-8")
+
+
 def test_deploy_dry_run_reports_unchanged_file(tmp_path, monkeypatch, capsys):
     target = tmp_path / "codex-agents"
     monkeypatch.setenv("CODEX_AGENTS_DIR", str(target))
@@ -780,6 +846,7 @@ def test_render_all_prunes_stale_generated_outputs(tmp_path):
 # --- shell-ro compatibility -----------------------------------------------
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 @pytest.mark.parametrize(
     "payload",
     [
@@ -885,6 +952,7 @@ DOCUMENTED_KEYS = {
 }
 
 OPENCODE_PERMISSION_KEYS = {
+    "*",
     "read",
     "edit",
     "glob",
@@ -940,6 +1008,7 @@ def test_verify_flags_an_undeployed_harness(tmp_path):
     assert ra.verify(REPO, ["codex"], env=env) == 1
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_validate_overrides_rejects_null_effort_map_value(tmp_path):
     (tmp_path / "prompts").mkdir()
     (tmp_path / "prompts" / "models.local.json").write_text(
@@ -976,17 +1045,27 @@ def test_render_omp_uses_role_alias_and_thinking_level():
     assert ra.GENERATED_MARKER in text
 
 
-def test_render_omp_empty_tool_expansion_stays_restricted():
-    resolved = ra.resolve(spec(), "omp", {}, DEFAULTS)
-    text = ra.render_omp(spec(tools=("shell-ro",)), resolved, INVARIANTS)
-    assert "tools: []" in text
-    assert omp_fields(text)["tools"] == []
+@pytest.mark.parametrize("harness", ["claude", "opencode", "commandcode", "antigravity", "omp"])
+def test_render_rejects_empty_tool_expansion(harness):
+    role = spec(tools=("shell-ro",))
+    resolved = ra.resolve(role, harness, {}, DEFAULTS)
+    with pytest.raises(SystemExit, match=rf"^error: .*{harness}/sample: tool expansion is empty"):
+        ra.RENDERERS[harness](role, resolved, INVARIANTS)
 
 
 def test_render_omp_apex_falls_back_to_slow_role_with_max_effort():
     resolved = ra.resolve(spec(tier="apex", effort="max"), "omp", {}, DEFAULTS)
     assert resolved.model == "@slow"
     assert resolved.effort == "max"
+
+
+def test_null_flagship_fallback_explains_session_inheritance():
+    defaults = {"codex": {"tiers": {"flagship": {"model": None, "effort": "high"}}}}
+    resolved = ra.resolve(spec(tier="apex"), "codex", {}, defaults)
+    assert resolved.model is None and resolved.effort == "high"
+    assert resolved.notices == [
+        "codex/sample: no apex model configured; using flagship settings and inheriting the session model",
+    ]
 
 
 def test_omp_reviewer_shadow_is_noticed():
@@ -1031,7 +1110,7 @@ def test_agent_dir_follows_native_config_home(tmp_path, harness, native):
 
 def test_dry_run_flags_unmanaged_files(tmp_path, capsys):
     managed = tmp_path / "managed.md"
-    managed.write_text(f"x {ra.GENERATED_MARKER} y", encoding="utf-8")
+    managed.write_text(f"<!-- {ra.GENERATED_MARKER} from agents/sample.md -->\n", encoding="utf-8")
     unmanaged = tmp_path / "mine.md"
     unmanaged.write_text("hand written", encoding="utf-8")
     ra.print_dry_run("claude", managed, "new")
@@ -1039,6 +1118,62 @@ def test_dry_run_flags_unmanaged_files(tmp_path, capsys):
     out = capsys.readouterr().out
     assert f"would replace claude: {managed}" in out
     assert f"would replace unmanaged claude: {unmanaged}" in out
+
+
+@pytest.mark.parametrize("harness", ra.AGENT_HARNESSES)
+def test_generated_ownership_matches_rendered_header_only(tmp_path, harness):
+    files, _ = ra.render_harness(ra.load_agents(REPO), harness, {}, INVARIANTS, DEFAULTS)
+    text = next(iter(files.values()))
+    assert ra.generated_text(text)
+    assert not ra.generated_text("User notes\n" + text)
+    target = tmp_path / ("quoted" + ra.EXTENSIONS[harness])
+    target.write_text("User notes\n" + text)
+    assert ra.stale_outputs(tmp_path, ra.EXTENSIONS[harness], {}) == []
+
+
+@pytest.mark.parametrize("harness", ["claude", "codex"])
+def test_role_adoption_requires_own_header_and_preserves_original(tmp_path, monkeypatch, harness):
+    import render_prompts
+
+    target = tmp_path / "roles"
+    target.mkdir()
+    original = "User notes\n<!-- Generated by sync-ai-prompts rev old. -->\n"
+    role = target / ("explorer" + ra.EXTENSIONS[harness])
+    role.write_text(original)
+    monkeypatch.setenv(ra.TARGET_DIRS[harness][1], str(target))
+    monkeypatch.setattr(render_prompts, "manifest_path", lambda repo: tmp_path / "manifest.json")
+    with pytest.raises(SystemExit, match="--adopt"):
+        ra.deploy(REPO, [harness], {}, False, tmp_path / "backups")
+    assert list(target.iterdir()) == [role]
+    ra.deploy(REPO, [harness], {}, False, tmp_path / "backups", adopt=True)
+    assert ra.is_generated(role)
+    assert [path.read_text() for path in (tmp_path / "backups").iterdir()] == [original]
+
+
+def test_role_write_failure_leaves_first_role_recorded(tmp_path, monkeypatch):
+    import render_prompts
+
+    target = tmp_path / "roles"
+    monkeypatch.setenv("CLAUDE_AGENTS_DIR", str(target))
+    monkeypatch.setattr(render_prompts, "manifest_path", lambda repo: tmp_path / "manifest.json")
+    write = ra.atomic_write
+    completed = []
+
+    def fail_second(path, text):
+        if completed:
+            raise OSError("second role failed")
+        write(path, text)
+        completed.append(path)
+
+    monkeypatch.setattr(ra, "atomic_write", fail_second)
+    with pytest.raises(OSError, match="second role failed"):
+        ra.deploy(REPO, ["claude"], {}, False, tmp_path / "backups")
+    first = completed[0]
+    assert ra.is_generated(first)
+    manifest = render_prompts.load_manifest(REPO)
+    assert manifest[f"roles:claude:{first.name}"] == {
+        "path": str(first), "hash": render_prompts.content_hash(first.read_text()),
+    }
 
 
 EXAMPLE = json.loads((REPO / "prompts" / "models.local.example.json").read_text(encoding="utf-8"))
@@ -1090,3 +1225,54 @@ def test_opencode_unlisted_model_is_not_checked():
 def test_validate_overrides_rejects_bad_variants(bad):
     with pytest.raises(SystemExit, match="variants"):
         ra.validate_overrides({"opencode": {"variants": {"opencode-go/x": bad}}}, Path("models.local.json"))
+
+
+@pytest.mark.parametrize("role", ra.load_agents(REPO), ids=lambda role: role.name)
+def test_opencode_role_permissions_deny_unknown_tools_only_for_read_only_roles(role):
+    text = ra.render_opencode(role, ra.resolve(role, "opencode", {}, DEFAULTS), INVARIANTS)
+    permissions = yaml.safe_load(text.split("---")[1])["permission"]
+    if ra.WRITE_TOOLS & set(role.tools):
+        assert "*" not in permissions
+        assert set(permissions) == set(ra.OPENCODE_KNOWN)
+    else:
+        assert text.split("permission:\n", 1)[1].startswith('  "*": deny\n')
+        assert next(iter(permissions)) == "*"
+        assert permissions["*"] == "deny"
+        assert permissions.get("skill", permissions["*"]) == "deny"
+        assert "skill: allow" not in text
+        for tool in ("mcp_custom_write", "lsp", "external_directory", "skill"):
+            assert permissions.get(tool, permissions["*"]) == "deny"
+    allowed = {
+        "builder": {"read", "list", "grep", "glob", "edit", "bash"},
+        "explorer": {"read", "list", "grep", "glob"},
+        "planner": {"read", "list", "grep", "glob", "webfetch", "websearch"},
+        "researcher": {"read", "list", "grep", "glob", "webfetch", "websearch"},
+        "reviewer": {"read", "list", "grep", "glob"},
+        "verifier": {"read", "list", "bash"},
+    }[role.name]
+    assert {tool for tool, effect in permissions.items() if effect == "allow"} == allowed
+    for tool in ("edit", "bash", "task", "todowrite", "question"):
+        if tool not in allowed:
+            assert permissions[tool] == "deny"
+
+
+@pytest.mark.parametrize("harness", ra.AGENT_HARNESSES)
+@pytest.mark.parametrize("max_turns", [None, 30])
+def test_unsupported_max_turns_is_noticed(harness, max_turns, capsys):
+    role = spec(max_turns=max_turns)
+    _, notices = ra.render_harness([role, replace(role, name="second")], harness, {}, INVARIANTS, DEFAULTS)
+    ra.print_notices(notices)
+    output = capsys.readouterr().err
+    if max_turns is not None and harness in {"codex", "antigravity", "omp"}:
+        assert output.count(f"note: {harness}: max_turns is not supported") == 1
+        assert "tool-call budget is advisory" in output
+    else:
+        assert "max_turns" not in output
+
+
+def test_antigravity_render_ignores_resolved_effort_but_tracks_model():
+    role = spec()
+    resolved = ra.resolve(role, "antigravity", {}, DEFAULTS)
+    text = ra.render_antigravity(role, resolved, INVARIANTS)
+    assert text == ra.render_antigravity(role, replace(resolved, effort="high"), INVARIANTS)
+    assert text != ra.render_antigravity(role, replace(resolved, model="pro"), INVARIANTS)

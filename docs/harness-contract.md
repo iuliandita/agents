@@ -28,6 +28,7 @@ pattern (`medium`), or it is not vendored (`n/a`).
 - The desktop Code tab runs the same engine and reads the same files; the Chat/Cowork tab does not
   (see `docs/surfaces.md`).
 - Skills and hooks are first-class; the `UserPromptSubmit` hook is the invariants channel.
+  `render-invariants --deploy --harness claude` installs the script and merges its settings entry.
 
 ### OpenAI Codex
 - Global rules `$CODEX_HOME/AGENTS.md` (default `~/.codex/AGENTS.md`), read as `AGENTS.override.md` then
@@ -45,14 +46,17 @@ pattern (`medium`), or it is not vendored (`n/a`).
   `%USERPROFILE%\.config\opencode`. A WSL install reads the WSL home, separate from native Windows.
 - Permission keys include `read`, `edit` (gates `write`/`edit`/`apply_patch`), `bash`, `task`, `glob`,
   `grep`, `list`, `todowrite`, `webfetch`, `websearch`, `external_directory`, `lsp`, `skill`,
-  `question`. Unlisted custom/MCP tools fall back to global defaults.
+  `question`. Rendered read-only roles put `"*": deny` first, then their explicit allows and denies;
+  unlisted custom/MCP tools, `skill`, `lsp`, and `external_directory` stay denied. Builder and verifier
+  retain explicit maps without a wildcard. This uses the V1 Markdown `permission` format
+  ([wildcards and ordering](https://github.com/anomalyco/opencode/blob/v1.2.0/packages/web/src/content/docs/permissions.mdx)).
 
 ### Command Code
 - Global rules `~/.commandcode/AGENTS.md`; project rules `./AGENTS.md`; settings and hooks in
   `~/.commandcode/settings.json`; agents in `~/.commandcode/agents/`. Skills are recommended
   in shared `~/.agents/skills/`; native `~/.commandcode/skills/` remains valid.
 - Home is resolved from `HOME`/`USERPROFILE`, so Windows native gives `%USERPROFILE%\.commandcode`.
-  Binary aliases: `cmd`/`command-code`/`commandcode` (POSIX), `cmdc` (native Windows).
+  Binary aliases: `cmd`/`command-code`/`commandcode` (POSIX), `cmdc` (native Windows). Automatic detection checks `commandcode`, `command-code`, and `cmdc`, but not `cmd`.
 - Confidence is medium because the memory path is documented but the per-OS spelling is inferred.
 
 ### Antigravity
@@ -64,6 +68,10 @@ pattern (`medium`), or it is not vendored (`n/a`).
   `~/.gemini/config/mcp_config.json`. Hooks `hooks.json` in `.agents/` or `~/.gemini/config/`
   (`PreToolUse`, `PostToolUse`, `PreInvocation`, `PostInvocation`, `Stop`); `PreInvocation` can return
   `injectSteps[].ephemeralMessage`, the invariants channel for this harness.
+  `render-invariants --deploy --harness antigravity` installs `invariants-preinvocation.sh` and
+  merges `invariants.PreInvocation` into global `hooks.json`, with backups and the same destination
+  and settings validation as Claude. `--antigravity-config-dir` relocates both files. With no
+  `--harness`, the invariants deploy selects both Claude and Antigravity.
 - Headless: `agy -p` with `--output-format text|json|stream-json`, `--effort`, `--continue`.
 - Custom subagents: `.agents/agents/<name>.md` (workspace) or `~/.gemini/config/agents/<name>.md`
   (global), YAML frontmatter `name`, `description`, `tools` (exact names; a misspelled tool can hang the
@@ -138,15 +146,28 @@ plain model string (both drop the pinned `max`). The old behavior needs `"effort
 and the previous map (`medium` to `medium`, `xhigh` and `max` to `high`). That the provider ignores the
 raw body key is inferred, not observed.
 
+## Command Code effort levels (2026-11-13)
+
+Read from the model catalog bundled with Command Code v1.88.5 (`reference/models.md` and
+`reference/custom-agents.md` in its knowledge directory); `cmd --help` and `cmd --list-models` do not
+print per-model levels. `--help` says only `--effort <level>` "depends on the model".
+
+- DeepSeek V4.1 Flash accepts `off`, `low`, `high`, and `max`, with no `medium`. GLM-5.3 Flash accepts
+  `low`, `high`, and `max`. Claude Sonnet 5.5 and Opus 5.5 accept `low` through `max`.
+- An agent file's `reasoningEffort` that the pinned model does not support falls back to the model
+  default instead of failing.
+
+The tracked cheap tier therefore pins `high` on DeepSeek V4.1 Flash, the same level OpenCode renders for
+that model, where the cheap roles' `medium` used to fall back silently. A `models.local.json` tier written
+as a plain model string drops the pin; use the object form with an `effort` the model accepts.
+
 ## Claude Haiku 5.5 (2026-10-08)
 
 The API model ID is `claude-haiku-5-5`, released 2026-10-07. Current Claude Code resolves `haiku` to
 Haiku 5.5 on the Anthropic API; Bedrock, Google Cloud, Microsoft Foundry, and Claude Platform on AWS
 resolve it to Haiku 4.5, which has no effort control. The Claude `cheap` tier is now the plain `haiku`
-alias, so each role keeps its own effort: explorer at `low`, researcher at `medium`. See
-[Claude Code model configuration](https://code.claude.com/docs/en/model-config). Since 2026-10-09 the
-explorer runs at `medium` and the verifier moved to the cheap tier at `medium`; the README roster has
-current values.
+alias, so each role keeps its own effort: explorer, researcher, and verifier use `medium`. See
+[Claude Code model configuration](https://code.claude.com/docs/en/model-config). The README roster has current values.
 
 Haiku 5.5 is the first Haiku with adaptive thinking and effort (`medium` default, `low` through
 `max`), a 1M-token context, and 128k output. Pricing is $0.10 / $0.50 per MTok (cache read $0.01) for

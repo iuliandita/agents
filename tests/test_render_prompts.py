@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import lint_prompts as linter
 import render_prompts as renderer
 
 
@@ -93,34 +94,6 @@ def test_harness_catalog_is_the_seven_supported_plus_generic():
         assert removed not in harnesses
 
 
-def test_harness_displays_are_stable():
-    harnesses = {harness.name: harness for harness in renderer.HARNESSES}
-
-    assert harnesses["claude"].display == "Claude Code"
-    assert harnesses["codex"].display == "OpenAI Codex"
-    assert harnesses["opencode"].display == "OpenCode"
-    assert harnesses["commandcode"].display == "Command Code"
-    assert harnesses["antigravity"].display == "Antigravity"
-    assert harnesses["hermes"].display == "Hermes Agent"
-    assert harnesses["generic"].display == "Generic AGENTS.md"
-
-
-def test_harness_support_levels_are_exposed_in_registry():
-
-    levels = {harness.name: harness.support_level for harness in renderer.HARNESSES}
-
-    assert renderer.DEPLOYABLE == "deployable"
-    assert renderer.MANUAL == "manual"
-    assert renderer.SUPPORT_LEVELS == {"deployable", "manual"}
-    assert levels["claude"] == "deployable"
-    assert levels["codex"] == "deployable"
-    assert levels["opencode"] == "deployable"
-    assert levels["commandcode"] == "deployable"
-    assert levels["antigravity"] == "deployable"
-    assert levels["hermes"] == "manual"
-    assert levels["generic"] == "manual"
-
-
 def test_target_path_uses_home_and_env_override(tmp_path):
 
     default_path = renderer.target_path("codex", home=tmp_path, env={})
@@ -172,6 +145,7 @@ def test_selected_harnesses_accept_comma_separated_targets():
     assert [harness.name for harness in selected] == ["claude", "codex", "opencode"]
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_render_all_writes_selected_harnesses_to_output_dir(tmp_path):
     repo = tmp_path / "repo"
     (repo / "prompts" / "harnesses").mkdir(parents=True)
@@ -197,7 +171,7 @@ def test_render_all_writes_selected_harnesses_to_output_dir(tmp_path):
 
     assert written == {
         "claude": tmp_path / "out" / "CLAUDE.md",
-        "codex": tmp_path / "out" / "AGENTS.md",
+        "codex": tmp_path / "out" / "codex" / "AGENTS.md",
     }
     assert "claude only" in written["claude"].read_text(encoding="utf-8")
     assert "shared" in written["codex"].read_text(encoding="utf-8")
@@ -223,17 +197,19 @@ def test_full_catalog_render_places_colliding_outputs_in_harness_subdirectories(
             assert path == tmp_path / "out" / harness / item.output_name
 
 
-def test_single_selected_agents_output_stays_top_level(tmp_path):
+def test_selected_output_path_matches_full_catalog_and_deduplicates_targets(tmp_path):
     repo = Path(__file__).resolve().parents[1]
 
     written = renderer.render_all(
         repo_root=repo,
         out_dir=tmp_path / "out",
-        selected=["codex"],
+        selected=["codex,codex", "codex"],
         stamp="2026-04-25",
     )
 
-    assert written["codex"] == tmp_path / "out" / "AGENTS.md"
+    assert written == {"codex": tmp_path / "out" / "codex" / "AGENTS.md"}
+    full = renderer.render_all(repo_root=repo, out_dir=tmp_path / "out", stamp="2026-04-25")
+    assert full["codex"] == written["codex"]
 
 
 def test_apply_optional_blocks_keeps_enabled_and_drops_disabled():
@@ -243,6 +219,68 @@ def test_apply_optional_blocks_keeps_enabled_and_drops_disabled():
     assert "B" not in renderer.apply_optional_blocks(text, frozenset())
     assert "A" in renderer.apply_optional_blocks(text, frozenset())
     assert "C" in renderer.apply_optional_blocks(text, frozenset())
+
+
+@pytest.mark.parametrize("enabled", [frozenset(), frozenset({"subagents"})])
+def test_optional_blocks_accept_empty_body(enabled):
+    assert renderer.apply_optional_blocks("A\n<!-- optional:subagents -->\n<!-- /optional:subagents -->\nB\n", enabled) == "A\nB\n"
+
+
+@pytest.mark.parametrize("block", [
+    "<!-- optional:subagents -->\nbody\n<!-- /optional:other -->\n",
+    "<!-- optional:UPPER -->\nbody\n<!-- /optional:UPPER -->\n",
+    "<!-- optional:subagents -->\nbody\n",
+    "<!-- /optional:subagents -->\n",
+])
+def test_optional_blocks_reject_leftover_markers(block):
+    with pytest.raises(SystemExit, match="optional block marker"):
+        renderer.apply_optional_blocks(block, frozenset())
+
+
+@pytest.mark.parametrize("fence", ["```", "~~~~"])
+def test_heading_detection_ignores_fenced_content(fence):
+    code = f"{fence}text\n# code heading\n## B\n`\n{fence}\n"
+    core = f"# Core\n## A\n{code}## B\nkeep\n"
+    sizes = renderer.section_sizes(core)
+    assert [name for name, _ in sizes] == ["Core"]
+    assert sum(size for _, size in sizes) == len(core.encode("utf-8"))
+
+
+@pytest.mark.usefixtures("checkout_overlays")
+@pytest.mark.parametrize("core", ["", " \n", "<!-- optional:subagents -->\nonly optional\n<!-- /optional:subagents -->\n"])
+def test_shape_check_rejects_empty_core(tmp_path, core):
+    repo = overlay_repo(tmp_path)
+    (repo / "prompts" / "core.md").write_text(core, encoding="utf-8")
+    with pytest.raises(SystemExit, match="core is empty"):
+        renderer.check_render_shape(repo, ["generic"])
+
+
+@pytest.mark.usefixtures("checkout_overlays")
+@pytest.mark.parametrize("corruption", ["header", "core", "optional"])
+def test_shape_check_detects_corrupt_output(tmp_path, monkeypatch, capsys, corruption):
+    repo = overlay_repo(tmp_path)
+    render = renderer.render_all
+
+    def corrupt(*args, **kwargs):
+        written = render(*args, **kwargs)
+        path = written["claude"]
+        text = path.read_text(encoding="utf-8")
+        if corruption == "header":
+            text = text.split("\n", 1)[1]
+        elif corruption == "core":
+            text = text.replace("shared", "lost body")
+        else:
+            text += "<!-- optional:leftover -->\n"
+        path.write_text(text, encoding="utf-8")
+        return written
+
+    monkeypatch.setattr(renderer, "render_all", corrupt)
+    if corruption == "optional":
+        with pytest.raises(SystemExit, match="optional block marker"):
+            renderer.check_render_shape(repo, ["claude"])
+    else:
+        assert renderer.check_render_shape(repo, ["claude"]) == 1
+        assert "error:" in capsys.readouterr().err
 
 
 def test_generic_target_drops_the_subagent_delegation_block(tmp_path):
@@ -258,24 +296,6 @@ def test_generic_target_drops_the_subagent_delegation_block(tmp_path):
     assert "## Delegation" not in generic["generic"].read_text(encoding="utf-8")
     assert "## Delegation" in claude["claude"].read_text(encoding="utf-8")
 
-
-def test_drop_sections_removes_only_the_named_section_and_fails_loud_when_missing():
-    core = "# Core\n\n## A\n- a\n\n## B\n- b\n\n## C\n- c\n"
-
-    assert renderer.drop_sections(core, ("B",)) == "# Core\n\n## A\n- a\n\n## C\n- c\n"
-    with pytest.raises(SystemExit, match="'Renamed' not found"):
-        renderer.drop_sections(core, ("Renamed",))
-    with pytest.raises(SystemExit, match="more than once"):
-        renderer.drop_sections(core + "\n## B\n- again\n", ("B",))
-
-
-def test_omitted_sections_are_dropped_after_optional_blocks():
-    core = "# Core\n\n## A\n- a\n\n<!-- optional:subagents -->\n## Delegation\n- d\n<!-- /optional:subagents -->\n## Scope\n- s\n"
-
-    rendered = renderer.render_document("## F\n", core, stamp="x", enabled_optional=frozenset(), omit_sections=("A",))
-
-    assert "## A" not in rendered and "optional" not in rendered.split("\n", 3)[3]
-    assert "## Delegation" not in rendered and "## Scope" in rendered
 
 
 PRESENT_PINS = {
@@ -293,7 +313,9 @@ PRESENT_PINS = {
         "`[partial]`",
         "Precedence is `[needs you]` > `[waiting]` > `[partial]` > `[done]`",
         "A subagent with a role output format follows that format instead",
-        "Never run destructive infrastructure commands without explicit confirmation",
+        "Destructive infrastructure commands always need explicit confirmation naming the command in this session",
+        "subagents stop and return the blocker to the parent",
+        "Never put secrets on the command line",
         "`terraform apply`",
         "`terraform destroy`",
         "`helm delete`",
@@ -310,20 +332,18 @@ PRESENT_PINS = {
         "unrelated work needs authorization",
         "Delegate by default whenever a bounded task",
         "Maximize useful delegation, not agent count",
-        "configured Jev/TypeSafe API key",
-        "Jev output is evidence, not authorization or proof",
         "Finish the whole task",
         "Safe local actions need no confirmation",
     ),
     "claude": (
-        "Haiku 5.5 = cheap, fast tier",
+        "`haiku` = cheap, fast tier",
         "at `low` it skips searches, stops early, and skips checks more often",
-        "Sonnet 5.5 = balanced tier",
+        "`sonnet` = balanced tier",
         "`medium` as its default effort",
-        "Fable 5.1 = apex",
+        "`fable` = apex",
+        "does not replace the confirmation rules",
         "Haiku 4.5 has no effort control",
         "`medium` for bounded coding and `high` for hard reasoning or long work",
-        "recalibrate effort after model changes",
         "check the resolved model and provider",
         "aliases may be overridden",
         "`haiku` and `sonnet` select 5.5 only on the Anthropic API",
@@ -336,19 +356,18 @@ PRESENT_PINS = {
         "CLAUDE_CODE_SUBAGENT_MODEL",
         "Auto mode is the default permission mode",
         "run in the background by default",
-        "Effort names vary by model",
     ),
     "codex": (
-        "GPT-6 Luna = cheap tier",
-        "GPT-6.1 Terra = mid tier",
-        "GPT-6.1 Sol = flagship",
-        "GPT-6 Astra = apex",
+        "Luna = cheap tier",
+        "Terra = mid tier",
+        "Sol = flagship",
+        "Astra = apex, only when Sol has measurably fallen short",
         "do not freeze stale names",
         "do not assume API and app effort ranges match",
         "Prompt text does not enable API features",
         "Untrusted projects do not contribute project-level",
         "AGENTS.override.md",
-        "Verify current CLI/docs before setting automation flags",
+        "Set it to at least 40960 in `config.toml` and check the cap and trust",
     ),
     "contract": (
         "GPT-6.1 Sol accepts `low`, `medium` (default), `high`, `xhigh`, and `max`",
@@ -449,9 +468,9 @@ def test_prompt_line_limits_are_enforced():
     core_lines = (repo / "prompts" / "core.md").read_text(encoding="utf-8").splitlines()
     harness_paths = sorted((repo / "prompts" / "harnesses").glob("*.md"))
 
-    assert len(core_lines) <= 100
+    assert len(core_lines) <= linter.CORE_MAX_LINES
     for path in harness_paths:
-        assert len(path.read_text(encoding="utf-8").splitlines()) <= 20, path
+        assert len(path.read_text(encoding="utf-8").splitlines()) <= linter.HARNESS_MAX_LINES, path
 
     result = subprocess.run(
         [sys.executable, "scripts/lint_prompts.py"],
@@ -462,7 +481,7 @@ def test_prompt_line_limits_are_enforced():
     )
 
     assert result.returncode == 0
-    assert "WARN: " not in result.stdout
+    assert "warning:" not in result.stderr
 
 
 def test_gitignore_covers_security_audit_and_tool_caches():
@@ -566,7 +585,6 @@ def test_selected_harnesses_reject_empty_target_list():
 def test_deploy_skips_manual_harness_without_override(tmp_path, capsys, monkeypatch):
     repo = Path(__file__).resolve().parents[1]
     monkeypatch.delenv("HERMES_AGENTS_PATH", raising=False)
-    monkeypatch.delenv("NANOCLAW_AGENTS_PATH", raising=False)
 
     deployed = renderer.deploy(
         repo_root=repo,
@@ -724,6 +742,21 @@ def test_status_reports_drift_then_in_sync(tmp_path, monkeypatch, capsys):
     assert "in sync" in capsys.readouterr().out
 
 
+@pytest.mark.usefixtures("checkout_overlays")
+def test_crlf_prompts_show_drift_and_are_replaced(tmp_path, monkeypatch, capsys):
+    repo = overlay_repo(tmp_path)
+    destination = tmp_path / "CLAUDE.md"
+    monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(destination))
+    renderer.deploy(repo, ["claude"], None, False, tmp_path / "backups")
+    expected = destination.read_bytes()
+    destination.write_bytes(expected.replace(b"\n", b"\r\n"))
+    assert renderer.status(repo, ["claude"], None) == 1
+    renderer.deploy(repo, ["claude"], None, True, tmp_path / "backups")
+    assert f"would update claude: {destination}" in capsys.readouterr().out
+    renderer.deploy(repo, ["claude"], None, False, tmp_path / "backups")
+    assert destination.read_bytes() == expected
+
+
 def test_target_path_prefers_explicit_override_then_native_env(tmp_path):
     assert renderer.target_path("codex", home=tmp_path, env={"CODEX_HOME": "/native"}) == Path("/native/AGENTS.md")
     assert renderer.target_path(
@@ -759,25 +792,25 @@ def test_backup_existing_flattens_windows_style_paths(tmp_path):
 def test_prune_backups_keeps_newest(tmp_path):
     backup_dir = tmp_path / "b"
     backup_dir.mkdir()
+    source = tmp_path / "AGENTS.md"
     for index in range(5):
-        path = backup_dir / f"x-{index}.bak"
-        path.write_text(str(index), encoding="utf-8")
+        source.write_text(str(index), encoding="utf-8")
+        path = renderer.backup_existing(source, backup_dir)
         os.utime(path, (1000 + index, 1000 + index))
 
     assert renderer.prune_backups(backup_dir, 2, dry_run=True) == 0
     assert len(list(backup_dir.iterdir())) == 5
-
     assert renderer.prune_backups(backup_dir, 2, dry_run=False) == 0
-    assert sorted(path.name for path in backup_dir.iterdir()) == ["x-3.bak", "x-4.bak"]
+    assert {path.read_text() for path in backup_dir.iterdir()} == {"3", "4"}
 
 
 def test_prune_backups_keeps_new_backup_of_old_file(tmp_path):
     backup_dir = tmp_path / "b"
     backup_dir.mkdir()
-    previous = backup_dir / "previous.bak"
-    previous.write_text("previous", encoding="utf-8")
-    os.utime(previous, (2000, 2000))
     old_source = tmp_path / "AGENTS.md"
+    old_source.write_text("previous", encoding="utf-8")
+    previous = renderer.backup_existing(old_source, backup_dir)
+    os.utime(previous, (2000, 2000))
     old_source.write_text("old", encoding="utf-8")
     os.utime(old_source, (1000, 1000))
 
@@ -804,14 +837,17 @@ def test_prune_backups_ignores_non_bak_files(tmp_path):
     backup_dir.mkdir()
     archive = backup_dir / "old-backups-archive.tar.gz"
     archive.write_text("x", encoding="utf-8")
+    source = tmp_path / "AGENTS.md"
+    unknown = backup_dir / "personal.bak"
+    unknown.write_text("keep", encoding="utf-8")
     for index in range(3):
-        path = backup_dir / f"x-{index}.bak"
-        path.write_text(str(index), encoding="utf-8")
+        source.write_text(str(index), encoding="utf-8")
+        path = renderer.backup_existing(source, backup_dir)
         os.utime(path, (1000 + index, 1000 + index))
 
     assert renderer.prune_backups(backup_dir, 1, dry_run=False) == 0
     assert archive.exists()
-    assert sorted(path.name for path in backup_dir.iterdir()) == ["old-backups-archive.tar.gz", "x-2.bak"]
+    assert {path.read_text() for path in backup_dir.iterdir()} == {"x", "keep", "2"}
 
 
 def test_render_document_header_has_no_git_revision_churn():
@@ -859,6 +895,22 @@ def test_private_harnesses_file_overrides_default(tmp_path):
     assert renderer.private_harnesses(tmp_path, env={}) == frozenset({"opencode"})
 
 
+def test_overlay_dir_override_replaces_the_checkout_prompts_dir(tmp_path, monkeypatch):
+    # The autouse fixture points the override at an empty directory, so the real checkout has no overlays.
+    assert renderer.load_overlays(REPO) == renderer.Overlays("", "", frozenset())
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "local.md").write_text("checkout layer\n", encoding="utf-8")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "local.md").write_text("relocated layer\n", encoding="utf-8")
+    (elsewhere / "private-harnesses.txt").write_text("codex\n", encoding="utf-8")
+
+    monkeypatch.setenv("AGENTS_OVERLAY_DIR", str(elsewhere))
+    assert renderer.load_overlays(tmp_path) == renderer.Overlays("relocated layer\n", "", frozenset({"codex"}))
+    monkeypatch.delenv("AGENTS_OVERLAY_DIR")
+    assert renderer.load_overlays(tmp_path) == renderer.Overlays("checkout layer\n", "", frozenset())
+
+
 def overlay_repo(tmp_path):
     repo = tmp_path / "repo"
     (repo / "prompts" / "harnesses").mkdir(parents=True)
@@ -871,6 +923,7 @@ def overlay_repo(tmp_path):
     return repo
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_private_overlay_withheld_everywhere_without_trust_list(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("AGENTS_PRIVATE_HARNESSES", raising=False)
     repo = overlay_repo(tmp_path)
@@ -886,6 +939,7 @@ def test_private_overlay_withheld_everywhere_without_trust_list(tmp_path, monkey
     assert "generic" not in notice
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_private_overlay_reaches_only_trusted_harnesses(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "opencode,omp")
     repo = overlay_repo(tmp_path)
@@ -899,6 +953,7 @@ def test_private_overlay_reaches_only_trusted_harnesses(tmp_path, monkeypatch, c
     assert "omp" not in notice.split("withheld from")[1].split(";")[0]
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_trust_all_reaches_every_global_target_without_notice(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
     repo = overlay_repo(tmp_path)
@@ -913,6 +968,7 @@ def test_trust_all_reaches_every_global_target_without_notice(tmp_path, monkeypa
     assert "withheld" not in capsys.readouterr().err
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_project_level_targets_never_carry_overlays(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
     repo = overlay_repo(tmp_path)
@@ -993,11 +1049,23 @@ def test_omp_profile_derived_match_is_exact(tmp_path):
     assert renderer.target_path("omp", home=tmp_path, env=env) == Path(derived) / "AGENTS.md"
 
 
+@pytest.mark.parametrize("config,expected", [
+    (r"D:\config\omp", "config/omp"), (r"D:config\omp", "config/omp"),
+    (r"\\server\share\omp", "omp"),
+])
+def test_omp_windows_pi_config_dir_stays_under_home(tmp_path, monkeypatch, config, expected):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(renderer, "os", SimpleNamespace(name="nt"))
+    assert renderer.omp_config_root(tmp_path, {"PI_CONFIG_DIR": config}) == tmp_path / expected
+
+
 def test_omp_absolute_pi_config_dir_stays_under_home(tmp_path):
     env = {"PI_CONFIG_DIR": "/srv/omp"}
     assert renderer.target_path("omp", home=tmp_path, env=env) == tmp_path / "srv" / "omp" / "agent" / "AGENTS.md"
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_deploy_keeps_project_level_targets_clean_under_trust_all(tmp_path, monkeypatch):
     repo = overlay_repo(tmp_path)
     monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
@@ -1014,6 +1082,7 @@ def test_deploy_keeps_project_level_targets_clean_under_trust_all(tmp_path, monk
         assert "local layer" not in text and "private layer" not in text
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_revoked_trust_shows_as_drift_and_redeploy_removes_private(tmp_path, monkeypatch, capsys):
     repo = overlay_repo(tmp_path)
     target = tmp_path / "opencode" / "AGENTS.md"
@@ -1033,6 +1102,7 @@ def test_revoked_trust_shows_as_drift_and_redeploy_removes_private(tmp_path, mon
     assert renderer.status(repo, ["opencode"], None) == 0
 
 
+@pytest.mark.usefixtures("checkout_overlays")
 def test_deploy_dry_run_flags_unmanaged_rules_file(tmp_path, monkeypatch, capsys):
     repo = overlay_repo(tmp_path)
     mine = tmp_path / "CLAUDE.md"
@@ -1040,7 +1110,7 @@ def test_deploy_dry_run_flags_unmanaged_rules_file(tmp_path, monkeypatch, capsys
     monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(mine))
     renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=True, backup_dir=tmp_path / "b")
     assert f"would replace unmanaged claude: {mine}" in capsys.readouterr().out
-    renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=False, backup_dir=tmp_path / "b")
+    renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=False, backup_dir=tmp_path / "b", adopt=True)
     capsys.readouterr()
     renderer.deploy(repo_root=repo, selected=["claude"], stamp=None, dry_run=True, backup_dir=tmp_path / "b")
     assert f"unchanged claude: {mine}" in capsys.readouterr().out
@@ -1056,3 +1126,195 @@ def test_harness_is_an_alias_of_target(capsys, args):
     assert renderer.main(["--list-targets", *args]) == 0
     out = capsys.readouterr().out
     assert "claude" in out and "codex" in out and "opencode" not in out
+
+
+@pytest.mark.usefixtures("checkout_overlays")
+@pytest.mark.parametrize("harness,override", [
+    *[(item.name, item.env_var) for item in renderer.HARNESSES if item.support_level == renderer.DEPLOYABLE],
+    *[(item.name, item.native_env_var) for item in renderer.HARNESSES if item.native_env_var],
+    ("omp", "PI_CONFIG_DIR"), ("omp", "OMP_PROFILE"), ("omp", "PI_PROFILE"),
+])
+@pytest.mark.parametrize("git_marker", ["directory", "file", None])
+def test_environment_targets_withhold_overlays_in_work_trees(tmp_path, monkeypatch, capsys, harness, override, git_marker):
+    repo = overlay_repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    if git_marker == "directory":
+        (home / ".git").mkdir()
+    elif git_marker == "file":
+        (home / ".git").write_text("gitdir: elsewhere\n")
+    monkeypatch.setattr(Path, "home", lambda: home)
+    for item in renderer.HARNESSES:
+        monkeypatch.delenv(item.env_var, raising=False)
+        if item.native_env_var:
+            monkeypatch.delenv(item.native_env_var, raising=False)
+    for key in ("PI_CONFIG_DIR", "OMP_PROFILE", "PI_PROFILE"):
+        monkeypatch.delenv(key, raising=False)
+    value = "custom" if override in {"PI_CONFIG_DIR", "OMP_PROFILE", "PI_PROFILE"} else str(home / "custom")
+    monkeypatch.setenv(override, value)
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
+    target = renderer.target_path(harness)
+    renderer.deploy(repo, [harness], None, False, tmp_path / "backups")
+    text = target.read_text()
+    assert ("local layer" in text) == (git_marker is None)
+    assert ("private layer" in text) == (git_marker is None)
+    if os.name != "nt":
+        assert target.stat().st_mode & 0o777 == 0o600
+    assert ("environment-selected target" in capsys.readouterr().err) == (git_marker is not None)
+    assert renderer.status(repo, [harness], None) == 0
+
+
+@pytest.mark.usefixtures("checkout_overlays")
+def test_default_global_target_keeps_overlays_in_dotfiles_tree(tmp_path, monkeypatch):
+    repo = overlay_repo(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / ".git").mkdir()
+    monkeypatch.setattr(Path, "home", lambda: home)
+    monkeypatch.delenv("CLAUDE_AGENTS_PATH", raising=False)
+    monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+    monkeypatch.setenv("AGENTS_PRIVATE_HARNESSES", "all")
+    renderer.deploy(repo, ["claude"], None, False, tmp_path / "backups")
+    text = (home / ".claude" / "CLAUDE.md").read_text()
+    assert "local layer" in text and "private layer" in text
+
+
+@pytest.mark.usefixtures("checkout_overlays")
+@pytest.mark.parametrize("mode", ["render", "deploy"])
+def test_all_budgets_checked_before_any_output(tmp_path, monkeypatch, mode):
+    repo = overlay_repo(tmp_path)
+    (repo / "prompts" / "harnesses" / "codex.md").write_text("x" * 33000)
+    first = tmp_path / "CLAUDE.md"
+    first.write_text("<!-- Generated by sync-ai-prompts rev old. -->\noriginal\n")
+    monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(first))
+    monkeypatch.setenv("CODEX_AGENTS_PATH", str(tmp_path / "AGENTS.md"))
+    before = first.read_bytes()
+    with pytest.raises(SystemExit, match="exceeds its"):
+        if mode == "deploy":
+            renderer.deploy(repo, ["claude", "codex"], None, False, tmp_path / "backups")
+        else:
+            renderer.render_all(repo, tmp_path / "out", ["claude", "codex"])
+    assert first.read_bytes() == before
+    assert not (tmp_path / "out").exists()
+    assert not (repo / "build").exists()
+
+
+@pytest.mark.usefixtures("checkout_overlays")
+def test_interrupted_replace_keeps_complete_files_and_manifest(tmp_path, monkeypatch):
+    repo = overlay_repo(tmp_path)
+    first, second = tmp_path / "CLAUDE.md", tmp_path / "AGENTS.md"
+    second.write_text("<!-- Generated by sync-ai-prompts rev old. -->\noriginal\n")
+    monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(first))
+    monkeypatch.setenv("CODEX_AGENTS_PATH", str(second))
+    replace = os.replace
+
+    def interrupt(source, destination):
+        if destination == second:
+            assert Path(source).parent == second.parent
+            raise OSError("interrupted second replace")
+        replace(source, destination)
+
+    monkeypatch.setattr(os, "replace", interrupt)
+    with pytest.raises(OSError, match="interrupted"):
+        renderer.deploy(repo, ["claude", "codex"], None, False, tmp_path / "backups")
+    assert first.read_text() == renderer.render_for(
+        repo, renderer.harness_by_name("claude"), (repo / "prompts" / "core.md").read_text(), renderer.load_overlays(repo),
+    )
+    assert second.read_text().endswith("original\n")
+    manifest = renderer.load_manifest(repo)
+    assert manifest == {"claude": {"path": str(first), "hash": renderer.content_hash(first.read_text())}}
+    assert not list(tmp_path.glob(".agents-*"))
+
+
+@pytest.mark.usefixtures("checkout_overlays")
+@pytest.mark.parametrize("existing", ["my rules\n", "example:\n<!-- Generated by sync-ai-prompts rev old. -->\n"])
+def test_prompt_adoption_requires_opt_in_and_backs_up_original(tmp_path, monkeypatch, existing):
+    repo = overlay_repo(tmp_path)
+    target = tmp_path / "CLAUDE.md"
+    target.write_text(existing)
+    monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(target))
+    with pytest.raises(SystemExit, match="--adopt"):
+        renderer.deploy(repo, ["claude"], None, False, tmp_path / "backups")
+    assert target.read_text() == existing
+    renderer.deploy(repo, ["claude"], None, False, tmp_path / "backups", adopt=True)
+    assert [path.read_text() for path in (tmp_path / "backups").iterdir()] == [existing]
+
+
+@pytest.mark.usefixtures("checkout_overlays")
+def test_directory_target_refused_before_earlier_target_written(tmp_path, monkeypatch):
+    repo = overlay_repo(tmp_path)
+    directory = tmp_path / "directory"
+    directory.mkdir()
+    first = tmp_path / "CLAUDE.md"
+    monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(first))
+    monkeypatch.setenv("CODEX_AGENTS_PATH", str(directory))
+    with pytest.raises(SystemExit, match="not a regular file"):
+        renderer.deploy(repo, ["claude", "codex"], None, False, tmp_path / "backups")
+    assert not first.exists()
+
+
+@pytest.mark.parametrize("corrupt", ["not json", "[]", '{"claude": 7}'])
+def test_corrupt_manifest_warns_and_is_preserved_before_replacement(tmp_path, capsys, corrupt):
+    path = renderer.manifest_path(tmp_path)
+    path.parent.mkdir()
+    path.write_text(corrupt)
+    assert renderer.load_manifest(tmp_path) == {}
+    assert "warning: cannot read deploy manifest" in capsys.readouterr().err
+    renderer.record_deployed(tmp_path, "claude", tmp_path / "CLAUDE.md", "new")
+    assert [backup.read_text() for backup in (tmp_path / ".backups").iterdir()] == [corrupt]
+    assert renderer.load_manifest(tmp_path)["claude"]["hash"] == renderer.content_hash("new")
+
+
+@pytest.mark.usefixtures("checkout_overlays")
+def test_status_ignores_manifest_hash_for_another_path(tmp_path, monkeypatch, capsys):
+    repo = overlay_repo(tmp_path)
+    target = tmp_path / "CLAUDE.md"
+    target.write_text("different content")
+    monkeypatch.setenv("CLAUDE_AGENTS_PATH", str(target))
+    renderer.write_manifest(repo, {"claude": {"path": str(tmp_path / "elsewhere"), "hash": "old"}})
+    assert renderer.status(repo, ["claude"], None) == 1
+    output = capsys.readouterr().out
+    assert "drift from current render" in output and "local edits" not in output
+
+
+def test_backup_retention_groups_source_paths_and_recognizes_legacy_names(tmp_path):
+    backups = tmp_path / "backups"
+    for parent in ("one", "two"):
+        source = tmp_path / parent / "AGENTS.md"
+        source.parent.mkdir()
+        for index in range(3):
+            source.write_text(f"{parent}:{index}")
+            backup = renderer.backup_existing(source, backups)
+            os.utime(backup, (index + 1, index + 1))  # whole seconds: NTFS has 100 ns resolution
+    legacy = backups / "AGENTS-2026-01-01-tmp-legacy-AGENTS.md.bak"
+    legacy.write_text("legacy")
+    renderer.prune_backups(backups, 1, False)
+    assert {path.read_text() for path in backups.iterdir()} == {"one:2", "two:2", "legacy"}
+
+
+def test_long_backup_names_and_private_file_modes(tmp_path):
+    source = tmp_path / ("a" * 120) / ("b" * 120) / ("c" * 120 + ".md")
+    source.parent.mkdir(parents=True)
+    source.write_text("private")
+    source.chmod(0o644)
+    backups = tmp_path / "backups"
+    backups.mkdir(mode=0o755)
+    backup = renderer.backup_existing(source, backups)
+    assert len(os.fsencode(backup.name)) < 255
+    assert backup.read_text() == "private"
+    output = tmp_path / "output.md"
+    renderer.atomic_write(output, "private", mode=0o600)
+    if os.name != "nt":
+        assert backups.stat().st_mode & 0o777 == 0o700
+        assert backup.stat().st_mode & 0o777 == 0o600
+        assert output.stat().st_mode & 0o777 == 0o600
+
+
+def test_dangling_symlink_backup_has_fresh_time(tmp_path):
+    source = tmp_path / "dangling.md"
+    source.symlink_to("missing.md")
+    if os.utime in os.supports_follow_symlinks:
+        os.utime(source, ns=(1, 1), follow_symlinks=False)
+    backup = renderer.backup_existing(source, tmp_path / "backups")
+    assert backup.is_symlink() and os.readlink(backup) == "missing.md"
+    assert backup.lstat().st_mtime_ns > 1

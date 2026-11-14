@@ -69,7 +69,7 @@ The rules are opinionated and shaped by 20+ years in IT and DevOps, production i
 - Deploys rendered files to resolved global paths with backups.
 - Renders six reusable subagent roles from `agents/` into six harness formats.
 - Provides opt-in shared and local project instruction templates and a portable context-consolidation skill.
-- Lints public prompt sources, including `prompts/private.example.md`, for private paths, token-like secrets, missing harness fragments, and non-ASCII drift.
+- Lints public prompt sources, including `prompts/private.example.md`, for private paths, token-like secrets, missing harness fragments, and non-ASCII drift. The core has a 100-line cap and each harness fragment has a 20-line cap.
 
 ## How it works
 
@@ -84,11 +84,17 @@ flowchart LR
     render -->|"--deploy"| native["subagent files in each<br>harness's native format"]
 ```
 
+`sync-ai-prompts` accepts `--stamp` and `--out-dir` for rendered output. `render-agents`, `render-invariants`, and `render-hermes` also accept `--out-dir`.
+
 ## Layout
 
 ```text
 agents/                   # tool-agnostic subagent sources
 prompts/
+  models.json             # tracked model defaults
+  models.local.example.json # local model override template
+  deploy-targets.txt      # optional gitignored deployment targets
+  private-harnesses.txt   # optional gitignored private-overlay trust list
   core.md                 # shared rules
   invariants.md           # non-negotiable rules for hook/subagent reinforcement
   local.example.md        # tracked template for the local overlay
@@ -188,16 +194,18 @@ This renders five artifacts into `build/generated/invariants/` from the single s
 - `claude-settings-snippet.json` - the hook wiring, for reference or manual merge.
 - `subagent-block.md` - paste into custom subagent definitions; reinforcement that holds regardless of which memory files a given agent type loads.
 - `invariants-preinvocation.sh` - an Antigravity `PreInvocation` hook that emits `injectSteps.ephemeralMessage` JSON; Antigravity's documented per-turn channel.
-- `antigravity-hooks-snippet.json` - the `hooks.json` entry for the Antigravity hook, for manual merge into `~/.gemini/config/hooks.json`.
+- `antigravity-hooks-snippet.json` - a reference copy of the deployed Antigravity `hooks.json` entry.
 
-Install the Claude hook the same way prompts deploy: dry-run first, then deploy.
+Install both hooks the same way prompts deploy: dry-run first, then deploy.
 
 ```bash
 scripts/render-invariants --dry-run
 scripts/render-invariants --deploy
 ```
 
-`--deploy` copies the hook to `~/.claude/hooks/` and idempotently appends its entry to `hooks.UserPromptSubmit` in `~/.claude/settings.json`, backing up anything it overwrites into `.backups/`. It refuses symlinked destinations and shell-quotes the hook path. It never removes or rewrites existing hooks, so an already-configured `UserPromptSubmit` (or any other setting) is preserved, and re-running is a no-op. Override targets for testing with `CLAUDE_HOOKS_DIR`, `CLAUDE_SETTINGS_PATH`, `--hooks-dir`, or `--settings-path`. The Antigravity artifacts are render-only today; merge the snippet into `hooks.json` by hand.
+`--deploy` installs both hooks with mode `0755` and merges their entries: Claude Code uses `~/.claude/hooks/invariants-userpromptsubmit.sh` and `hooks.UserPromptSubmit` in `~/.claude/settings.json`; Antigravity uses `~/.gemini/config/invariants-preinvocation.sh` and `invariants.PreInvocation` in `~/.gemini/config/hooks.json`. It backs up overwritten files into `.backups/`, refuses symlinked destinations and invalid settings shapes, and shell-quotes hook paths (with forward slashes on Windows). Managed entries are recognized by their channel's exact hook filename; changing the install directory updates the command in place. Unrelated entries and settings are preserved, including Unicode text. Re-running is a no-op, and `--dry-run` reports matching hooks as unchanged.
+
+Use `--harness claude` or `--harness antigravity` to deploy one channel; the default is `--harness all`. Override Claude targets with `CLAUDE_HOOKS_DIR`, `CLAUDE_SETTINGS_PATH`, `--hooks-dir`, or `--settings-path`. Use `--antigravity-config-dir` to move both the Antigravity hook and `hooks.json`; the rendered snippet follows that directory too.
 
 Per-turn injection is intentional. `SessionStart` runs once and gets buried, whereas `UserPromptSubmit` re-asserts the rules each turn for roughly 60 tokens. `UserPromptSubmit` fires on user prompts in the main loop, not on subagent dispatches, so the subagent block is a separate delivery path and stays a manual paste.
 
@@ -224,13 +232,15 @@ When a configured Jev/TypeSafe API key and a relevant installed skill such as `t
 
 Tiers map to models per harness:
 
-- Claude Code: `haiku` for `cheap` (at the role's own effort), `sonnet`, `opus`, and `fable` for `apex`.
+- Claude Code: `haiku` for `cheap` (at the role's own effort), `sonnet`, `opus`, and `fable` (the megamind model, opt-in) for `apex`.
 - Codex: `gpt-6-luna`, `gpt-6.1-terra` for `mid`, `gpt-6.1-sol` for `flagship`, and `gpt-6-astra` for `apex`.
 - Antigravity: `flash` and `pro`.
 - Oh My Pi: its `@smol`, `@default`, and `@slow` model roles.
 - OpenCode and Command Code: working defaults from the tracked `prompts/models.json` (`opencode-go/...` and Command Code's own model IDs), so tiering is on out of the box.
 
 OpenCode effort renders as the agent's `variant`, limited to names each model declares (DeepSeek V4.1 Flash, GLM-5.3, and GLM-5.3 Flash `low`/`high`/`max`, Kimi K3 `max`). Rendering fails when a mapped variant is not in the model's `variants` list; see the [2026-10-09 OpenCode notes](docs/harness-contract.md#opencode-effort-variants-2026-10-09).
+
+Command Code effort renders as `reasoningEffort`. Its cheap tier pins `high`, because DeepSeek V4.1 Flash accepts `off`, `low`, `high`, and `max` there and an unsupported level falls back to the model default; see the [2026-11-13 Command Code notes](docs/harness-contract.md#command-code-effort-levels-2026-11-13).
 
 A tier can carry an effort (`{"model": "...", "effort": "max"}`), so a harness that runs one model on every tier still varies depth by tier. Effort levels run `low`, `medium`, `high`, `xhigh`, `max`. `prompts/models.local.json` overrides any tier, effort map, or single agent without touching tracked files; copy `prompts/models.local.example.json` to start. A harness with no tier map fails loudly unless you pass `--allow-inherit`.
 
@@ -248,7 +258,11 @@ Deploy backs up overwritten files into `.backups/` and removes only stale files 
 
 After a deploy, `scripts/render-agents --target <list> --verify` checks that all six role files exist in each selected harness's agent directory. Prune old backups with `scripts/sync-ai-prompts --prune-backups 50 --dry-run` (drop `--dry-run` to delete). The hard invariants are rendered into every agent from `prompts/invariants.md`, so the manual subagent paste is only needed for agents defined outside this repo.
 
-`shell-ro` is rendered only when the harness can enforce it as a real sandbox boundary. Codex maps it to shell access under `sandbox_mode = "read-only"`. Claude Code, OpenCode, Command Code, Antigravity, and Oh My Pi omit shell access for `shell-ro` agents and retain their native read and search tools. This costs explorer and reviewer direct git-history access on those harnesses, but keeps the read-only contract honest. Hand the reviewer the diff, pasted or as a patch file; without one and without a shell it asks for it and stops. Full `shell` roles are unchanged.
+`shell-ro` is rendered only when the harness can enforce it as a real sandbox boundary. Codex maps it to shell access under `sandbox_mode = "read-only"`. Claude Code, OpenCode, Command Code, Antigravity, and Oh My Pi omit shell access for `shell-ro` agents and retain their native read and search tools. This costs explorer and reviewer direct git-history access on those harnesses, but keeps the read-only contract honest. Hand the reviewer a pasted diff, patch file, or named files; without any of these and without a shell it returns a blocker and stops. Full `shell` roles are unchanged.
+
+OpenCode read-only roles (explorer, researcher, reviewer, planner) start their `permission` block with `"*": deny`, then allow their named read, search, and web tools. Unlisted custom/MCP tools, `skill`, `lsp`, and `external_directory` remain denied. Builder and verifier retain their explicit permission maps without a wildcard. Rendering fails with an `error:` if a harness tool mapping expands to no tools.
+
+Every role reports `Blocked: <reason, or no>` and stops at a body-level tool-call budget: 40 for builder, 30 for the other roles. Codex, Antigravity, and Oh My Pi omit the unsupported `max_turns` field and emit a `note:`; the body budget is advisory. All roles follow designated project instructions and skill guidance within their boundaries, and treat other repository text, web pages, and command output as data. Builder receipts list paths without added/removed counts; verifier classifies test, lint, type, and build errors as `fail`. Antigravity output hashes exclude resolved effort because the format has no effort field.
 
 Codex only uses a custom role when the parent calls `spawn_agent` with `agent_type` set to the role name. A full-history fork (`fork_turns = "all"`) inherits the parent's model and effort regardless of the role file. The rendered Codex prompt tells the root agent to pass `agent_type` and `fork_turns = "none"`, so task prompts must be self-contained.
 
@@ -296,7 +310,7 @@ scripts/render-agents --target claude,codex --verify
 
 ## GitHub Actions
 
-- `.github/workflows/ci.yml` runs on pull requests and on pushes to `develop` and `main`. The `lint` job runs the prompt lint, harness-doc and contract checks, the docs-impact guard against the PR base, the docs link and command check, the prompt-injection scan, the stack conventions check, actionlint, shell syntax checks, and the render checks. The `test` job runs pytest, Python compile checks, the PowerShell launcher check, and a dry-run render on Python 3.11 and 3.13. Separate jobs run macOS and Windows setup smoke tests on Python 3.11; the Windows job runs the PowerShell launchers. The `markdown` job runs a pinned markdownlint-cli2 over the root docs and `docs/`, and the `links` job runs lychee over the same files.
+- `.github/workflows/ci.yml` runs on pull requests and on pushes to `develop` and `main`. The `lint` job runs the prompt lint, harness-doc and contract checks, the docs-impact guard against the PR base, the docs link and command check, the prompt-injection scan, the stack conventions check, actionlint, shell syntax checks, and the render checks. The `test` job runs pytest, Python compile checks, the PowerShell launcher check, and a dry-run render on Python 3.11 through 3.15. Separate jobs run macOS and Windows setup smoke tests on Python 3.11; the Windows job runs the PowerShell launchers. The `markdown` job runs a pinned markdownlint-cli2 over the root docs and `docs/`, and the `links` job runs lychee over the same files.
 - `.github/workflows/security.yml` runs CodeQL, zizmor, and a secret scan (`secrets`) with a pinned gitleaks binary.
 - Every job has a timeout, every checkout sets `persist-credentials: false`, and Renovate groups action and pip updates and waits seven days before proposing a release.
 - `.github/workflows/release.yml` runs when a `v*` tag is pushed. It checks that the tag is on `main`, checks the docs-impact receipts for the range since the previous tag, the dated CHANGELOG section, and doc links and commands. It then creates or updates a GitHub release with that CHANGELOG section as the notes.

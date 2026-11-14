@@ -25,12 +25,20 @@ issues include:
 - consolidation steps that delete or clear files outside their backup manifest
 - dependency vulnerabilities in the pinned tooling
 
+## Updater Trust Model
+
+The updater trusts the configured upstream of an allowed branch (`main` or `develop`, narrowed by
+`AGENTS_UPDATE_BRANCHES`) and runs the scripts it pulls. It does not verify commit or tag signatures
+yet. A compromised upstream can therefore execute code and change deployed prompts. With `--no-pull`,
+the updater skips branch and upstream checks and trusts the checkout as it is.
+
 ## Not in Scope
 
 - The behavior of third-party agent harnesses themselves.
 - The contents of `prompts/local.md` and `prompts/private.md` after they are rendered and deployed; the
   overlays are local by design and are never committed. Which harnesses receive `private.md` is the
-  user's trust list.
+  user's trust list. Environment-selected prompt and Hermes config paths inside Git worktrees
+  withhold both overlays; default global paths retain them even in dotfiles worktrees.
 
 ## Disclosure Expectations
 
