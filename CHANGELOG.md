@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-11-14
+
+- CI dependencies: zizmor 1.32.0, markdownlint-cli2 0.24.0, pytest 9.2.0, newer setup-python, CodeQL, code-scan, and zizmor actions, and the Ubuntu 26.04 and macOS 26 runner images. Python 3.15 joins the Linux test matrix; the macOS and Windows jobs stay on the 3.11 floor.
+
 - `AGENTS_OVERLAY_DIR` names a directory to read the gitignored overlay files from instead of `prompts/`; the test suite points it at an empty directory, so no test reads a real overlay. The prompt source scan flags a negation that removes a check ("never ask before you run ...") and scans `*.md.example` templates. Command Code's cheap tier pins `high`, because its DeepSeek V4.1 Flash has no `medium` level and the cheap roles' effort fell back to the model default; redeploy the Command Code roles to pick it up. CI's links job runs the documented lychee command, stack-check requires the markdown, links, and setup jobs, and tests that only restated constants are gone (#227, #177, #132).
 
 - Claude model ladder names Fable as the megamind model and keeps it opt-in: only on request or when Opus has measurably fallen short (#228).
