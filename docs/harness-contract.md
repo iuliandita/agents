@@ -233,11 +233,12 @@ These requirements and provider exceptions come from [What's new in Sonnet 5.5](
 Per-message effort, signed compaction, and inline tool additions are API/beta opportunities: enable
 them only after verifying the harness and provider support. This migration adds no API integration.
 
-### OpenAI GPT-6.1 Sol
+### OpenAI GPT-6.2 Sol and Astra (2026-11-17)
 
-The Codex `flagship` tier uses `gpt-6.1-sol`; `mid` moved to Terra on 2026-10-27. The API accepts `low`,
-`medium` (default), `high`, `xhigh`, and `max`; it rejects `none` and `minimal`. Tool calling requires
-the Responses API. See the [GPT-6.1 Sol model reference](https://developers.openai.com/api/docs/models/gpt-6.1-sol).
+The Codex `flagship` tier uses `gpt-6.2-sol` and `apex` uses `gpt-6.2-astra`, both released
+2026-11-17. Sol costs $2 / $10 and Astra $8 / $40 per million input / output tokens. Codex defaults
+to `low` effort and supports `low` through `ultra`. See the [Sol model reference](https://developers.openai.com/api/docs/models/gpt-6.2-sol)
+and [Astra model reference](https://developers.openai.com/api/docs/models/gpt-6.2-astra).
 
 Native Responses multi-agent is beta and shares the model and tools across agents; it is separate
 from Codex custom roles with independent model, effort, and tool settings. Async execution and

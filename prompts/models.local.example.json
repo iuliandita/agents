@@ -6,7 +6,7 @@
   },
   "codex": {
     "tiers": {
-      "apex": "gpt-6-astra"
+      "apex": "gpt-6.2-astra"
     }
   },
   "opencode": {

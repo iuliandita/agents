@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Versions follow semanti
 
 ## [Unreleased]
 
+## [6.0.1] - 2026-11-18
+
+- Codex `flagship` moves to `gpt-6.2-sol` and `apex` to `gpt-6.2-astra`; redeploy the Codex roles to pick them up (#242).
+
 ## [6.0.0] - 2026-11-14
 
 - CI dependencies: zizmor 1.32.0, markdownlint-cli2 0.24.0, pytest 9.2.0, newer setup-python, CodeQL, code-scan, and zizmor actions, and the Ubuntu 26.04 and macOS 26 runner images. Python 3.15 joins the Linux test matrix; the macOS and Windows jobs stay on the 3.11 floor.
