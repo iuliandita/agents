@@ -233,7 +233,7 @@ When a configured Jev/TypeSafe API key and a relevant installed skill such as `t
 Tiers map to models per harness:
 
 - Claude Code: `haiku` for `cheap` (at the role's own effort), `sonnet`, `opus`, and `fable` (the megamind model, opt-in) for `apex`.
-- Codex: `gpt-6-luna`, `gpt-6.1-terra` for `mid`, `gpt-6.1-sol` for `flagship`, and `gpt-6-astra` for `apex`.
+- Codex: `gpt-6-luna`, `gpt-6.1-terra` for `mid`, `gpt-6.2-sol` for `flagship`, and `gpt-6.2-astra` for `apex`.
 - Antigravity: `flash` and `pro`.
 - Oh My Pi: its `@smol`, `@default`, and `@slow` model roles.
 - OpenCode and Command Code: working defaults from the tracked `prompts/models.json` (`opencode-go/...` and Command Code's own model IDs), so tiering is on out of the box.

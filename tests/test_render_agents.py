@@ -158,7 +158,7 @@ def spec(**overrides):
     return ra.AgentSpec(**fields)
 
 
-@pytest.mark.parametrize(("tier", "model"), [("mid", "gpt-6.1-terra"), ("flagship", "gpt-6.1-sol")])
+@pytest.mark.parametrize(("tier", "model"), [("mid", "gpt-6.1-terra"), ("flagship", "gpt-6.2-sol")])
 @pytest.mark.parametrize("effort", ["low", "medium", "high", "xhigh", "max"])
 def test_codex_mid_and_flagship_tiers_render_model_and_keep_role_effort(tier, model, effort):
     role = spec(tier=tier, effort=effort)
@@ -222,7 +222,7 @@ ANY = object()
         (dict(tier="flagship", effort="high"), "claude", {}, DEFAULTS, "opus", "high", False),
         (dict(tier="cheap", effort="low"), "claude", {}, DEFAULTS, "haiku", "low", False),
         (dict(tier="cheap", effort="medium"), "claude", {}, DEFAULTS, "haiku", "medium", False),
-        (dict(tier="apex"), "codex", {}, DEFAULTS, "gpt-6-astra", ANY, False),
+        (dict(tier="apex"), "codex", {}, DEFAULTS, "gpt-6.2-astra", ANY, False),
         (dict(tier="mid"), "opencode", {}, DEFAULTS, "opencode-go/glm-5.3", "low", False),
         (dict(tier="mid", effort="xhigh"), "opencode", {}, DEFAULTS, ANY, "max", False),
         (
@@ -591,8 +591,8 @@ def test_resolve_applies_tracked_agent_overrides_under_local_ones():
         defaults,
     )
 
-    assert (tracked.model, tracked.effort) == ("gpt-6.1-sol", "low")
-    assert (local.model, local.effort) == ("gpt-6.1-sol", "high")
+    assert (tracked.model, tracked.effort) == ("gpt-6.2-sol", "low")
+    assert (local.model, local.effort) == ("gpt-6.2-sol", "high")
 
 
 def test_check_override_agents_names_the_source_file():

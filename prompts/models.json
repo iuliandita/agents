@@ -13,8 +13,8 @@
     "tiers": {
       "cheap": "gpt-6-luna",
       "mid": "gpt-6.1-terra",
-      "flagship": "gpt-6.1-sol",
-      "apex": "gpt-6-astra"
+      "flagship": "gpt-6.2-sol",
+      "apex": "gpt-6.2-astra"
     }
   },
   "opencode": {
